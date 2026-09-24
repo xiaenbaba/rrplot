@@ -1,0 +1,395 @@
+{
+  "name": "HVAC工程系统标准SVG图元库",
+  "version": "1.0.0",
+  "coordinate_system": "SVG viewBox",
+  "snap_radius": 12,
+  "symbols": {
+    "01_空气能主机.svg": {
+      "name": "01_空气能主机",
+      "file": "symbols/01_空气能主机.svg",
+      "format": "SVG",
+      "draggable": true,
+      "scalable": true,
+      "rotatable": true,
+      "editable_connection_points": true,
+      "connection_points": [
+        {
+          "id": "water_out",
+          "x": 160,
+          "y": 40
+        },
+        {
+          "id": "water_in",
+          "x": 0,
+          "y": 60
+        }
+      ]
+    },
+    "02_水泵.svg": {
+      "name": "02_水泵",
+      "file": "symbols/02_水泵.svg",
+      "format": "SVG",
+      "draggable": true,
+      "scalable": true,
+      "rotatable": true,
+      "editable_connection_points": true,
+      "connection_points": [
+        {
+          "id": "in",
+          "x": 0,
+          "y": 50
+        },
+        {
+          "id": "out",
+          "x": 160,
+          "y": 50
+        }
+      ]
+    },
+    "03_防冻阀.svg": {
+      "name": "03_防冻阀",
+      "file": "symbols/03_防冻阀.svg",
+      "format": "SVG",
+      "draggable": true,
+      "scalable": true,
+      "rotatable": true,
+      "editable_connection_points": true,
+      "connection_points": [
+        {
+          "id": "in",
+          "x": 0,
+          "y": 50
+        },
+        {
+          "id": "out",
+          "x": 160,
+          "y": 50
+        }
+      ]
+    },
+    "08_补水阀.svg": {
+      "name": "08_补水阀",
+      "file": "symbols/08_补水阀.svg",
+      "format": "SVG",
+      "draggable": true,
+      "scalable": true,
+      "rotatable": true,
+      "editable_connection_points": true,
+      "connection_points": [
+        {
+          "id": "in",
+          "x": 0,
+          "y": 50
+        },
+        {
+          "id": "out",
+          "x": 160,
+          "y": 50
+        }
+      ]
+    },
+    "07_排水阀.svg": {
+      "name": "07_排水阀",
+      "file": "symbols/07_排水阀.svg",
+      "format": "SVG",
+      "draggable": true,
+      "scalable": true,
+      "rotatable": true,
+      "editable_connection_points": true,
+      "connection_points": [
+        {
+          "id": "in",
+          "x": 0,
+          "y": 50
+        },
+        {
+          "id": "out",
+          "x": 160,
+          "y": 50
+        }
+      ]
+    },
+    "17_球阀.svg": {
+      "name": "17_球阀",
+      "file": "symbols/17_球阀.svg",
+      "format": "SVG",
+      "draggable": true,
+      "scalable": true,
+      "rotatable": true,
+      "editable_connection_points": true,
+      "connection_points": [
+        {
+          "id": "in",
+          "x": 0,
+          "y": 50
+        },
+        {
+          "id": "out",
+          "x": 160,
+          "y": 50
+        }
+      ]
+    },
+    "04_蓄热水箱.svg": {
+      "name": "04_蓄热水箱",
+      "file": "symbols/04_蓄热水箱.svg",
+      "format": "SVG",
+      "draggable": true,
+      "scalable": true,
+      "rotatable": true,
+      "editable_connection_points": true,
+      "connection_points": [
+        {
+          "id": "upper",
+          "x": 0,
+          "y": 32
+        },
+        {
+          "id": "lower",
+          "x": 0,
+          "y": 70
+        },
+        {
+          "id": "right",
+          "x": 160,
+          "y": 50
+        }
+      ]
+    },
+    "05_电加热.svg": {
+      "name": "05_电加热",
+      "file": "symbols/05_电加热.svg",
+      "format": "SVG",
+      "draggable": true,
+      "scalable": true,
+      "rotatable": true,
+      "editable_connection_points": true,
+      "connection_points": [
+        {
+          "id": "center",
+          "x": 0,
+          "y": 50
+        },
+        {
+          "id": "out",
+          "x": 160,
+          "y": 50
+        }
+      ]
+    },
+    "06_安全阀.svg": {
+      "name": "06_安全阀",
+      "file": "symbols/06_安全阀.svg",
+      "format": "SVG",
+      "draggable": true,
+      "scalable": true,
+      "rotatable": true,
+      "editable_connection_points": true,
+      "connection_points": [
+        {
+          "id": "in",
+          "x": 0,
+          "y": 55
+        },
+        {
+          "id": "out",
+          "x": 160,
+          "y": 55
+        },
+        {
+          "id": "drain",
+          "x": 80,
+          "y": 100
+        }
+      ]
+    },
+    "09_自动排气阀.svg": {
+      "name": "09_自动排气阀",
+      "file": "symbols/09_自动排气阀.svg",
+      "format": "SVG",
+      "draggable": true,
+      "scalable": true,
+      "rotatable": true,
+      "editable_connection_points": true,
+      "connection_points": [
+        {
+          "id": "pipe",
+          "x": 80,
+          "y": 100
+        }
+      ]
+    },
+    "10_风机盘管.svg": {
+      "name": "10_风机盘管",
+      "file": "symbols/10_风机盘管.svg",
+      "format": "SVG",
+      "draggable": true,
+      "scalable": true,
+      "rotatable": true,
+      "editable_connection_points": true,
+      "connection_points": [
+        {
+          "id": "water_in",
+          "x": 0,
+          "y": 42
+        },
+        {
+          "id": "water_out",
+          "x": 160,
+          "y": 58
+        },
+        {
+          "id": "air",
+          "x": 80,
+          "y": 0
+        }
+      ]
+    },
+    "11_不锈钢波纹管.svg": {
+      "name": "11_不锈钢波纹管",
+      "file": "symbols/11_不锈钢波纹管.svg",
+      "format": "SVG",
+      "draggable": true,
+      "scalable": true,
+      "rotatable": true,
+      "editable_connection_points": true,
+      "connection_points": [
+        {
+          "id": "in",
+          "x": 0,
+          "y": 50
+        },
+        {
+          "id": "out",
+          "x": 160,
+          "y": 50
+        }
+      ]
+    },
+    "12_地暖.svg": {
+      "name": "12_地暖",
+      "file": "symbols/12_地暖.svg",
+      "format": "SVG",
+      "draggable": true,
+      "scalable": true,
+      "rotatable": true,
+      "editable_connection_points": true,
+      "connection_points": [
+        {
+          "id": "in",
+          "x": 0,
+          "y": 50
+        },
+        {
+          "id": "out",
+          "x": 160,
+          "y": 50
+        }
+      ]
+    },
+    "13_分水器_供.svg": {
+      "name": "13_分水器_供",
+      "file": "symbols/13_分水器_供.svg",
+      "format": "SVG",
+      "draggable": true,
+      "scalable": true,
+      "rotatable": true,
+      "editable_connection_points": true,
+      "connection_points": [
+        {
+          "id": "main",
+          "x": 0,
+          "y": 50
+        },
+        {
+          "id": "loop1",
+          "x": 160,
+          "y": 30
+        },
+        {
+          "id": "loop2",
+          "x": 160,
+          "y": 50
+        },
+        {
+          "id": "loop3",
+          "x": 160,
+          "y": 70
+        }
+      ]
+    },
+    "14_分水器_进.svg": {
+      "name": "14_分水器_进",
+      "file": "symbols/14_分水器_进.svg",
+      "format": "SVG",
+      "draggable": true,
+      "scalable": true,
+      "rotatable": true,
+      "editable_connection_points": true,
+      "connection_points": [
+        {
+          "id": "main",
+          "x": 0,
+          "y": 50
+        },
+        {
+          "id": "loop1",
+          "x": 160,
+          "y": 30
+        },
+        {
+          "id": "loop2",
+          "x": 160,
+          "y": 50
+        },
+        {
+          "id": "loop3",
+          "x": 160,
+          "y": 70
+        }
+      ]
+    },
+    "15_供水管_热水.svg": {
+      "name": "15_供水管_热水",
+      "file": "symbols/15_供水管_热水.svg",
+      "format": "SVG",
+      "draggable": true,
+      "scalable": true,
+      "rotatable": true,
+      "editable_connection_points": true,
+      "connection_points": [
+        {
+          "id": "in",
+          "x": 0,
+          "y": 50
+        },
+        {
+          "id": "out",
+          "x": 160,
+          "y": 50
+        }
+      ]
+    },
+    "16_回水管.svg": {
+      "name": "16_回水管",
+      "file": "symbols/16_回水管.svg",
+      "format": "SVG",
+      "draggable": true,
+      "scalable": true,
+      "rotatable": true,
+      "editable_connection_points": true,
+      "connection_points": [
+        {
+          "id": "in",
+          "x": 0,
+          "y": 50
+        },
+        {
+          "id": "out",
+          "x": 160,
+          "y": 50
+        }
+      ]
+    }
+  }
+}

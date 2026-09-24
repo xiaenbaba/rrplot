@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="100" viewBox="0 0 160 100"
+ data-symbol="hvac" data-title="球阀" data-version="1.0"
+ data-connection-points='[{&quot;id&quot;: &quot;in&quot;, &quot;x&quot;: 0, &quot;y&quot;: 50}, {&quot;id&quot;: &quot;out&quot;, &quot;x&quot;: 160, &quot;y&quot;: 50}]'>
+<g id="symbol" stroke-linecap="round" stroke-linejoin="round">
+<path d="M10 50H58M102 50H150" stroke="#e53935" stroke-width="5"/><path d="M58 34L80 50 58 66ZM102 34L80 50 102 66Z" fill="#e53935" stroke="#e53935"/><circle cx="80" cy="50" r="9" fill="#fff" stroke="#e53935" stroke-width="3"/><path d="M80 50l14-10" stroke="#e53935" stroke-width="3"/>
+</g>
+<circle class="connection-point" data-id="in" cx="0" cy="50" r="4" fill="#fff" stroke="#1677ff" stroke-width="2"/>
+<circle class="connection-point" data-id="out" cx="160" cy="50" r="4" fill="#fff" stroke="#1677ff" stroke-width="2"/>
+</svg>

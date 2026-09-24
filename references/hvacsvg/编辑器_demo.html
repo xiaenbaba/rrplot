@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HVAC SVG 图元编辑器</title>
+<style>
+body{margin:0;font-family:Arial,"Microsoft YaHei",sans-serif;background:#f5f7fa;color:#222}
+#top{height:52px;background:#fff;border-bottom:1px solid #ddd;display:flex;align-items:center;padding:0 14px;gap:10px}
+button,select{padding:7px 10px;border:1px solid #bbb;border-radius:5px;background:white}
+#wrap{display:flex;height:calc(100vh - 53px)}
+#lib{width:240px;background:#fff;border-right:1px solid #ddd;padding:12px;overflow:auto}
+.item{border:1px solid #ddd;border-radius:6px;margin:7px 0;padding:7px;background:#fff;cursor:grab}
+.item img{width:100%;height:70px;object-fit:contain}
+#canvas{position:relative;flex:1;overflow:auto;background-image:linear-gradient(#e9edf2 1px,transparent 1px),linear-gradient(90deg,#e9edf2 1px,transparent 1px);background-size:20px 20px}
+.node{position:absolute;transform-origin:center;user-select:none}
+.node.selected{outline:2px solid #1677ff}
+.node img{display:block;width:100%;height:100%;pointer-events:none}
+.cp{position:absolute;width:10px;height:10px;border:2px solid #1677ff;background:#fff;border-radius:50%;margin:-7px;display:none}
+.node.selected .cp{display:block}
+#hint{position:absolute;right:15px;bottom:15px;background:#fff;border:1px solid #ddd;padding:8px;border-radius:6px;font-size:12px}
+</style></head><body>
+<div id="top"><b>HVAC SVG 标准图元编辑器</b><button id="addPipe">添加管道</button><button id="del">删除选中</button><button id="zoomIn">放大</button><button id="zoomOut">缩小</button><button id="reset">复位</button><button id="export">导出SVG</button></div>
+<div id="wrap"><aside id="lib"></aside><main id="canvas"><div id="hint">拖拽左侧图元到画布；选中后可拖动、缩放、移动连接点。</div></main></div>
+<script>
+const files = [
+"01_空气能主机.svg","02_水泵.svg","03_防冻阀.svg","04_蓄热水箱.svg","05_电加热.svg",
+"06_安全阀.svg","07_排水阀.svg","08_补水阀.svg","09_自动排气阀.svg","10_风机盘管.svg",
+"11_不锈钢波纹管.svg","12_地暖.svg","13_分水器_供.svg","14_分水器_进.svg",
+"15_供水管_热水.svg","16_回水管.svg","17_球阀.svg"];
+const lib=document.getElementById('lib'), canvas=document.getElementById('canvas');
+let selected=null, scale=1, drag=null;
+files.forEach(f=>{let d=document.createElement('div');d.className='item';d.draggable=true;
+d.innerHTML=`<img src="symbols/${f}"><div>${f.replace('.svg','')}</div>`;
+d.ondragstart=e=>e.dataTransfer.setData('text/plain',f);lib.appendChild(d)});
+canvas.ondragover=e=>e.preventDefault();
+canvas.ondrop=e=>{e.preventDefault();addNode(e.dataTransfer.getData('text/plain'),e.offsetX,e.offsetY)};
+function addNode(file,x,y){
+ const n=document.createElement('div'); n.className='node'; n.dataset.file=file;
+ n.style.left=(x-80)+'px';n.style.top=(y-50)+'px';n.style.width='160px';n.style.height='100px';
+ n.innerHTML=`<img src="symbols/${file}">`;
+ n.onclick=e=>{e.stopPropagation();select(n)};
+ n.onpointerdown=e=>{if(e.target.classList.contains('cp'))return;select(n);drag={n,dx:e.clientX-n.offsetLeft,dy:e.clientY-n.offsetTop}};
+ n.onpointermove=e=>{if(drag&&drag.n===n){n.style.left=(e.clientX-drag.dx)+'px';n.style.top=(e.clientY-drag.dy)+'px'}};
+ n.onpointerup=()=>drag=null;
+ canvas.appendChild(n);
+}
+function select(n){document.querySelectorAll('.node').forEach(x=>x.classList.remove('selected'));selected=n;n.classList.add('selected');}
+canvas.onclick=()=>{document.querySelectorAll('.node').forEach(x=>x.classList.remove('selected'));selected=null};
+document.getElementById('del').onclick=()=>{if(selected){selected.remove();selected=null}};
+document.getElementById('zoomIn').onclick=()=>{if(selected)resize(1.15)};
+document.getElementById('zoomOut').onclick=()=>{if(selected)resize(.87)};
+function resize(k){let w=parseFloat(selected.style.width)*k,h=parseFloat(selected.style.height)*k;selected.style.width=w+'px';selected.style.height=h+'px'}
+document.getElementById('reset').onclick=()=>{canvas.querySelectorAll('.node').forEach(n=>n.remove())};
+document.getElementById('addPipe').onclick=()=>addNode("15_供水管_热水.svg",300,180);
+document.getElementById('export').onclick=()=>{
+ let out=`<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900">`;
+ [...canvas.querySelectorAll('.node')].forEach(n=>{
+   let x=parseFloat(n.style.left),y=parseFloat(n.style.top),w=parseFloat(n.style.width),h=parseFloat(n.style.height);
+   out+=`<image href="${n.dataset.file}" x="${x}" y="${y}" width="${w}" height="${h}"/>`;
+ }); out+='</svg>';
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([out],{type:'image/svg+xml'}));a.download='HVAC_系统图.svg';a.click();
+};
+</script></body></html>

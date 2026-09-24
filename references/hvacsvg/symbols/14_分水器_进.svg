@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="100" viewBox="0 0 160 100"
+ data-symbol="hvac" data-title="分水器（进）" data-version="1.0"
+ data-connection-points='[{&quot;id&quot;: &quot;main&quot;, &quot;x&quot;: 0, &quot;y&quot;: 50}, {&quot;id&quot;: &quot;loop1&quot;, &quot;x&quot;: 160, &quot;y&quot;: 30}, {&quot;id&quot;: &quot;loop2&quot;, &quot;x&quot;: 160, &quot;y&quot;: 50}, {&quot;id&quot;: &quot;loop3&quot;, &quot;x&quot;: 160, &quot;y&quot;: 70}]'>
+<g id="symbol" stroke-linecap="round" stroke-linejoin="round">
+<path d="M25 20V80" stroke="#1677ff" stroke-width="7"/><path d="M25 30H140M25 50H140M25 70H140" stroke="#1677ff" stroke-width="5"/><circle cx="140" cy="30" r="5" fill="#fff" stroke="#1677ff" stroke-width="3"/><circle cx="140" cy="50" r="5" fill="#fff" stroke="#1677ff" stroke-width="3"/><circle cx="140" cy="70" r="5" fill="#fff" stroke="#1677ff" stroke-width="3"/>
+</g>
+<circle class="connection-point" data-id="main" cx="0" cy="50" r="4" fill="#fff" stroke="#1677ff" stroke-width="2"/>
+<circle class="connection-point" data-id="loop1" cx="160" cy="30" r="4" fill="#fff" stroke="#1677ff" stroke-width="2"/>
+<circle class="connection-point" data-id="loop2" cx="160" cy="50" r="4" fill="#fff" stroke="#1677ff" stroke-width="2"/>
+<circle class="connection-point" data-id="loop3" cx="160" cy="70" r="4" fill="#fff" stroke="#1677ff" stroke-width="2"/>
+</svg>
