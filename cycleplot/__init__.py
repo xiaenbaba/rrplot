@@ -14,11 +14,12 @@
            states=[("1", 0.5)])
     d.save("out.png")     # 也支持 .pdf / .svg 矢量输出
 """
-from . import parts, style
+from . import hvac, parts, style
 from .core import Diagram, Node, Pipe, Port, State, make_partial, use_font
 from .parts import COMPRESSOR_STYLES, HEX_SHAPES
 from .style import FONT, FONT_STACK, LINE
+from .svgparts import load_svg_part
 
 __all__ = ["Diagram", "Node", "Pipe", "Port", "State", "make_partial",
-           "use_font", "parts", "style", "FONT", "FONT_STACK", "LINE",
-           "HEX_SHAPES", "COMPRESSOR_STYLES"]
+           "use_font", "parts", "hvac", "style", "FONT", "FONT_STACK", "LINE",
+           "HEX_SHAPES", "COMPRESSOR_STYLES", "load_svg_part"]

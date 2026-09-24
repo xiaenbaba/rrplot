@@ -117,7 +117,8 @@ def _orthogonalize(pts):
 
 
 class Pipe:
-    def __init__(self, diagram, a, b, via, states, lw, head, head_at):
+    def __init__(self, diagram, a, b, via, states, lw, head, head_at,
+                 color=LINE):
         self.d = diagram
         self.a = a
         self.b = b
@@ -126,6 +127,7 @@ class Pipe:
         self.lw = lw
         self.head = head
         self.head_at = head_at
+        self.color = color
         self._pts = None
 
     def points(self):
@@ -153,12 +155,13 @@ class Pipe:
 
     def draw(self):
         pts = self.points()
-        _line(self.d.ax, pts, lw=self.lw, color=LINE)
+        _line(self.d.ax, pts, lw=self.lw, color=self.color)
         if self.head:
             for f in self.head_at:
                 (x1, y1), (ux, uy) = _polyline_point(pts, f)
                 arrow(self.d.ax, x1 - ux * 20, y1 - uy * 20,
-                      x1 + ux * 20, y1 + uy * 20, size=8, lw=0.9)
+                      x1 + ux * 20, y1 + uy * 20, size=8, lw=0.9,
+                      color=self.color)
         for st in self.states:
             self._draw_state(st, pts)
 
@@ -188,6 +191,7 @@ class Diagram:
         self.default_step = default_step
         self.fig, self.ax = plt.subplots(figsize=(width / 100, height / 100),
                                          dpi=100)
+        self.fig.subplots_adjust(0, 0, 1, 1)   # 画布 1 像素 = 1 画图单位
         self.ax.set_xlim(0, width)
         self.ax.set_ylim(height, 0)
         self.ax.set_aspect("equal")
@@ -203,7 +207,7 @@ class Diagram:
         return node
 
     def pipe(self, a, b, via=(), states=(), lw=LW_PIPE, head=True,
-             head_at=(0.55,)):
+             head_at=(0.55,), color=LINE):
         a, b = _as_port(a), _as_port(b)
         if isinstance(states, State):
             states = (states,)
@@ -217,7 +221,7 @@ class Diagram:
                                   s.pop("at", "mid"), **s))
             else:
                 norm.append(State(s[0], s[1]))
-        p = Pipe(self, a, b, list(via), norm, lw, head, head_at)
+        p = Pipe(self, a, b, list(via), norm, lw, head, head_at, color)
         self._pipes.append(p)
         return p
 
