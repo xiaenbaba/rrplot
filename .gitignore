@@ -12,3 +12,6 @@ htmlcov/
 build/
 dist/
 *.egg-info/
+
+# 文档构建产物
+docs/_build/

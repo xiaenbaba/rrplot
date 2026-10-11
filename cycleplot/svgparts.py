@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 """把 hvacsvg 式的 SVG 符号加载成 cycleplot 部件(路线一)。
 
-只解析本仓库 symbols/ 用到的 SVG 子集:
-  path 指令 M/m/L/l/H/h/V/v/C/c/Z/z + 标签 circle / ellipse / rect / g。
-连接点读根属性 data-connection-points,转成相对锚点的 (dx, dy) 偏移。
-class="connection-point" 的圆是元数据标记,默认跳过(show_ports=True 可见)。
+只解析本仓库 ``symbols/`` 用到的 SVG 子集:``path`` 指令
+M/m/L/l/H/h/V/v/C/c/Z/z,以及标签 circle / ellipse / rect / g。
+
+连接点读根属性 ``data-connection-points``,转成相对锚点的 (dx, dy) 偏移;
+``class="connection-point"`` 的圆是元数据标记,默认跳过
+(``show_ports=True`` 可见)。
 """
 import json
 import re
@@ -154,17 +156,18 @@ def _draw(ax, el, inherited, dx, dy, s):
 
 def load_svg_part(file, ports=None, name=None, scale=1.0, bridge=0, moves=None,
                   label_dy=None):
-    """读一个 hvacsvg 风格 SVG,返回可 d.add 的 Part。
+    """读一个 hvacsvg 风格 SVG,返回可 ``d.add`` 的 Part。
 
-    ports: {连接点 id: 端口名},省略时原名收进端口表。
-    moves: {连接点 id: (x, y)} 覆盖连接点在 viewBox 里的坐标(改接管位置)。
-        端口偏移与 bridge 引管都按覆盖后的坐标算,适合把口挪到别的边。
-    label_dy: 标签相对锚点的竖直偏移;None 画在符号下方(默认),
+    :param ports: ``{连接点 id: 端口名}``,省略时原名收进端口表。
+    :param moves: ``{连接点 id: (x, y)}`` 覆盖连接点在 viewBox 里的坐标
+        (改接管位置)。端口偏移与 bridge 引管都按覆盖后的坐标算。
+    :param label_dy: 标签相对锚点的竖直偏移;None 画在符号下方(默认),
         传 0 表示画在符号中心(如风机盘管、水箱把字压在图元上)。
-    锚点取 viewBox 中心,端口偏移 = (x-w/2, y-h/2) * scale。
-    bridge: hvacsvg 的连接点落在 viewBox 边缘、符号图形并不画到边,
+    :param bridge: hvacsvg 的连接点落在 viewBox 边缘、符号图形并不画到边,
         给一个正数就从每个连接点沿边缘法向朝内补一段引管(符号单位),
         让 cycleplot 的管路与符号图形接上。
+
+    锚点取 viewBox 中心,端口偏移 = (x-w/2, y-h/2) * scale。
     标签按 Part 惯例画制;传 label=None/"" 时不画。
     """
     root = ET.parse(file).getroot()

@@ -131,4 +131,14 @@ examples/      每张图一个脚本
 tests/         pytest 回归测试
 references/    早期原型脚本与 SVG 符号源文件
 SVG/           export_parts_svg.py 导出的部件单图(可直接进论文/PPT)
+docs/          Sphinx API 文档源文件
 ```
+
+## API 文档
+
+```powershell
+pip install sphinx
+python -m sphinx -b html docs docs/_build/html
+```
+
+生成的 `docs/_build/html/index.html` 即为可浏览的 API 参考。

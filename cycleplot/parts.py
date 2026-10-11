@@ -501,12 +501,14 @@ def make_heat_exchanger(w=80, h=80, r=None, shape="rect", name="冷凝器",
                         n_pts=5):
     """标准 PFD 换热器(由 references/pfd_symbols.heat_exchanger 移植)。
 
-    shape ∈ HEX_SHAPES:
-      circle       圆外壳 + 之字盘管(冷凝器/蒸发器通用)
-      rect         矩形外壳 + 之字盘管(参考版冷凝/蒸发器画法)
-      rect_zigzag  矩形外壳 + 蛇形盘管(n_pts 段交替圆弧 S 弯,默认 5)
-      rect_zigzag7 矩形外壳 + 7 点之字盘管
-      rect_diag    矩形外壳 + 左上→右下对角线(简化符号,即原 economizer)
+    :param shape: 取值 ``HEX_SHAPES`` 之一:
+
+      - ``circle`` 圆外壳 + 之字盘管(冷凝器/蒸发器通用)
+      - ``rect`` 矩形外壳 + 之字盘管(参考版冷凝/蒸发器画法)
+      - ``rect_zigzag`` 矩形外壳 + 蛇形盘管(n_pts 段交替圆弧 S 弯,默认 5)
+      - ``rect_zigzag7`` 矩形外壳 + 7 点之字盘管
+      - ``rect_diag`` 矩形外壳 + 左上→右下对角线(简化符号)
+
     端口落在四边中点。
     """
     if shape not in HEX_SHAPES:
