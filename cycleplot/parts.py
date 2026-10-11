@@ -110,6 +110,26 @@ def _four_way_valve(ax, x, y, label="四通阀", **kw):
         txt(ax, x + 36, y - 2, label, size=17, ha="left")
 
 
+def _four_way_round_valve(ax, x, y, label="四通阀", r=40, mark=True, **kw):
+    """四通换向阀(圆体 + 内菱形):菱形四角即四个接管口。
+
+    top=排气(D) right=冷凝(C) bottom=蒸发(E) left=回气(S)。
+    mark=True 在四端点外侧标注 D/S/C/E 口别字母。
+    """
+    ax.add_patch(Circle((x, y), r, facecolor=FILL, edgecolor=LINE,
+                        lw=LW_PART))
+    ax.add_patch(Polygon([(x, y - r), (x + r, y), (x, y + r), (x - r, y)],
+                         closed=True, facecolor=FILL, edgecolor=LINE,
+                         lw=LW_OUTLINE))
+    if mark:
+        m = r + 14
+        for letter, (px, py) in (("D", (x, y - m)), ("C", (x + m, y)),
+                                 ("E", (x, y + m)), ("S", (x - m, y))):
+            txt(ax, px, py, letter, size=15)
+    if label:
+        txt(ax, x, y + r + 34, label, size=17)
+
+
 def _expansion_valve(ax, x, y, label="电子膨胀阀", **kw):
     ax.add_patch(Polygon([[x - 16, y - 10], [x, y + 10], [x + 16, y - 10]],
                          closed=True, facecolor=FILL, edgecolor=LINE,
@@ -173,19 +193,76 @@ def _valve(ax, x, y, label=None, w=64, h=48, **kw):
         txt(ax, x, y + h / 2 + 24, label)
 
 
-def _scroll_compressor(ax, x, y, label="涡旋压缩机", r=95, **kw):
-    """涡旋压缩机(原图简化画法):圆内两条对称的括号形折线。
+def _globe_valve(ax, x, y, label=None, w=64, h=48, stem=26, handle=44, **kw):
+    """截止阀(globe valve):左右对顶三角(沙漏) + 贯穿阀杆 + 顶部手轮横杆。
 
-    注:标准 PFD 的涡旋符号是阿基米德螺线,见 compressor(style="scroll")。
+    左右竖边中点外侧各引一段接管,端口沿水平方向(in/out)。
     """
-    ax.add_patch(Circle((x, y), r, facecolor=FILL, edgecolor=LINE, lw=LW_OUTLINE))
-    for s in (1, -1):
-        top = (x + s * r * 0.12, y - r * 0.82)
-        mid = (x + s * r * 0.64, y - r * 0.18)
-        low = (x + s * r * 0.44, y + r * 0.80)
-        line(ax, [top, mid, low], lw=LW_PART)
+    ax.add_patch(Polygon([(x - w / 2, y - h / 2), (x - w / 2, y + h / 2),
+                          (x, y)], closed=True, facecolor=FILL,
+                         edgecolor=LINE, lw=LW_OUTLINE))
+    ax.add_patch(Polygon([(x + w / 2, y - h / 2), (x + w / 2, y + h / 2),
+                          (x, y)], closed=True, facecolor=FILL,
+                         edgecolor=LINE, lw=LW_OUTLINE))
+    top = y - h / 2 - stem
+    line(ax, [(x, y + h / 2), (x, top)], lw=LW_PART)      # 贯穿阀杆
+    line(ax, [(x - handle / 2, top), (x + handle / 2, top)],
+         lw=LW_STRONG)                                     # 手轮横杆
+    line(ax, [(x - w / 2, y), (x - w / 2 - 12, y)], lw=LW_STRONG)
+    line(ax, [(x + w / 2, y), (x + w / 2 + 12, y)], lw=LW_STRONG)
     if label:
-        txt(ax, x + 92, y + 52, label, ha="left")
+        txt(ax, x, y + h / 2 + 24, label)
+
+
+def _solenoid_valve(ax, x, y, label=None, r=34, stem=20, handle=40, **kw):
+    """电磁阀(solenoid valve):圆体 + 圆内 X(阀芯) + 顶部电磁引线与横杠。
+
+    X 为圆内接正方形对角线,两端落在圆周上;竖引线自圆心向上出圆,
+    顶端接水平横杠表示电磁线圈。端口在圆左右水平方向(in/out)。
+    """
+    ax.add_patch(Circle((x, y), r, facecolor=FILL, edgecolor=LINE,
+                        lw=LW_OUTLINE))
+    c = r / math.sqrt(2)
+    line(ax, [(x - c, y - c), (x + c, y + c)], lw=LW_PART)
+    line(ax, [(x + c, y - c), (x - c, y + c)], lw=LW_PART)
+    top = y - r - stem
+    line(ax, [(x, y), (x, top)], lw=LW_PART)                  # 电磁引线
+    line(ax, [(x - handle / 2, top), (x + handle / 2, top)],
+         lw=LW_STRONG)                                        # 线圈横杠
+    line(ax, [(x - r, y), (x - r - 12, y)], lw=LW_STRONG)
+    line(ax, [(x + r, y), (x + r + 12, y)], lw=LW_STRONG)
+    if label:
+        txt(ax, x, y + r + 26, label)
+
+
+def _bowtie_valve(ax, x, y, label=None, w=76, h=44, actuator="none",
+                  stem=14, dome_r=21, sol_len=62, **kw):
+    """对顶三角阀(参考图画法):两竖边三角相对,阀杆自中心引出。
+
+    actuator: "none"     裸阀(通用截断阀符号)
+              "dome"     顶部闭合半圆穹顶(热力膨胀阀 / 经济器膨胀器)
+              "solenoid" 电磁线圈(横杆 + Σ 折线)
+    """
+    for s in (-1, 1):
+        ax.add_patch(Polygon(
+            [(x + s * w / 2, y - h / 2), (x + s * w / 2, y + h / 2),
+             (x, y)], closed=True, facecolor=FILL, edgecolor=LINE,
+            lw=LW_OUTLINE))
+    if actuator == "dome":
+        base = y - h / 2 - stem
+        line(ax, [(x, y), (x, base)], lw=LW_PART)
+        pts = [(x + dome_r * math.cos(math.radians(a)),
+                base - dome_r * math.sin(math.radians(a)))
+               for a in range(0, 181, 6)]
+        line(ax, pts + [(x + dome_r, base)], lw=LW_PART)      # 闭合平底
+    elif actuator == "solenoid":
+        line(ax, [(x, y), (x, y - sol_len)], lw=LW_PART)           # 阀杆
+        bar = y - 26
+        line(ax, [(x - 26, bar), (x + 22, bar)], lw=LW_PART)       # 线圈横杆
+        line(ax, [(x - 26, bar), (x - 7, bar - 20), (x + 8, bar - 20)],
+             lw=LW_PART)                                           # Σ 折线
+    if label:
+        txt(ax, x, y + h / 2 + 26, label)
 
 
 # =========================
@@ -193,7 +270,7 @@ def _scroll_compressor(ax, x, y, label="涡旋压缩机", r=95, **kw):
 # 由 references/pfd_symbols.py 移植,坐标系统一为 y 向下
 # =========================
 COMPRESSOR_STYLES = ("centrifugal", "rotor", "axial", "recip", "screw",
-                     "scroll")
+                     "scroll", "chord")
 
 
 def _compressor(ax, x, y, label="压缩机", r=95, style="centrifugal",
@@ -207,6 +284,7 @@ def _compressor(ax, x, y, label="压缩机", r=95, style="centrifugal",
       recip       往复式:活塞矩形 + 连杆 + 曲柄销
       screw       螺杆式:两个相切内圆(8 字形啮合转子)
       scroll      涡旋式:阿基米德螺线
+      chord       涡旋式(参考图简化):两条左张右收的收敛弦线
     """
     if style not in COMPRESSOR_STYLES:
         raise ValueError(f"未知压缩机 style={style!r},可用:"
@@ -246,6 +324,14 @@ def _compressor(ax, x, y, label="压缩机", r=95, style="centrifugal",
         for s in (-1, 1):
             ax.add_patch(Circle((x + s * cr, y), cr, facecolor=FILL,
                                 edgecolor=LINE, lw=LW_PART))
+    elif style == "chord":
+        # 收敛双弦(参考图涡旋简化):左端张开、右端收拢,弦端落在圆周上
+        for au, bu in (((-0.84, -0.57), (0.91, -0.24)),
+                       ((-0.80, 0.61), (0.89, 0.27))):
+            pa = (au[0] / math.hypot(*au) * r, au[1] / math.hypot(*au) * r)
+            pb = (bu[0] / math.hypot(*bu) * r, bu[1] / math.hypot(*bu) * r)
+            line(ax, [(x + pa[0], y + pa[1]), (x + pb[0], y + pb[1])],
+                 lw=LW_PART)
     else:  # scroll
         pts = []
         n = 240
@@ -289,6 +375,29 @@ def _vessel(ax, x, y, w=66, h=150, label="容器", liquid=0.42,
         txt(ax, x + dx, y + dy, label, ha=label_ha)
 
 
+def _low_pressure_tank(ax, x, y, w=66, h=150, label="低压罐", liquid=0.3,
+                       label_offset=None, label_ha="left", sight=8, **kw):
+    """立式低压罐:平顶封头 + 向下凸的半圆底 + 液位线 + 液位计/视镜。
+
+    liquid ∈ [0,1] 控制液位线在筒体部分相对高度(0=圆底圆心处, 1=顶部)。
+    sight 为液位计/视镜小圆半径,画在液位线中点。
+    """
+    rx = w / 2
+    top = y - h / 2
+    cy_bot = y + h / 2 - rx               # 底部半圆圆心
+    line(ax, [(x - rx, top), (x - rx, cy_bot)], lw=LW_PART)
+    line(ax, [(x + rx, top), (x + rx, cy_bot)], lw=LW_PART)
+    line(ax, [(x - rx, top), (x + rx, top)], lw=LW_PART)   # 平顶封头
+    _dome(ax, x, cy_bot, rx, up=False)                      # 向下凸的半圆底
+    y_liq = cy_bot - liquid * (cy_bot - top)
+    line(ax, [(x - rx, y_liq), (x + rx, y_liq)], lw=LW_FINE)
+    ax.add_patch(Circle((x, y_liq), sight, facecolor=FILL,
+                        edgecolor=LINE, lw=LW_FINE))
+    if label:
+        dx, dy = label_offset if label_offset is not None else (rx + 20, 20)
+        txt(ax, x + dx, y + dy, label, ha=label_ha)
+
+
 def _pump(ax, x, y, r=40, label="泵", **kw):
     """泵:圆 + 内部三角形(离心泵符号,三角指向排液方向)。"""
     ax.add_patch(Circle((x, y), r, facecolor=FILL, edgecolor=LINE,
@@ -314,11 +423,27 @@ def _square_wave(ax, x, y, w=224, amp=25, n=6, label=None, **kw):
     ax.plot(xs, ys, color=LINE, lw=LW_PART)
 
 
-def _economizer(ax, x, y, w=40, h=90, label="经济器", **kw):
-    """经济器(板式换热器)符号:矩形 + 对角线换热面。"""
+ECONOMIZER_STYLES = ("diag", "plate")
+
+
+def _economizer(ax, x, y, w=40, h=90, label="经济器", style="diag",
+                n_plates=8, **kw):
+    """经济器(板式换热器)符号。
+
+    style="diag"  矩形 + 对角线换热面(默认)
+    style="plate" 矩形 + 水平板片堆(n_plates 条板片)
+    """
+    if style not in ECONOMIZER_STYLES:
+        raise ValueError(f"未知经济器 style={style!r},可用:"
+                         f"{', '.join(ECONOMIZER_STYLES)}")
     ax.add_patch(Rectangle((x - w / 2, y - h / 2), w, h, facecolor=FILL,
                            edgecolor=LINE, lw=LW_PART))
-    line(ax, [(x - w / 2, y - h / 2), (x + w / 2, y + h / 2)], lw=LW_PART)
+    if style == "plate":
+        for i in range(1, n_plates):
+            yy = y - h / 2 + h * i / n_plates
+            line(ax, [(x - w / 2, yy), (x + w / 2, yy)], lw=LW_PART)
+    else:
+        line(ax, [(x - w / 2, y - h / 2), (x + w / 2, y + h / 2)], lw=LW_PART)
     if label:
         txt(ax, x + w / 2 + 18, y + 30, label, ha="left", bg=True)
 
@@ -448,6 +573,12 @@ condenser = _part("冷凝器", {"left": (-32, 0), "right": (32, 0),
 four_way_valve = _part("四通阀", {"left": (-20, 0), "right": (20, 0),
                                   "top": (0, -14), "bottom": (0, 14)},
                        _four_way_valve, dirs={"top": "n", "bottom": "s"})
+four_way_round = _part("四通阀(圆菱形)",
+                       {"exhaust": (0, -40), "condenser": (40, 0),
+                        "evaporator": (0, 40), "suction": (-40, 0)},
+                       _four_way_round_valve,
+                       dirs={"exhaust": "n", "condenser": "e",
+                             "evaporator": "s", "suction": "w"})
 expansion_valve = _part("电子膨胀阀", {"in": (16, 0), "out": (-16, 0)},
                         _expansion_valve)
 filter_drier = _part("干燥过滤器", {"in": (35, 0), "out": (-35, 0)},
@@ -459,12 +590,6 @@ flow_meter = _part("流量计", {"left": (-28, 0), "right": (28, 0)}, _flow_mete
 valve = _part("阀", {"left": (-32, 0), "right": (32, 0), "top": (0, -36),
                      "bottom": (0, 24)}, _valve, dirs={"top": "n",
                                                        "bottom": "s"})
-scroll_compressor = _part("涡旋压缩机", {"suction": (-95, 0),
-                                         "discharge": (95, 0),
-                                         "vapor_inj": (0, 95)},
-                          _scroll_compressor, dirs={"suction": "w",
-                                                    "discharge": "e",
-                                                    "vapor_inj": "s"})
 square_wave = _part("过冷器换热面", {"left": (0, 55), "right": (224, 55)},
                     _square_wave, dirs={"left": "w", "right": "e"})
 economizer = _part("经济器", {"top": (0, -45), "bottom": (0, 45),
@@ -493,6 +618,27 @@ def make_compressor(r=95, style="centrifugal", name="压缩机", n_blades=3):
                 {"top": "n", "bottom": "s"})
 
 
+def make_scroll_chord(r=85, name="涡旋压缩机"):
+    """涡旋压缩机(参考图画法):圆 + 收敛双弦,即 style="chord"。
+
+    与 make_compressor 的差别在端口语义:suction/discharge 落在圆左右
+    中点(两弦之间的接管高度),补气口 inj 在圆底部略偏左 —— 与循环
+    图中补气管(如状态点 9)自下方接入的画法一致。
+    """
+    def draw(ax, x, y, label=None, label_offset=None, label_ha="center",
+             **kw):
+        _compressor(ax, x, y, label=label, r=r, style="chord",
+                    label_offset=label_offset, label_ha=label_ha)
+
+    return Part(name, draw,
+                {"suction": (-r, 0), "discharge": (r, 0),
+                 "inj": (-0.08 * r, r)},
+                {"suction": "w", "discharge": "e", "inj": "s"})
+
+
+scroll_chord = make_scroll_chord()
+
+
 def make_vessel(w=66, h=150, liquid=0.42, name="闪发罐"):
     """立式容器/闪发罐部件。vapor 口在筒体上端右侧(闪发气出口)。"""
     rx = w / 2
@@ -510,5 +656,96 @@ def make_vessel(w=66, h=150, liquid=0.42, name="闪发罐"):
                 {"top": "n", "bottom": "s"})
 
 
+def make_low_pressure_tank(w=66, h=150, liquid=0.3, name="低压罐"):
+    """立式低压罐部件:顶平底圆筒体。端口 top/bottom/left/right/vapor。
+
+    top 为平封头中点上接口(进液/气相),bottom 为圆底最低点液相出口,
+    vapor 为筒体上端右侧的闪发气出口。
+    """
+    rx = w / 2
+
+    def draw(ax, x, y, label="低压罐", label_offset=None, label_ha="left",
+             **kw):
+        _low_pressure_tank(ax, x, y, w=w, h=h, label=label, liquid=liquid,
+                           label_offset=label_offset, label_ha=label_ha)
+
+    return Part(name, draw,
+                {"top": (0, -h / 2), "bottom": (0, h / 2),
+                 "left": (-rx, 0), "right": (rx, 0),
+                 "vapor": (rx, -h / 2 + 10)},
+                {"top": "n", "bottom": "s"})
+
+
 # 默认尺寸实例(尺寸不合适时用上面的工厂函数按需生成)
 vessel = make_vessel()
+low_pressure_tank = make_low_pressure_tank()
+
+
+def make_globe_valve(w=64, h=48, stem=26, handle=44, name="截止阀"):
+    """截止阀部件:左右对顶三角沙漏 + 贯穿阀杆 + 手轮横杆。端口 in/out。
+
+    端口落在左右接管外端,沿水平方向(in=w, out=e)。
+    """
+    def draw(ax, x, y, label=None, **kw):
+        _globe_valve(ax, x, y, label=label, w=w, h=h, stem=stem,
+                     handle=handle)
+
+    return Part(name, draw,
+                {"in": (-w / 2 - 12, 0), "out": (w / 2 + 12, 0)},
+                {"in": "w", "out": "e"})
+
+
+globe_valve = make_globe_valve()
+
+
+def make_solenoid_valve(r=34, stem=20, handle=40, name="电磁阀"):
+    """电磁阀部件:圆体 + 圆内 X + 顶部电磁引线与横杠。端口 in/out。
+
+    端口落在圆左右接管外端,沿水平方向(in=w, out=e)。
+    """
+    def draw(ax, x, y, label=None, **kw):
+        _solenoid_valve(ax, x, y, label=label, r=r, stem=stem, handle=handle)
+
+    return Part(name, draw,
+                {"in": (-r - 12, 0), "out": (r + 12, 0)},
+                {"in": "w", "out": "e"})
+
+
+solenoid_valve = make_solenoid_valve()
+
+
+def make_bowtie_valve(w=76, h=44, actuator="none", stem=14, dome_r=21,
+                      sol_len=62, name="对顶三角阀"):
+    """对顶三角阀部件(论文/参考图风格),actuator 见 _bowtie_valve。
+
+    端口按库内两端口件惯例 in=东口 / out=西口(图内流向东->西);
+    actuator/stem 等也可在 add() 时以同名词覆盖,如
+    d.add(parts.bowtie_valve, "电磁阀", loc=..., actuator="solenoid")。
+    """
+    def draw(ax, x, y, label=None, **kw):
+        _bowtie_valve(ax, x, y, label=label, w=w, h=h, actuator=actuator,
+                      stem=stem, dome_r=dome_r, sol_len=sol_len)
+
+    return Part(name, draw, {"in": (w / 2, 0), "out": (-w / 2, 0)},
+                {"in": "e", "out": "w"})
+
+
+bowtie_valve = make_bowtie_valve()
+bowtie_valve_dome = make_bowtie_valve(actuator="dome", name="膨胀阀(穹顶)")
+bowtie_valve_solenoid = make_bowtie_valve(actuator="solenoid",
+                                          name="电磁阀(对顶三角)")
+
+
+def make_economizer(w=40, h=90, style="diag", n_plates=8, name="经济器"):
+    """经济器部件。style ∈ ECONOMIZER_STYLES,n_plates 为 plate 样式板片数。"""
+    def draw(ax, x, y, label="经济器", **kw):
+        _economizer(ax, x, y, w=w, h=h, label=label, style=style,
+                    n_plates=n_plates)
+
+    return Part(name, draw,
+                {"top": (0, -h / 2), "bottom": (0, h / 2),
+                 "left": (-w / 2, 0), "right": (w / 2, 0)},
+                {"top": "n", "bottom": "s"})
+
+
+economizer_plate = make_economizer(style="plate")

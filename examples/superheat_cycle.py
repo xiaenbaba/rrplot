@@ -20,7 +20,11 @@ subcooler.name = "过冷器"
 d = Diagram(width=880, height=740)
 
 # ---------- 部件 ----------
-comp = d.add(parts.scroll_compressor, "涡旋压缩机", loc=(310, 110))
+comp_part = make_partial(
+    parts.make_compressor(style="scroll", name="涡旋压缩机"),
+    {"suction": (-95, 0), "discharge": (95, 0), "vapor_inj": (0, 95)})
+comp = d.add(comp_part, "涡旋压缩机", loc=(310, 110),
+             label_offset=(92, 52), label_ha="left")
 evap = d.add(parts.evaporator, loc=(102, 305), label="")
 cond = d.add(parts.make_heat_exchanger(205, 86, shape="rect_zigzag7"),
              "冷凝器", loc=(607, 95))

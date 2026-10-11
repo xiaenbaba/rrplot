@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """字体、颜色、线宽等全局样式常量。"""
 import matplotlib
-import matplotlib.pyplot as plt
 from matplotlib import font_manager as fm
 
 FONT_CANDIDATES = [

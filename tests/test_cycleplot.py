@@ -3,10 +3,15 @@
 import os
 import sys
 
+import matplotlib
+
+matplotlib.use("Agg")            # 无界面环境稳定出图
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from cycleplot import Diagram, parts
-from cycleplot.core import Port, _is_sensor, make_partial
+from cycleplot.core import Port, _fit_end, _is_sensor, _orthogonalize, \
+    make_partial
 from cycleplot.svgparts import load_svg_part
 
 
@@ -17,8 +22,10 @@ def test_evaporator_ports_on_body():
     assert parts.evaporator.direction("out") == (0, -1)
 
 
-def test_scroll_discharge_on_circle():
-    assert parts.scroll_compressor.port("discharge") == (95, 0)
+def test_scroll_style_factory_ports():
+    comp = parts.make_compressor(style="scroll")
+    assert comp.port("right") == (95, 0)
+    assert comp.port("top") == (0, -95)
 
 
 def test_make_partial_dirs_and_stale_dir_dropped():
@@ -96,6 +103,141 @@ def test_hvac_factory_ports_match_svg_part():
         for k in nat.ports:
             assert nat.port(k) == ref.port(k), (svg, k)
             assert nat.direction(k) == ref.direction(k)
+
+
+def _port(point, direction):
+    d = {"e": (1, 0), "w": (-1, 0), "n": (0, -1), "s": (0, 1)}[direction]
+    return Port(point, d, None)
+
+
+def test_fit_end_snap_small_tangent_offset():
+    # 东向端口 + 邻段切向 8px 错位:吸附到沿法向的笔直切入,返回 None
+    pts = [(100.0, 50.0), (108.0, 0.0), (170.0, 0.0)]
+    assert _fit_end(pts, True, _port((100.0, 50.0), "e")) is None
+    assert pts[1] == (100.0, 0.0)
+    assert pts[0] == (100.0, 50.0)
+
+
+def test_fit_end_big_offset_normal_side_returns_hint():
+    # 斜接且错位大、在法向正确一侧:不改坐标,返回走线提示给 _orthogonalize
+    pts = [(100.0, 50.0), (300.0, 30.0)]
+    assert _fit_end(pts, True, _port((100.0, 50.0), "e")) == "h"
+    assert pts == [(100.0, 50.0), (300.0, 30.0)]
+    # 东向端口但来点在背面:提示为 None(交给走线提示以外的常规规则)
+    pts = [(100.0, 50.0), (80.0, 30.0)]
+    assert _fit_end(pts, True, _port((100.0, 50.0), "e")) is None
+
+
+def test_fit_end_tangent_aligned_backside_snapped():
+    # 切向对齐但来点在端口法向背面近处:整段吸附到端口坐标
+    pts = [(100.0, 50.0), (96.0, 50.0)]
+    assert _fit_end(pts, True, _port((100.0, 50.0), "e")) is None
+    assert pts[1] == (100.0, 50.0)
+    # 终点端:连 feeder 竖段一起挪到端口平面
+    pts = [(50.0, 300.0), (50.0, 70.0), (50.0, 60.0)]
+    assert _fit_end(pts, False, _port((50.0, 60.0), "n")) is None
+    assert pts[1] == (50.0, 60.0)
+
+
+def test_orthogonalize_inserts_corner():
+    assert _orthogonalize([(0.0, 0.0), (108.0, 30.0)]) == \
+        [(0.0, 0.0), (0.0, 30.0), (108.0, 30.0)]
+
+
+def test_orthogonalize_first_and_last_along():
+    # first_along="h":起点先沿水平(东向端口法向)
+    assert _orthogonalize([(0.0, 0.0), (108.0, 30.0)], "h") == \
+        [(0.0, 0.0), (108.0, 0.0), (108.0, 30.0)]
+    # last_along="v":末段竖直(利于终点端口沿法向出入)
+    assert _orthogonalize([(0.0, 0.0), (108.0, 30.0)], None, "v") == \
+        [(0.0, 0.0), (108.0, 0.0), (108.0, 30.0)]
+    assert _orthogonalize([(0.0, 0.0), (30.0, 80.0)], None, "h") == \
+        [(0.0, 0.0), (0.0, 80.0), (30.0, 80.0)]
+
+
+def test_pipe_points_orthogonal_and_cached():
+    d = Diagram(width=200, height=200)
+    p = d.pipe((0.0, 0.0), (50.0, 50.0))
+    assert p.points() == [(0.0, 0.0), (0.0, 50.0), (50.0, 50.0)]
+    assert p.points() is p.points()
+
+
+def test_pipe_via_tokens_end_on_port():
+    d = Diagram(width=800, height=600, default_step=100)
+    from cycleplot import parts as _parts
+    comp = d.add(_parts.compressor, None, loc=(330, 140))
+    evap = d.add(_parts.evaporator, None, loc=(100, 105))
+    assert d.pipe(evap["out"], comp["suction"],
+                  via=[("e", 200), ("n", 105)]).points()[-1] == \
+        comp["suction"].point
+
+
+def test_four_way_round_ports():
+    assert parts.four_way_round.port("exhaust") == (0, -40)
+    assert parts.four_way_round.port("condenser") == (40, 0)
+    assert parts.four_way_round.port("evaporator") == (0, 40)
+    assert parts.four_way_round.port("suction") == (-40, 0)
+
+
+def test_low_pressure_tank_ports():
+    # 默认 w=66 h=150:rx=33, vapor 在筒体上端右侧
+    assert parts.low_pressure_tank.port("top") == (0, -75)
+    assert parts.low_pressure_tank.port("bottom") == (0, 75)
+    assert parts.low_pressure_tank.port("vapor") == (33, -65)
+    assert parts.low_pressure_tank.direction("top") == (0, -1)
+    assert parts.low_pressure_tank.direction("bottom") == (0, 1)
+
+
+def test_globe_valve_ports():
+    # 默认 w=64:接管外端 x=±(32+12)
+    assert parts.globe_valve.port("in") == (-44, 0)
+    assert parts.globe_valve.port("out") == (44, 0)
+    assert parts.globe_valve.direction("in") == (-1, 0)
+    assert parts.globe_valve.direction("out") == (1, 0)
+
+
+def test_solenoid_valve_ports():
+    # 默认 r=34:接管外端 x=±(34+12)
+    assert parts.solenoid_valve.port("in") == (-46, 0)
+    assert parts.solenoid_valve.port("out") == (46, 0)
+    assert parts.solenoid_valve.direction("in") == (-1, 0)
+    assert parts.solenoid_valve.direction("out") == (1, 0)
+
+
+def test_bowtie_valve_family():
+    # 默认 w=76:端口在两三角竖边 x=±38,流向惯例 in=东口/out=西口
+    assert parts.bowtie_valve.port("in") == (38, 0)
+    assert parts.bowtie_valve.port("out") == (-38, 0)
+    assert parts.bowtie_valve.direction("in") == (1, 0)
+    assert parts.bowtie_valve.direction("out") == (-1, 0)
+    assert parts.bowtie_valve_dome.name == "膨胀阀(穹顶)"
+    assert parts.bowtie_valve_solenoid.name == "电磁阀(对顶三角)"
+
+
+def test_bowtie_valve_actuator_override_render():
+    # actuator 可在 add() 时以同名词覆盖;三种执行机构都能渲染
+    d = Diagram(width=320, height=140)
+    d.add(parts.bowtie_valve, "阀", loc=(60, 70))
+    d.add(parts.bowtie_valve, "", loc=(160, 70), actuator="dome")
+    d.add(parts.bowtie_valve_solenoid, "", loc=(260, 70))
+    d.render()
+
+
+def test_scroll_chord_ports_and_render():
+    assert "chord" in parts.COMPRESSOR_STYLES
+    sc = parts.make_scroll_chord()
+    assert sc.port("suction") == (-85, 0)
+    assert sc.port("discharge") == (85, 0)
+    assert sc.port("inj") == (-0.08 * 85, 85)
+    assert sc.direction("suction") == (-1, 0)
+    assert sc.direction("discharge") == (1, 0)
+    assert sc.direction("inj") == (0, 1)
+    # chord 画法挂进 make_compressor,scroll_chord 为带端口语义的实例
+    d = Diagram(width=420, height=220)
+    d.add(parts.make_compressor(style="chord"), "chord", loc=(110, 110))
+    d.add(parts.scroll_chord, "涡旋压缩机", loc=(310, 110),
+          label_offset=(95, 60), label_ha="left")
+    d.render()
 
 
 if __name__ == "__main__":

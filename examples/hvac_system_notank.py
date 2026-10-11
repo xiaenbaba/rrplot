@@ -30,7 +30,6 @@ from cycleplot.hvac import (anti_freeze_valve, auto_vent, ball_valve,
                             heat_pump, supply_manifold, water_pump,
                             return_manifold)
 from cycleplot.parts import Part
-from cycleplot.style import LINE
 
 use_font()
 

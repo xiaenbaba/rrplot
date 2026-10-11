@@ -16,10 +16,11 @@
 """
 from . import hvac, parts, style
 from .core import Diagram, Node, Pipe, Port, State, make_partial, use_font
-from .parts import COMPRESSOR_STYLES, HEX_SHAPES
+from .parts import COMPRESSOR_STYLES, ECONOMIZER_STYLES, HEX_SHAPES
 from .style import FONT, FONT_STACK, LINE
 from .svgparts import load_svg_part
 
 __all__ = ["Diagram", "Node", "Pipe", "Port", "State", "make_partial",
            "use_font", "parts", "hvac", "style", "FONT", "FONT_STACK", "LINE",
-           "HEX_SHAPES", "COMPRESSOR_STYLES", "load_svg_part"]
+           "HEX_SHAPES", "COMPRESSOR_STYLES", "ECONOMIZER_STYLES",
+           "load_svg_part"]
