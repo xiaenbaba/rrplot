@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 
 from ._primitives import arrow, line as _line, txt
-from .style import (FONT_STACK, LINE, LW_PIPE, NUM_SIZE, SENSOR_SIZE,
-                    use_font)
+from .style import (FONT_STACK, LINE, LW_PIPE, NUM_SIZE, SENSOR_R,
+                    SENSOR_SIZE, use_font)
 
 _DIR_TOKENS = {
     "e": (1, 0), "w": (-1, 0), "n": (0, -1), "s": (0, 1),
@@ -272,7 +272,7 @@ class Pipe:
         py = y + ny * off * st.side
         if st.is_sensor:
             size = st.size or SENSOR_SIZE
-            self.d.ax.add_patch(Circle((px, py), 18, facecolor="white",
+            self.d.ax.add_patch(Circle((px, py), SENSOR_R, facecolor="white",
                                        edgecolor=LINE, lw=1.0, zorder=5))
             txt(self.d.ax, px, py, st.text, size=size)
             self.d.ax.texts[-1].set_zorder(6)
@@ -327,7 +327,7 @@ class Diagram:
         return p
 
     # 便捷:直接按坐标放一个 T/P 传感器圆圈
-    def sensor(self, x, y, text, r=18, size=SENSOR_SIZE):
+    def sensor(self, x, y, text, r=SENSOR_R, size=SENSOR_SIZE):
         self.ax.add_patch(Circle((x, y), r, facecolor="white",
                                  edgecolor=LINE, lw=1.0, zorder=5))
         txt(self.ax, x, y, text, size=size)

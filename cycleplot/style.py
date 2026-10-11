@@ -32,9 +32,15 @@ LW_STRONG = 1.5      # 强调线(壳体主轮廓、接管短管)
 LW_FINE = 0.6        # 内部细节线(格栅、液位)
 NUM_SIZE = 24
 SENSOR_SIZE = 15
+SENSOR_R = 18         # 随线 T/P 传感器圆圈半径
 
 
 def use_font():
-    """打印当前选用的中文字体,便于排查缺字问题。"""
+    """打印实际生效的字体(逐字回退栈),便于排查中文方框字。"""
     print("使用字体：", FONT)
+    if len(FONT_STACK) > 1:
+        print("回退栈：", " -> ".join(FONT_STACK))
+    else:
+        print("警告：仅匹配到", FONT,
+              "，未安装中文字体时汉字会渲染成方框")
     return FONT

@@ -450,7 +450,7 @@ def _economizer(ax, x, y, w=40, h=90, label="经济器", style="diag",
     else:
         line(ax, [(x - w / 2, y - h / 2), (x + w / 2, y + h / 2)], lw=LW_PART)
     if label:
-        txt(ax, x + w / 2 + 18, y + 30, label, ha="left", bg=True)
+        txt(ax, x + w / 2 + 18, y + 30, label, ha="left", boxed=True)
 
 
 def _capillary(ax, x, y, label="毛细管", w=18, h=80, n=5, **kw):
@@ -470,7 +470,7 @@ def _capillary(ax, x, y, label="毛细管", w=18, h=80, n=5, **kw):
     ax.plot(xs, ys, color=LINE, lw=LW_OUTLINE, solid_capstyle="round",
             solid_joinstyle="round")
     if label:
-        txt(ax, x + w / 2 + 18, y, label, ha="left", bg=True)
+        txt(ax, x + w / 2 + 18, y, label, ha="left", boxed=True)
 
 
 def _box(ax, x, y, w, h, label=None, **kw):
@@ -554,7 +554,7 @@ def make_heat_exchanger(w=80, h=80, r=None, shape="rect", name="冷凝器",
             pts.append((x + xs, y))
             line(ax, pts, lw=LW_OUTLINE)
         if label:
-            txt(ax, x, y + ry + 26, label, bg=True)
+            txt(ax, x, y + ry + 26, label, boxed=True)
 
     return Part(name, draw, ports, dirs)
 
@@ -754,3 +754,6 @@ def make_economizer(w=40, h=90, style="diag", n_plates=8, name="经济器"):
 
 
 economizer_plate = make_economizer(style="plate")
+
+# 语义上属于部件库的派生工具,core 保留导出以维持既有 import 路径
+from .core import make_partial            # noqa: E402,F401

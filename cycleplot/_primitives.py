@@ -4,9 +4,10 @@ from .style import FONT_STACK, LINE
 
 
 def txt(ax, x, y, s, size=18, ha="center", va="center", weight="normal",
-        rot=0, color=LINE, bg=False):
+        rot=0, color=LINE, boxed=False):
+    """写一段文本;boxed=True 时垫一层白底,压在管线上也可读。"""
     kw = {}
-    if bg:
+    if boxed:
         kw["bbox"] = dict(facecolor="white", edgecolor="none", pad=1.5)
     ax.text(x, y, s, fontsize=size, fontfamily=FONT_STACK, ha=ha, va=va,
             color=color, fontweight=weight, rotation=rot, **kw)
