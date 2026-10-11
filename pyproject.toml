@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cycleplot"
+version = "0.1.0"
+description = "通用制冷循环 / HVAC 示意图绘制库:坐标式部件拼装 + 走线式连管,输出 PNG/PDF/SVG"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "xiaenbaba" }]
+keywords = ["refrigeration", "hvac", "diagram", "matplotlib", "schematic"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Visualization",
+]
+dependencies = [
+    "numpy>=1.23,<3",
+    "matplotlib>=3.7,<4",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7,<9"]
+
+[project.urls]
+Repository = "https://github.com/xiaenbaba/cycle-plot"
+
+[tool.setuptools]
+packages = ["cycleplot"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
