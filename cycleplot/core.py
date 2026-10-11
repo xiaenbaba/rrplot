@@ -19,6 +19,8 @@ _DIR_TOKENS = {
 SNAP_TOL = 10        # 端口附近小于此值的错位视为笔误,吸附消除接缝碎块
 ARROW_HALF = 20      # 随线箭头线长的一半(px)
 
+_AT_TOKENS = {"start": 0.0, "mid": 0.5, "end": 1.0}
+
 
 def _fit_end(pts, at_start, port):
     """把端口邻段的小错位吸附到端口坐标,避免接缝处多出小碎块。
@@ -124,7 +126,11 @@ def _is_sensor(text):
 def _resolve_at(at):
     """把 at 归一为 [0,1] 的折线弧长比例。"""
     if isinstance(at, str):
-        at = {"start": 0.0, "mid": 0.5, "end": 1.0}[at.lower()]
+        key = at.lower()
+        if key not in _AT_TOKENS:
+            raise ValueError(f"at={at!r} 不是合法位置,"
+                             f"可用:{'/'.join(sorted(_AT_TOKENS))} 或 0~1 的数值")
+        at = _AT_TOKENS[key]
     return float(at)
 
 
@@ -216,18 +222,31 @@ class Pipe:
             return self._pts
         pts = [self.a.point]
         cur = self.a.point
-        for token in self.via:
-            if isinstance(token, (tuple, list)) and len(token) == 2 \
-                    and isinstance(token[0], str):
-                d = _DIR_TOKENS[token[0].lower()]
-                val = token[1]
-                nxt = (val, cur[1]) if d[0] else (cur[0], val)
-            elif isinstance(token, str):
-                d = _DIR_TOKENS[token.lower()]
-                length = self.d.default_step
-                nxt = (cur[0] + d[0] * length, cur[1] + d[1] * length)
+        for i, token in enumerate(self.via):
+            if isinstance(token, str) or (isinstance(token, (tuple, list))
+                                          and len(token) == 2
+                                          and isinstance(token[0], str)):
+                name = token if isinstance(token, str) else token[0]
+                key = str(name).lower()
+                if key not in _DIR_TOKENS:
+                    raise ValueError(
+                        f"via[{i}] 方向令牌 {name!r} 无效,"
+                        f"可用:{', '.join(sorted(set(_DIR_TOKENS)))}")
+                d = _DIR_TOKENS[key]
+                if isinstance(token, str):
+                    length = self.d.default_step
+                    nxt = (cur[0] + d[0] * length, cur[1] + d[1] * length)
+                else:
+                    val = token[1]
+                    nxt = (val, cur[1]) if d[0] else (cur[0], val)
             else:
-                nxt = (float(token[0]), float(token[1]))
+                try:
+                    tx, ty = token
+                    nxt = (float(tx), float(ty))
+                except (TypeError, ValueError):
+                    raise ValueError(
+                        f"via[{i}]={token!r} 不是合法走点;支持方向令牌 "
+                        f"('e', 200)、裸字符串 'e' 或坐标 (x, y)") from None
             pts.append(nxt)
             cur = nxt
         pts.append(self.b.point)

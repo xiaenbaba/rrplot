@@ -30,13 +30,18 @@ class Part:
     _dirs: dict = field(default_factory=dict)
 
     def port(self, key):
-        return self.ports[key]
+        try:
+            return self.ports[key]
+        except KeyError:
+            raise KeyError(f"部件 {self.name!r} 没有端口 {key!r},"
+                           f"可用端口:{', '.join(sorted(self.ports)) or '(无)'}"
+                           ) from None
 
     def direction(self, key):
         """端口外法向单位向量,优先取显式声明。"""
         if key in self._dirs:
             return _PORT_DIR[self._dirs[key]]
-        dx, dy = self.ports[key]
+        dx, dy = self.port(key)
         if dx == 0 and dy == 0:
             return (0, 0)
         if abs(dx) >= abs(dy):

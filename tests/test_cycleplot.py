@@ -11,8 +11,17 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from cycleplot import Diagram, parts
 from cycleplot.core import Port, _fit_end, _is_sensor, _orthogonalize, \
-    make_partial
+    _resolve_at, make_partial
 from cycleplot.svgparts import load_svg_part
+
+
+def _raises(exc, fn, *args, **kw):
+    """兼容 pytest 与 `python tests/test_cycleplot.py` 两种跑法的断言。"""
+    try:
+        fn(*args, **kw)
+    except exc as e:
+        return e
+    raise AssertionError(f"未抛出 {exc.__name__}")
 
 
 def test_evaporator_ports_on_body():
@@ -238,6 +247,143 @@ def test_scroll_chord_ports_and_render():
     d.add(parts.scroll_chord, "涡旋压缩机", loc=(310, 110),
           label_offset=(95, 60), label_ha="left")
     d.render()
+
+
+def test_part_unknown_port_error_lists_available():
+    e = _raises(KeyError, parts.evaporator.port, "outt")
+    assert "没有端口" in str(e) and "out" in str(e)
+    n = Diagram(width=100, height=100).add(parts.globe_valve, None,
+                                            loc=(50, 50))
+    e = _raises(KeyError, lambda: n["top"])
+    assert "截止阀" in str(e)
+
+
+def test_via_bad_token_error_message():
+    d = Diagram(width=200, height=200, default_step=100)
+    e = _raises(ValueError, d.pipe((0, 0), (50, 50), via=["q"]).points)
+    assert "via[0]" in str(e) and "方向令牌" in str(e)
+    e = _raises(ValueError, d.pipe((0, 0), (50, 50), via=[("q", 10)]).points)
+    assert "via[0]" in str(e)
+    # 非走点类型(标量)与过长坐标元组都要给出可读提示
+    e = _raises(ValueError, d.pipe((0, 0), (50, 50), via=[5]).points)
+    assert "不是合法走点" in str(e)
+    e = _raises(ValueError, d.pipe((0, 0), (50, 50), via=[(1, 2, 3)]).points)
+    assert "不是合法走点" in str(e)
+
+
+def test_via_valid_tokens_still_route():
+    d = Diagram(width=400, height=300, default_step=100)
+    assert d.pipe((0, 0), (50, 50), via=["e"]).points()[1] == (100.0, 0.0)
+    assert d.pipe((0, 0), (50, 50), via=[("n", 30)]).points()[1] == (0.0, 30.0)
+    # 坐标走点经正交化后作为拐点出现在折线中
+    pts = d.pipe((0, 0), (50, 50), via=[(10.5, 20.5)]).points()
+    assert (10.5, 20.5) in pts and pts[0] == (0.0, 0.0) \
+        and pts[-1] == (50.0, 50.0)
+
+
+def test_resolve_at_tokens_and_error():
+    assert _resolve_at("start") == 0.0
+    assert _resolve_at("MID") == 0.5
+    assert _resolve_at("End") == 1.0
+    assert _resolve_at(0.3) == 0.3
+    e = _raises(ValueError, _resolve_at, "middle")
+    assert "start" in str(e) and "mid" in str(e)
+
+
+def test_degenerate_diagram_and_pipe():
+    # 零尺寸画布:允许构造并出图(不抛异常)
+    d = Diagram(width=0, height=0)
+    d.pipe((0, 0), (0, 0))
+    d.render()
+    # 同点/空 via 管线:退化为单点折线,不炸
+    d2 = Diagram(width=100, height=100)
+    assert d2.pipe((10, 10), (10, 10)).points() == [(10.0, 10.0), (10.0, 10.0)]
+    assert d2.pipe((0, 0), (50, 50)).points() == [(0.0, 0.0), (0.0, 50.0),
+                                                   (50.0, 50.0)]
+
+
+def test_save_writes_readable_image(tmp_path=None):
+    import tempfile
+    tmp = tmp_path if tmp_path is not None else tempfile.mkdtemp()
+    d = Diagram(width=200, height=120)
+    d.add(parts.compressor, "压缩机", loc=(100, 60))
+    d.pipe((0, 0), (60, 60))
+
+    png = d.save(os.path.join(tmp, "out.png"))
+    head = open(png, "rb").read(8)
+    assert head == b"\x89PNG\r\n\x1a\n"
+    assert os.path.getsize(png) > 1000
+
+    svg = d.save(os.path.join(tmp, "out.svg"))
+    with open(svg, "rb") as f:
+        body = f.read()
+    assert b"<svg" in body and b"</svg>" in body
+
+    # 读回 PNG 校验:画布尺寸正确且画面非纯白
+    import matplotlib.pyplot as plt
+    img = plt.imread(png)
+    assert img.shape[0] >= 100 and img.shape[1] >= 180
+    assert (img[..., :3] < 0.99).any(), "渲染结果应包含非白像素"
+
+
+def test_render_every_part_and_hvac_symbol(tmp_path=None):
+    """烟雾测试:部件库与 HVAC 符号全部上屏渲染,防止画图代码静默腐坏。
+
+    不做像素级回归——中文字体跨平台差异会让参考图比对脆到不可用,
+    这里改为校验"画得出来 + 落盘非空"。
+    """
+    import tempfile
+    from cycleplot import hvac
+    from cycleplot.parts import Part
+    tmp = tmp_path if tmp_path is not None else tempfile.mkdtemp()
+
+    # hvac 模块提供的是工厂函数(显式列举,避开它导入的 matplotlib 类)
+    hvac_factories = ("heat_pump", "water_pump", "thermal_tank", "fan_coil",
+                      "floor_heating", "supply_manifold", "return_manifold",
+                      "ball_valve", "anti_freeze_valve", "drain_valve",
+                      "makeup_valve", "safety_valve", "auto_vent",
+                      "electric_heater", "corrugated_pipe", "supply_pipe",
+                      "return_pipe")
+    items = [(k, v) for k, v in vars(parts).items() if isinstance(v, Part)
+             and not k.startswith("_")]
+    items += [(name, getattr(hvac, name)()) for name in hvac_factories]
+
+    d = Diagram(width=1400, height=900)
+    i = 0
+    for name, obj in items:
+        if isinstance(obj, Part) and not str(name).startswith("_"):
+            d.add(obj, None, loc=(110 + (i % 7) * 195, 90 + (i // 7) * 150))
+            i += 1
+    assert i >= 40, f"可渲染图元过少:{i}"
+    d.render()
+    png = d.save(os.path.join(tmp, "all_parts.png"))
+    assert os.path.getsize(png) > 10_000
+    import matplotlib.pyplot as plt
+    plt.close(d.fig)
+
+
+def test_render_every_svg_symbol(tmp_path=None):
+    """references/hvacsvg/symbols 下每个 SVG 都能加载并渲染。"""
+    import glob
+    import tempfile
+    from cycleplot.parts import Part
+    tmp = tmp_path if tmp_path is not None else tempfile.mkdtemp()
+    sym_dir = os.path.join(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__))), "references", "hvacsvg", "symbols")
+    files = sorted(glob.glob(os.path.join(sym_dir, "*.svg")))
+    assert files, "未找到 SVG 符号源文件"
+
+    d = Diagram(width=1400, height=900)
+    loaded = []
+    for i, f in enumerate(files):
+        loaded.append(load_svg_part(f))
+    for i, p in enumerate(loaded):
+        assert isinstance(p, Part)
+        d.add(p, None, loc=(110 + (i % 7) * 195, 90 + (i // 7) * 150))
+    png = d.save(os.path.join(tmp, "all_svg.png"))
+    assert os.path.getsize(png) > 10_000
+    import matplotlib.pyplot as plt
+    plt.close(d.fig)
 
 
 if __name__ == "__main__":
