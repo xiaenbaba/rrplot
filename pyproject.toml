@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cycleplot"
-version = "0.1.0"
+dynamic = ["version"]
 description = "通用制冷循环 / HVAC 示意图绘制库:坐标式部件拼装 + 走线式连管,输出 PNG/PDF/SVG"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -29,9 +29,19 @@ test = ["pytest>=7,<10", "pytest-cov>=4,<8"]
 [project.urls]
 Repository = "https://github.com/xiaenbaba/cycle-plot"
 
-[tool.setuptools]
-packages = ["cycleplot"]
+[tool.setuptools.packages.find]
+include = ["cycleplot*"]
+
+[tool.setuptools.dynamic]
+version = { attr = "cycleplot.__version__" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+
+[tool.ruff]
+line-length = 88
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]

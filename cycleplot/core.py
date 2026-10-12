@@ -6,9 +6,9 @@
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 
-from ._primitives import arrow, line as _line, txt
-from .style import (FONT_STACK, LINE, LW_PIPE, NUM_SIZE, SENSOR_R,
-                    SENSOR_SIZE, use_font)
+from ._primitives import arrow, txt
+from ._primitives import line as _line
+from .style import FONT_STACK, LINE, LW_PIPE, NUM_SIZE, SENSOR_R, SENSOR_SIZE, use_font
 
 _DIR_TOKENS = {
     "e": (1, 0), "w": (-1, 0), "n": (0, -1), "s": (0, 1),
@@ -291,8 +291,12 @@ class Diagram:
         self.fig, self.ax = plt.subplots(figsize=(width / 100, height / 100),
                                          dpi=100)
         self.fig.subplots_adjust(0, 0, 1, 1)   # 画布 1 像素 = 1 画图单位
-        self.ax.set_xlim(0, width)
-        self.ax.set_ylim(height, 0)
+        # 零尺寸画布:跳过 set_xlim/ylim,避免 matplotlib 的 identical
+        # limits 警告(Diagram(0, 0) 是合法的退化输入)
+        if width > 0:
+            self.ax.set_xlim(0, width)
+        if height > 0:
+            self.ax.set_ylim(height, 0)
         self.ax.set_aspect("equal")
         self.ax.axis("off")
         self.fig.patch.set_facecolor("white")

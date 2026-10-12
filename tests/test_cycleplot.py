@@ -10,8 +10,14 @@ matplotlib.use("Agg")            # 无界面环境稳定出图
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from cycleplot import Diagram, parts
-from cycleplot.core import Port, _fit_end, _is_sensor, _orthogonalize, \
-    _resolve_at, make_partial
+from cycleplot.core import (
+    Port,
+    _fit_end,
+    _is_sensor,
+    _orthogonalize,
+    _resolve_at,
+    make_partial,
+)
 from cycleplot.svgparts import load_svg_part
 
 
@@ -333,6 +339,7 @@ def test_render_every_part_and_hvac_symbol(tmp_path=None):
     这里改为校验"画得出来 + 落盘非空"。
     """
     import tempfile
+
     from cycleplot import hvac
     from cycleplot.parts import Part
     tmp = tmp_path if tmp_path is not None else tempfile.mkdtemp()
@@ -366,6 +373,7 @@ def test_render_every_svg_symbol(tmp_path=None):
     """references/hvacsvg/symbols 下每个 SVG 都能加载并渲染。"""
     import glob
     import tempfile
+
     from cycleplot.parts import Part
     tmp = tmp_path if tmp_path is not None else tempfile.mkdtemp()
     sym_dir = os.path.join(os.path.dirname(os.path.dirname(
@@ -384,6 +392,152 @@ def test_render_every_svg_symbol(tmp_path=None):
     assert os.path.getsize(png) > 10_000
     import matplotlib.pyplot as plt
     plt.close(d.fig)
+
+
+def test_render_all_compressor_styles(tmp_path=None):
+    """压缩机全部 style 都能渲染(防止纯几何画法静默腐坏)。"""
+    import tempfile
+    tmp = tmp_path if tmp_path is not None else tempfile.mkdtemp()
+    d = Diagram(width=len(parts.COMPRESSOR_STYLES) * 200 + 40, height=260)
+    for i, style in enumerate(parts.COMPRESSOR_STYLES):
+        d.add(parts.make_compressor(70, style=style), f"s{i}",
+              loc=(140 + i * 200, 130))
+    png = d.save(os.path.join(tmp, "compressors.png"))
+    assert os.path.getsize(png) > 10_000
+    import matplotlib.pyplot as plt
+    plt.close(d.fig)
+
+
+def test_render_all_heat_exchanger_shapes(tmp_path=None):
+    """换热器全部 shape 都能渲染。"""
+    import tempfile
+    tmp = tmp_path if tmp_path is not None else tempfile.mkdtemp()
+    d = Diagram(width=len(parts.HEX_SHAPES) * 200 + 40, height=260)
+    for i, shape in enumerate(parts.HEX_SHAPES):
+        d.add(parts.make_heat_exchanger(140, 90, shape=shape), f"h{i}",
+              loc=(140 + i * 200, 130))
+    png = d.save(os.path.join(tmp, "hex.png"))
+    assert os.path.getsize(png) > 10_000
+    import matplotlib.pyplot as plt
+    plt.close(d.fig)
+
+
+def test_render_all_economizer_styles(tmp_path=None):
+    """经济器全部 style 都能渲染。"""
+    import tempfile
+    tmp = tmp_path if tmp_path is not None else tempfile.mkdtemp()
+    d = Diagram(width=len(parts.ECONOMIZER_STYLES) * 160 + 40, height=220)
+    for i, style in enumerate(parts.ECONOMIZER_STYLES):
+        d.add(parts.make_economizer(60, 120, style=style), f"e{i}",
+              loc=(120 + i * 160, 110))
+    png = d.save(os.path.join(tmp, "econ.png"))
+    assert os.path.getsize(png) > 1_500
+    import matplotlib.pyplot as plt
+    plt.close(d.fig)
+
+
+def test_render_all_labels_on_and_off(tmp_path=None):
+    """每个部件在 label 有/无两种情况下都能渲染(覆盖 if label 分支)。"""
+    import tempfile
+
+    from cycleplot.parts import Part
+    tmp = tmp_path if tmp_path is not None else tempfile.mkdtemp()
+    d = Diagram(width=1400, height=900)
+    i = 0
+    for k, v in vars(parts).items():
+        if isinstance(v, Part) and not k.startswith("_"):
+            d.add(v, "X", loc=(110 + (i % 7) * 195, 90 + (i // 7) * 150))
+            i += 1
+    d.render()
+    import matplotlib.pyplot as plt
+    plt.close(d.fig)
+
+    d2 = Diagram(width=1400, height=900)
+    j = 0
+    for k, v in vars(parts).items():
+        if isinstance(v, Part) and not k.startswith("_"):
+            d2.add(v, None, loc=(110 + (j % 7) * 195, 90 + (j // 7) * 150))
+            j += 1
+    png = d2.save(os.path.join(tmp, "nolabel.png"))
+    assert os.path.getsize(png) > 10_000
+    plt.close(d2.fig)
+
+
+def test_svg_part_bridge_and_label_dy():
+    """bridge 引管与 label_dy 不改端口偏移,且能渲染。"""
+    sym = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                       "references", "hvacsvg", "symbols", "02_水泵.svg")
+    p = load_svg_part(sym, bridge=20, label_dy=0)
+    # bridge 只是画引管,不该影响端口定义
+    assert p.port("in") == (-80.0, 0.0)
+    assert p.port("out") == (80.0, 0.0)
+
+    d = Diagram(width=300, height=200)
+    d.add(p, "水泵", loc=(150, 100))
+    d.render()
+    import matplotlib.pyplot as plt
+    plt.close(d.fig)
+
+
+def test_render():
+    """render() 返回 fig,并把部件与管线都画上。"""
+    d = Diagram(width=200, height=150)
+    n = d.add(parts.compressor, "压缩机", loc=(100, 75))
+    d.pipe(n["discharge"], n["suction"])
+    fig = d.render()
+    assert fig is d.fig
+
+
+def test_sensor_and_text_helpers():
+    """Diagram.sensor()/text() 都能落笔,不报错。"""
+    d = Diagram(width=200, height=150)
+    d.sensor(40, 40, "T_1")
+    d.text(160, 40, "回水", ha="left", boxed=True)
+    d.render()
+    import matplotlib.pyplot as plt
+    plt.close(d.fig)
+
+
+def test_state_instance_and_full_options():
+    """State 实例可直接传;dict 形式支持 side/kind/size 全参数。"""
+    d = Diagram(width=200, height=150)
+    from cycleplot.core import State
+    st = State("1", 0.5)
+    d.pipe((0, 0), (100, 0), states=st)
+    d.pipe((0, 10), (100, 10),
+           states=[{"text": "$T_1$", "at": 0.5, "side": 1, "size": 18}])
+    d.pipe((0, 20), (100, 20),
+           states=[{"text": "2", "at": 0.5, "side": -1, "size": 12}])
+    # 强制 kind,绕过 _is_sensor 自动判定
+    d.pipe((0, 30), (100, 30),
+           states=[{"text": "9", "at": 0.5, "kind": "sensor"}])
+    d.render()
+    import matplotlib.pyplot as plt
+    plt.close(d.fig)
+
+
+def test_fit_end_free_port_zero_dir():
+    """端口法向为零(自由端)时 _fit_end 不做吸附。"""
+    pts = [(100.0, 50.0), (108.0, 0.0), (170.0, 0.0)]
+    free = Port((100.0, 50.0), (0.0, 0.0), None)
+    assert _fit_end(pts, True, free) is None
+    assert pts[1] == (108.0, 0.0)   # 坐标未被改动
+
+
+def test_fit_end_tangent_aligned_normal_offset():
+    """邻段与端口同轴、法向错位在容差内:直接吸附到端口法向。"""
+    pts = [(100.0, 50.0), (105.0, 0.0)]
+    assert _fit_end(pts, True, _port((100.0, 50.0), "e")) is None
+    assert pts[1] == (100.0, 0.0)
+
+
+def test_use_font_prints(capsys=None):
+    """use_font() 打印当前生效字体,且返回字体名。"""
+    from cycleplot.style import FONT, use_font
+    out = use_font()
+    assert out == FONT
+    if capsys is not None:                 # pytest 下校验打印内容
+        assert "使用字体" in capsys.readouterr().out
 
 
 if __name__ == "__main__":

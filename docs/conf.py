@@ -5,10 +5,13 @@ import sys
 
 sys.path.insert(0, os.path.abspath(".."))
 
+from cycleplot import __version__  # noqa: E402
+
 project = "cycleplot"
 copyright = "2026, xiaenbaba"
 author = "xiaenbaba"
-release = "0.1.0"
+version = __version__
+release = __version__
 
 extensions = [
     "sphinx.ext.autodoc",

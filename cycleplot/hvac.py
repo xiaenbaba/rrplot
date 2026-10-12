@@ -21,8 +21,7 @@ scale 再平移到锚点;stroke-width 换算与 svgparts 同规则。同一个 S
 路径的描边光栅化不同,按原分组才能与 load_svg_part 逐像素一致。
 SVG 原文件只作形状参考,形状以本模块为准。
 """
-from matplotlib.patches import (Circle, Ellipse, FancyBboxPatch, PathPatch,
-                                Rectangle)
+from matplotlib.patches import Circle, Ellipse, FancyBboxPatch, PathPatch, Rectangle
 from matplotlib.path import Path
 
 from ._primitives import line, txt

@@ -20,7 +20,9 @@ from .parts import COMPRESSOR_STYLES, ECONOMIZER_STYLES, HEX_SHAPES
 from .style import FONT, FONT_STACK, LINE
 from .svgparts import load_svg_part
 
-__all__ = ["Diagram", "Node", "Pipe", "Port", "State", "make_partial",
-           "use_font", "parts", "hvac", "style", "FONT", "FONT_STACK", "LINE",
-           "HEX_SHAPES", "COMPRESSOR_STYLES", "ECONOMIZER_STYLES",
-           "load_svg_part"]
+__version__ = "0.1.0"
+
+__all__ = ["__version__", "Diagram", "Node", "Pipe", "Port", "State",
+           "make_partial", "use_font", "parts", "hvac", "style", "FONT",
+           "FONT_STACK", "LINE", "HEX_SHAPES", "COMPRESSOR_STYLES",
+           "ECONOMIZER_STYLES", "load_svg_part"]

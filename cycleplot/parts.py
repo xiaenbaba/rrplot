@@ -7,17 +7,22 @@
 命名约定:贯通式两口元件(阀、过滤器、毛细管等)用 in/out;
 多口/换热类部件用 left/right/top/bottom 表示边中点。
 """
+import math
 from dataclasses import dataclass, field
 
-import math
-
 import numpy as np
-from matplotlib.patches import (Circle, Ellipse, FancyBboxPatch, Polygon,
-                                Rectangle, Wedge)
+from matplotlib.patches import (
+    Circle,
+    Ellipse,
+    FancyBboxPatch,
+    Polygon,
+    Rectangle,
+    Wedge,
+)
 
 from ._primitives import line, txt
-from .style import (COIL, FILL, GRID, LINE, LW_FINE, LW_OUTLINE, LW_PART,
-                    LW_STRONG)
+from .core import make_partial  # noqa: F401  重新导出,维持 from parts import 路径
+from .style import COIL, FILL, GRID, LINE, LW_FINE, LW_OUTLINE, LW_PART, LW_STRONG
 
 _PORT_DIR = {"n": (0, -1), "s": (0, 1), "e": (1, 0), "w": (-1, 0)}
 
@@ -756,6 +761,3 @@ def make_economizer(w=40, h=90, style="diag", n_plates=8, name="经济器"):
 
 
 economizer_plate = make_economizer(style="plate")
-
-# 语义上属于部件库的派生工具,core 保留导出以维持既有 import 路径
-from .core import make_partial            # noqa: E402,F401

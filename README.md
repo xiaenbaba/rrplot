@@ -1,8 +1,16 @@
 # cycleplot —— 通用制冷循环/HVAC 示意图库
 
+[![CI](https://github.com/xiaenbaba/cycle-plot/actions/workflows/ci.yml/badge.svg)](https://github.com/xiaenbaba/cycle-plot/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 用 Matplotlib 按坐标拼装原理图:放置部件、走线式连管、随线标注状态点与
 T/P 传感器圆圈,一键输出 PNG / PDF / SVG。坐标 1:1 对应画布像素(x 向右,
 y 向下),所见即所得。
+
+![单级制冷循环](examples/simple_cycle.png)
+
+更多示例见 [`examples/`](#示例)。
 
 ## 安装
 
@@ -15,11 +23,20 @@ pip install -e .
 
 不安装也可用:在仓库根目录下直接 `import cycleplot`。
 
-跑回归测试:
+跑回归测试(32 个用例,CI 覆盖 ubuntu/windows × Python 3.9/3.12):
 
 ```powershell
 pip install -e ".[test]"
 python -m pytest
+```
+
+`tests/test_cycleplot.py` 也可以直接 `python tests/test_cycleplot.py` 跑,
+不带 pytest 环境也能用。
+
+静态检查(CI 里跑同一条):
+
+```powershell
+ruff check cycleplot tests
 ```
 
 ## 快速上手
@@ -36,12 +53,17 @@ d.pipe(evap["out"], comp["suction"], via=[("e", 200), ("n", 105)],
 d.save("out.png")     # 也支持 .pdf / .svg 矢量输出
 ```
 
+完整教程(含部件速查表、标注语法、排错)见 `docs/tutorial.rst`;
+坐标系与走线算法的原理见 `docs/design.rst`。
+
 ## 核心概念
 
 **Diagram** 是画布。`add(part, label, loc, **style)` 放置部件返回 Node;
 `node["端口名"]` 取得带绝对坐标与外法向的端口;`pipe(a, b, via, states,
 head_at, color)` 连线。
 
+- 坐标 1 单位 = 1 像素,x 向右、y 向下;`loc` 是部件中心,`save()` 默认裁边,
+  需要严格 `width × height` 传 `tight=False`。
 - `via` 三种写法混用:`("e", 200)` 走到 x=200;直接给 `(x, y)` 折点;裸
   字符串 `"e"` 走一个默认步长。方向令牌支持 e/w/n/s/right/left/up/down
   与中文名。
@@ -88,9 +110,18 @@ docstring。特殊端口定义可用 `make_partial(part, ports=..., dirs=...)`
 接点内侧补引管、`label_dy` 调标签位置。也可用
 `cycleplot.svgparts.load_svg_part(path, ...)` 直接加载新 SVG。
 
+<details>
+<summary>看图:空气能供暖系统(带水箱)/ 四通阀圆体回路 / SVG 符号直接加载</summary>
+
+![空气能供暖系统](examples/hvac_system.png)
+![四通阀圆体回路](examples/four_way_round_demo.png)
+![SVG 符号直接加载](examples/hvacsvg_demo.png)
+
+</details>
+
 ## 示例
 
-`examples/` 各图配套同名 `.py`,可对照学习连管与标注技巧:
+`examples/` 各图配套同名 `.py` 与同名 `.png`,可对照学习连管与标注技巧:
 
 | 文件 | 内容 |
 | --- | --- |
@@ -108,6 +139,13 @@ docstring。特殊端口定义可用 `make_partial(part, ports=..., dirs=...)`
 | low_pressure_tank_demo.py | 低压罐图元演示(顶平底圆 + 液位计) |
 | globe_valve_demo.py | 截止阀图元演示(左右对顶沙漏 + 手轮) |
 | solenoid_valve_demo.py | 电磁阀图元演示(圆体 + 圆内 X + 电磁杠) |
+
+改完脚本直接重跑即覆盖同名 PNG:
+
+```powershell
+python examples/simple_cycle.py
+python examples/hvac_system.py
+```
 
 ## 字体
 
@@ -127,18 +165,37 @@ docstring。特殊端口定义可用 `make_partial(part, ports=..., dirs=...)`
 ```
 cycleplot/     库本体:core(引擎)/ parts(部件)/ hvac、svgparts(HVAC)/
                style(样式)/ _primitives(底层绘制)
-examples/      每张图一个脚本
-tests/         pytest 回归测试
+examples/      每张图一个脚本 + 同名 PNG
+tests/         pytest 回归测试(端口/走线/错误提示/全件渲染)
 references/    早期原型脚本与 SVG 符号源文件
 SVG/           export_parts_svg.py 导出的部件单图(可直接进论文/PPT)
-docs/          Sphinx API 文档源文件
+docs/          Sphinx 文档:tutorial(上手)/ design(原理)/ api(自动提取)
 ```
 
-## API 文档
+## 文档
+
+| 页面 | 内容 |
+| --- | --- |
+| `docs/tutorial.rst` | 上手教程:最小例子、via 三种写法、标注语法、部件速查表、排错 |
+| `docs/design.rst` | 设计说明:坐标系约定、端口法向规则、走线三阶段算法、扩展部件的三条路 |
+| `docs/api.rst` | 全部模块与函数的 API 参考(autodoc 自动提取) |
+
+本地构建(0 警告):
 
 ```powershell
 pip install sphinx
 python -m sphinx -b html docs docs/_build/html
 ```
 
-生成的 `docs/_build/html/index.html` 即为可浏览的 API 参考。
+生成的 `docs/_build/html/index.html` 即为可浏览的文档站点。
+
+## 贡献
+
+新增部件请在 `cycleplot/parts.py` 里写绘制函数 + 端口表(或用
+`make_partial` 派生),并在 `tests/test_cycleplot.py` 补端口断言、
+在 `examples/` 加一个演示脚本;提交前跑通 `python -m pytest` 与
+`ruff check cycleplot tests`。
+
+## 许可
+
+MIT,见 [LICENSE](LICENSE)。
