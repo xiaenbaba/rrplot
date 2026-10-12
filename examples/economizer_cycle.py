@@ -29,7 +29,7 @@ eev2 = d.add(parts.valve, loc=(150, 340))
 evap = d.add(parts.make_heat_exchanger(190, 60, shape="rect_zigzag7"),
              "蒸发器", loc=(440, 425))
 
-d.text(600, 262, "压缩机", size=20, ha="right", bg=True)
+d.text(600, 262, "压缩机", size=20, ha="right", boxed=True)
 d.text(190, 95, "EEV$_1$", size=20, ha="left")
 d.text(190, 340, "EEV$_2$", size=20, ha="left")
 

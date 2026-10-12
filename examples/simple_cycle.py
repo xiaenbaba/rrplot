@@ -25,7 +25,7 @@ cap = d.add(parts.capillary, "毛细管", loc=(90, 250))
 evap = d.add(parts.make_heat_exchanger(240, 62, shape="rect_zigzag7"),
              "蒸发器", loc=(360, 425))
 
-d.text(530, 262, "压缩机", size=20, ha="right", bg=True)
+d.text(530, 262, "压缩机", size=20, ha="right", boxed=True)
 
 # ---------- 管路 ----------
 # 压缩机排气 -> 上行 -> 左行 -> 冷凝器
