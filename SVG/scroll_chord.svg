@@ -6,7 +6,7 @@
   <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:date>2026-10-08T08:57:33.014493</dc:date>
+    <dc:date>2026-10-14T17:22:44.021390</dc:date>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
@@ -40,17 +40,17 @@ C 164.848418 251.398288 158.4 235.83043 158.4 219.6
 C 158.4 203.36957 164.848418 187.801712 176.325065 176.325065 
 C 187.801712 164.848418 203.36957 158.4 219.6 158.4 
 z
-" clip-path="url(#pb7083902c5)" style="fill: #ffffff; stroke: #000000; stroke-width: 1.2; stroke-linejoin: miter"/>
+" clip-path="url(#p251d2d674b)" style="fill: #ffffff; stroke: #000000; stroke-width: 1.2; stroke-linejoin: miter"/>
    </g>
    <g id="line2d_1">
     <path d="M 168.958483 185.236113 
 L 278.77653 203.993003 
-" clip-path="url(#pb7083902c5)" style="fill: none; stroke: #000000; stroke-linecap: round"/>
+" clip-path="url(#p251d2d674b)" style="fill: none; stroke: #000000; stroke-linecap: round"/>
    </g>
    <g id="line2d_2">
     <path d="M 170.933547 256.708171 
 L 278.164356 237.366715 
-" clip-path="url(#pb7083902c5)" style="fill: none; stroke: #000000; stroke-linecap: round"/>
+" clip-path="url(#p251d2d674b)" style="fill: none; stroke: #000000; stroke-linecap: round"/>
    </g>
    <g id="text_1">
     <!-- 涡旋压缩机 -->
@@ -449,7 +449,7 @@ z
   </g>
  </g>
  <defs>
-  <clipPath id="pb7083902c5">
+  <clipPath id="p251d2d674b">
    <rect x="3.6" y="3.6" width="432" height="432"/>
   </clipPath>
  </defs>

@@ -6,7 +6,7 @@
   <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:date>2026-10-08T08:57:33.750383</dc:date>
+    <dc:date>2026-10-14T17:22:44.809367</dc:date>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
@@ -40,22 +40,22 @@ C 158.407055 255.139263 151.2 237.739892 151.2 219.6
 C 151.2 201.460108 158.407055 184.060737 171.233896 171.233896 
 C 184.060737 158.407055 201.460108 151.2 219.6 151.2 
 z
-" clip-path="url(#p4f5a98a3a3)" style="fill: #ffffff; stroke: #000000; stroke-width: 1.2; stroke-linejoin: miter"/>
+" clip-path="url(#pd3932af4fb)" style="fill: #ffffff; stroke: #000000; stroke-width: 1.2; stroke-linejoin: miter"/>
    </g>
    <g id="line2d_1">
     <path d="M 219.6 196.344 
 L 219.6 153.936 
-" clip-path="url(#p4f5a98a3a3)" style="fill: none; stroke: #000000; stroke-linecap: round"/>
+" clip-path="url(#pd3932af4fb)" style="fill: none; stroke: #000000; stroke-linecap: round"/>
    </g>
    <g id="line2d_2">
     <path d="M 199.459713 231.228 
 L 162.733308 252.432 
-" clip-path="url(#p4f5a98a3a3)" style="fill: none; stroke: #000000; stroke-linecap: round"/>
+" clip-path="url(#pd3932af4fb)" style="fill: none; stroke: #000000; stroke-linecap: round"/>
    </g>
    <g id="line2d_3">
     <path d="M 239.740287 231.228 
 L 276.466692 252.432 
-" clip-path="url(#p4f5a98a3a3)" style="fill: none; stroke: #000000; stroke-linecap: round"/>
+" clip-path="url(#pd3932af4fb)" style="fill: none; stroke: #000000; stroke-linecap: round"/>
    </g>
    <g id="text_1">
     <!-- 通用旋转式 -->
@@ -434,7 +434,7 @@ z
   </g>
  </g>
  <defs>
-  <clipPath id="p4f5a98a3a3">
+  <clipPath id="pd3932af4fb">
    <rect x="3.6" y="3.6" width="432" height="432"/>
   </clipPath>
  </defs>

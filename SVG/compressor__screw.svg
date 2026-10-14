@@ -6,7 +6,7 @@
   <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:date>2026-10-08T08:57:33.977038</dc:date>
+    <dc:date>2026-10-14T17:22:45.025797</dc:date>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
@@ -40,7 +40,7 @@ C 158.407055 255.139263 151.2 237.739892 151.2 219.6
 C 151.2 201.460108 158.407055 184.060737 171.233896 171.233896 
 C 184.060737 158.407055 201.460108 151.2 219.6 151.2 
 z
-" clip-path="url(#p6c3550812b)" style="fill: #ffffff; stroke: #000000; stroke-width: 1.2; stroke-linejoin: miter"/>
+" clip-path="url(#pc5af1eda8b)" style="fill: #ffffff; stroke: #000000; stroke-width: 1.2; stroke-linejoin: miter"/>
    </g>
    <g id="patch_3">
     <path d="M 190.872 190.872 
@@ -53,7 +53,7 @@ C 165.170963 234.526491 162.144 227.218755 162.144 219.6
 C 162.144 211.981245 165.170963 204.673509 170.558236 199.286236 
 C 175.945509 193.898963 183.253245 190.872 190.872 190.872 
 z
-" clip-path="url(#p6c3550812b)" style="fill: #ffffff; stroke: #000000; stroke-linejoin: miter"/>
+" clip-path="url(#pc5af1eda8b)" style="fill: #ffffff; stroke: #000000; stroke-linejoin: miter"/>
    </g>
    <g id="patch_4">
     <path d="M 248.328 190.872 
@@ -66,7 +66,7 @@ C 222.626963 234.526491 219.6 227.218755 219.6 219.6
 C 219.6 211.981245 222.626963 204.673509 228.014236 199.286236 
 C 233.401509 193.898963 240.709245 190.872 248.328 190.872 
 z
-" clip-path="url(#p6c3550812b)" style="fill: #ffffff; stroke: #000000; stroke-linejoin: miter"/>
+" clip-path="url(#pc5af1eda8b)" style="fill: #ffffff; stroke: #000000; stroke-linejoin: miter"/>
    </g>
    <g id="text_1">
     <!-- 螺杆式 -->
@@ -323,7 +323,7 @@ z
   </g>
  </g>
  <defs>
-  <clipPath id="p6c3550812b">
+  <clipPath id="pc5af1eda8b">
    <rect x="3.6" y="3.6" width="432" height="432"/>
   </clipPath>
  </defs>

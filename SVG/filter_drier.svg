@@ -6,7 +6,7 @@
   <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:date>2026-10-08T08:57:32.351722</dc:date>
+    <dc:date>2026-10-14T17:22:43.378066</dc:date>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
@@ -35,7 +35,7 @@ L 244.8 206.64
 L 244.8 232.56 
 L 194.4 232.56 
 z
-" clip-path="url(#pd56b12cd3a)" style="fill: #ffffff; stroke: #000000; stroke-linejoin: miter"/>
+" clip-path="url(#pe59d85efd2)" style="fill: #ffffff; stroke: #000000; stroke-linejoin: miter"/>
    </g>
    <g id="patch_3">
     <path d="M 219.6 207.36 
@@ -48,7 +48,7 @@ C 208.649684 225.959658 207.36 222.846086 207.36 219.6
 C 207.36 216.353914 208.649684 213.240342 210.945013 210.945013 
 C 213.240342 208.649684 216.353914 207.36 219.6 207.36 
 z
-" clip-path="url(#pd56b12cd3a)" style="fill: #ffffff; stroke: #000000; stroke-linejoin: miter"/>
+" clip-path="url(#pe59d85efd2)" style="fill: #ffffff; stroke: #000000; stroke-linejoin: miter"/>
    </g>
    <g id="text_1">
     <!-- 干燥过滤器 -->
@@ -517,7 +517,7 @@ z
   </g>
  </g>
  <defs>
-  <clipPath id="pd56b12cd3a">
+  <clipPath id="pe59d85efd2">
    <rect x="3.6" y="3.6" width="432" height="432"/>
   </clipPath>
  </defs>

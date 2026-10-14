@@ -88,6 +88,52 @@ def _separator(ax, x, y, label="气液分离器", **kw):
         txt(ax, x - 30, y + 62, label, size=17, ha="right")
 
 
+def _oil_separator(ax, x, y, label="油分离器", w=64, h=176, stub=16,
+                   **kw):
+    """油分离器:瘦长矩形壳 + 顶/底/侧三根接管(参考图画法,内部无构件)。
+
+    进气自顶管(接压缩机排气),干燥气自上部侧管出(接冷凝器),
+    回油自底管出(接压缩机曲轴箱)。
+    """
+    ax.add_patch(Rectangle((x - w / 2, y - h / 2), w, h,
+                           facecolor=FILL, edgecolor=LINE, lw=LW_PART))
+    y_side = y - h / 4                        # 侧管:壳顶下 1/4(参考图比例)
+    line(ax, [(x, y - h / 2 - stub), (x, y - h / 2)], lw=LW_PART)
+    line(ax, [(x, y + h / 2), (x, y + h / 2 + stub)], lw=LW_PART)
+    line(ax, [(x - w / 2 - stub, y_side), (x - w / 2, y_side)], lw=LW_PART)
+    if label:
+        txt(ax, x + w / 2 + 18, y - 8, label, size=17, ha="left")
+
+
+def _separator_utube(ax, x, y, label=None, w=120, h=118, stub=16, **kw):
+    """气液分离器(U 形管液封):方壳 + 内置 U 形管 + 弯底放油点。
+
+    进气短管自壳顶伸入、悬于壳内上部;出气管即 U 形管右腿,穿壳顶引出;
+    U 形管兼作液封(液体积于弯底),弯底小圆点为放油/排液口标记。
+    """
+    ax.add_patch(Rectangle((x - w / 2, y - h / 2), w, h,
+                           facecolor=FILL, edgecolor=LINE, lw=LW_PART))
+    y_top = y - h / 2
+    lx = 0.435 * w                  # U 形管两腿半距(约壳宽 87%)
+    y_leg = y_top + 0.116 * h       # 左腿上口(壳内开管)
+    y_arc = y_top + 0.61 * h        # 弯头起点(竖段下端)
+    y_bot = y_top + 0.963 * h       # 弯底(壳底上方)
+    x_in = x - 0.365 * w            # 进气短管(偏西)
+    b = y_bot - y_arc               # 弯头竖半轴
+    arc = [(x + lx * math.cos(math.radians(t)),
+            y_arc + b * math.sin(math.radians(t)))
+           for t in range(180, -1, -6)]        # 左 -> 弯底 -> 右
+    line(ax, [(x - lx, y_leg)] + arc + [(x + lx, y_top - stub)],
+         lw=LW_PART)                            # U 形管 + 出气管
+    line(ax, [(x_in, y_top - stub), (x_in, y_top + 0.2 * h)],
+         lw=LW_PART)                            # 进气短管(悬于壳内上部)
+    ax.add_patch(Circle((x, y_bot), max(2.0, 0.022 * w),
+                        facecolor=LINE, edgecolor=LINE, lw=LW_FINE))
+    if label:
+        # 标签放壳体右侧:底部中央留给 drain 放油管
+        txt(ax, x + w / 2 + 18, y - 8, label, ha="left")
+
+
 def _receiver(ax, x, y, label="储液器", **kw):
     ax.add_patch(FancyBboxPatch((x - 17, y - 35), 34, 70,
                                 boxstyle="round,pad=0.02,rounding_size=8",
@@ -204,8 +250,9 @@ def _valve(ax, x, y, label=None, w=64, h=48, **kw):
 
 
 def _globe_valve(ax, x, y, label=None, w=64, h=48, stem=26, handle=44, **kw):
-    """截止阀(globe valve):左右对顶三角(沙漏) + 贯穿阀杆 + 顶部手轮横杆。
+    """截止阀(globe valve):左右对顶三角(沙漏) + 阀杆 + 顶部手轮横杆。
 
+    阀杆自两三角交汇的中点向上引出(不贯穿阀体),顶端接手轮横杆;
     左右竖边中点外侧各引一段接管,端口沿水平方向(in/out)。
     """
     ax.add_patch(Polygon([(x - w / 2, y - h / 2), (x - w / 2, y + h / 2),
@@ -215,7 +262,7 @@ def _globe_valve(ax, x, y, label=None, w=64, h=48, stem=26, handle=44, **kw):
                           (x, y)], closed=True, facecolor=FILL,
                          edgecolor=LINE, lw=LW_OUTLINE))
     top = y - h / 2 - stem
-    line(ax, [(x, y + h / 2), (x, top)], lw=LW_PART)      # 贯穿阀杆
+    line(ax, [(x, y), (x, top)], lw=LW_PART)              # 阀杆(止于中点)
     line(ax, [(x - handle / 2, top), (x + handle / 2, top)],
          lw=LW_STRONG)                                     # 手轮横杆
     line(ax, [(x - w / 2, y), (x - w / 2 - 12, y)], lw=LW_STRONG)
@@ -761,3 +808,43 @@ def make_economizer(w=40, h=90, style="diag", n_plates=8, name="经济器"):
 
 
 economizer_plate = make_economizer(style="plate")
+
+
+def make_separator_utube(w=120, h=118, stub=16, name="气液分离器(U形管)"):
+    """气液分离器(U 形管液封)部件,形状见 _separator_utube。
+
+    端口:in 进气(壳顶西侧短管)、out 出气(U 形管右腿,壳顶东侧)、
+    drain 放油/排液(U 形弯底,向南引出)。
+    """
+    y_port = -h / 2 - stub
+
+    def draw(ax, x, y, label=None, **kw):
+        _separator_utube(ax, x, y, label=label, w=w, h=h, stub=stub)
+
+    return Part(name, draw,
+                {"in": (-0.365 * w, y_port), "out": (0.435 * w, y_port),
+                 "drain": (0, 0.463 * h)},
+                {"in": "n", "out": "n", "drain": "s"})
+
+
+separator_utube = make_separator_utube()
+
+
+def make_oil_separator(w=64, h=176, stub=16, name="油分离器"):
+    """油分离器部件:瘦长矩形壳 + 顶/底/侧三接管(参考图画法)。
+
+    端口:top 进气(接压缩机排气)、left 干燥气出口(壳顶下 1/4,接冷凝器)、
+    bottom 回油口(接曲轴箱)。
+    """
+    y_port = -h / 2 - stub
+
+    def draw(ax, x, y, label=None, **kw):
+        _oil_separator(ax, x, y, label=label, w=w, h=h, stub=stub)
+
+    return Part(name, draw,
+                {"top": (0, y_port), "left": (-w / 2 - stub, -h / 4),
+                 "bottom": (0, -y_port)},
+                {"top": "n", "left": "w", "bottom": "s"})
+
+
+oil_separator = make_oil_separator()

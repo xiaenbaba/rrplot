@@ -255,6 +255,38 @@ def test_scroll_chord_ports_and_render():
     d.render()
 
 
+def test_separator_ports():
+    assert parts.separator.port("left") == (-17, 0)
+    assert parts.separator.port("right") == (17, 0)
+    assert parts.separator.port("top") == (0, -32)
+    assert parts.separator.direction("top") == (0, -1)
+
+
+def test_oil_separator_ports():
+    """油分离器(瘦长矩形壳):顶进气 / 上部侧口出气 / 底回油。"""
+    oil = parts.oil_separator
+    assert oil.port("top") == (0, -104)      # 默认 w=64 h=176 stub=16
+    assert oil.port("left") == (-48, -44)    # 侧管在壳顶下 h/4
+    assert oil.port("bottom") == (0, 104)
+    assert oil.direction("top") == (0, -1)
+    assert oil.direction("left") == (-1, 0)
+    assert oil.direction("bottom") == (0, 1)
+
+
+def test_separator_utube_ports():
+    """U 形管气液分离器:壳顶短管进气 / U 形管右腿出气 / 弯底放油。"""
+    sep = parts.separator_utube
+    xin, yin = sep.port("in")
+    xout, yout = sep.port("out")
+    xd, yd = sep.port("drain")
+    assert (round(xin, 1), yin) == (-43.8, -75.0)   # 默认 w=120 stub=16
+    assert (round(xout, 1), yout) == (52.2, -75.0)
+    assert (xd, round(yd, 1)) == (0, 54.6)          # 弯底放油点
+    assert sep.direction("in") == (0, -1)
+    assert sep.direction("out") == (0, -1)
+    assert sep.direction("drain") == (0, 1)
+
+
 def test_part_unknown_port_error_lists_available():
     e = _raises(KeyError, parts.evaporator.port, "outt")
     assert "没有端口" in str(e) and "out" in str(e)
