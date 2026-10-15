@@ -198,12 +198,21 @@ Linux 装 ``fonts-noto-cjk``。详见 README 的"字体"一节。
    * - ``bowtie_valve`` 系
      - ``in`` ``out``
      - 对顶三角阀;``bowtie_valve_dome`` / ``bowtie_valve_solenoid`` 带执行机构
-   * - ``globe_valve``
-     - ``in`` ``out``
-     - 截止阀:沙漏 + 贯穿阀杆 + 手轮
-   * - ``solenoid_valve``
-     - ``in`` ``out``
-     - 电磁阀:圆体 + 圆内 X + 电磁横杠
+    * - ``globe_valve``
+      - ``in`` ``out``
+      - 截止阀:沙漏 + 阀杆(止于中点) + 手轮
+    * - ``solenoid_valve``
+      - ``in`` ``out``
+      - 电磁阀:圆体 + 圆内 X + 电磁横杠
+    * - ``expansion_valve_eng``
+      - ``in`` ``out``
+      - 电子膨胀阀工程画法:圆体 + 圆内 X(无执行机构)
+    * - ``check_valve`` / ``check_valve_w``
+      - ``in`` ``out``
+      - 单向阀:实心三角 + 尖端挡条,``_w`` 为反向实例
+    * - ``filter``
+      - ``in`` ``out``
+      - 过滤器:矩形 + 菱形网格(区别于 ``filter_drier`` 干燥过滤器)
    * - ``vessel``
      - ``top`` ``bottom`` ``left`` ``right`` ``vapor``
      - 闪发罐,胶囊形上下封头
@@ -221,7 +230,9 @@ Linux 装 ``fonts-noto-cjk``。详见 README 的"字体"一节。
    from cycleplot.parts import (make_compressor, make_heat_exchanger,
                                 make_vessel, make_low_pressure_tank,
                                 make_globe_valve, make_solenoid_valve,
-                                make_bowtie_valve, make_economizer, make_rect)
+                                make_expansion_valve_eng, make_bowtie_valve,
+                                make_check_valve, make_filter,
+                                make_economizer, make_rect)
 
    comp = make_compressor(r=80, style="centrifugal")        # 半径 80
    cond = make_heat_exchanger(240, 62, shape="rect_zigzag7")  # 宽 240 高 62
@@ -388,8 +399,14 @@ Linux 装 ``fonts-noto-cjk``。详见 README 的"字体"一节。
      - 低压罐图元(顶平底圆 + 液位计)
    * - ``globe_valve_demo.py``
      - 截止阀图元(沙漏 + 手轮)
-   * - ``solenoid_valve_demo.py``
-     - 电磁阀图元(圆体 + 圆内 X)
+    * - ``solenoid_valve_demo.py``
+      - 电磁阀图元(圆体 + 圆内 X)
+    * - ``expansion_valve_eng_demo.py``
+      - 电子膨胀阀图元(工程画法)
+    * - ``check_valve_demo.py``
+      - 单向阀图元(实心三角,方向可选)
+    * - ``filter_demo.py``
+      - 过滤器图元(矩形 + 菱形网格)
 
 
 下一步

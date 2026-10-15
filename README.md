@@ -82,9 +82,12 @@ head_at, color)` 连线。
 `four_way_round`(圆体菱形四通阀,端口 exhaust/condenser/evaporator/
 suction,自带 D/S/C/E 口别标注)、`vessel`(闪发罐,
 胶囊形)、`low_pressure_tank`(低压罐,顶平底圆 + 液位计/视镜,端口
-top/bottom/left/right/vapor)、`globe_valve`(截止阀,左右对顶沙漏 + 贯穿
-阀杆 + 手轮横杆,端口 in/out)、`solenoid_valve`(电磁阀,圆体 + 圆内 X +
-顶部电磁引线与横杠,端口 in/out)等。
+top/bottom/left/right/vapor)、`globe_valve`(截止阀,左右对顶沙漏 + 阀杆
+(止于中点) + 手轮横杆,端口 in/out)、`solenoid_valve`(电磁阀,圆体 + 圆内 X +
+顶部电磁引线与横杠,端口 in/out)、`expansion_valve_eng`(电子膨胀阀工程
+画法,电磁阀体去掉引线与横杠,端口 in/out)、`check_valve`(单向阀,实心
+三角指向流通方向 + 尖端挡条,`check_valve_w` 为反向实例,端口 in/out)、
+`filter`(过滤器,矩形 + 菱形网格,端口 in/out)等。
 
 尺寸不合适时用工厂生成:
 
@@ -139,6 +142,9 @@ docstring。特殊端口定义可用 `make_partial(part, ports=..., dirs=...)`
 | low_pressure_tank_demo.py | 低压罐图元演示(顶平底圆 + 液位计) |
 | globe_valve_demo.py | 截止阀图元演示(左右对顶沙漏 + 手轮) |
 | solenoid_valve_demo.py | 电磁阀图元演示(圆体 + 圆内 X + 电磁杠) |
+| expansion_valve_eng_demo.py | 电子膨胀阀图元演示(工程画法,无执行机构) |
+| check_valve_demo.py | 单向阀图元演示(实心三角,方向可选) |
+| filter_demo.py | 过滤器图元演示(矩形 + 菱形网格) |
 
 改完脚本直接重跑即覆盖同名 PNG:
 

@@ -219,6 +219,51 @@ def test_solenoid_valve_ports():
     assert parts.solenoid_valve.direction("out") == (1, 0)
 
 
+def test_expansion_valve_eng_ports():
+    """工程画法电子膨胀阀:电磁阀体去掉引线与横杠,端口同电磁阀。"""
+    v = parts.expansion_valve_eng
+    assert v.port("in") == (-46, 0)
+    assert v.port("out") == (46, 0)
+    assert v.direction("in") == (-1, 0)
+    assert v.direction("out") == (1, 0)
+
+
+def test_check_valve_ports():
+    """单向阀:实心三角 + 尖端挡条,point 决定指向与进出端口。"""
+    cv = parts.check_valve
+    assert cv.port("in") == (-40, 0)       # 默认 w=56 stub=12
+    assert cv.port("out") == (40, 0)
+    assert cv.direction("in") == (-1, 0)
+    assert cv.direction("out") == (1, 0)
+    cw = parts.check_valve_w
+    assert cw.port("in") == (40, 0)
+    assert cw.port("out") == (-40, 0)
+    assert cw.direction("in") == (1, 0)
+    assert cw.direction("out") == (-1, 0)
+    assert cw.name == "单向阀(反向)"
+    e = _raises(ValueError, parts.make_check_valve, point="n")
+    assert "point" in str(e) and "'e'" in str(e)
+
+
+def test_check_valve_render_both_directions():
+    d = Diagram(width=360, height=140)
+    d.add(parts.check_valve, "单向阀", loc=(90, 70))
+    d.add(parts.check_valve_w, "反向", loc=(260, 70))
+    d.render()
+
+
+def test_filter_ports():
+    """过滤器:矩形 + 菱形网格,in=西口 / out=东口。"""
+    f = parts.filter
+    assert f.port("in") == (-48, 0)       # 默认 w=72 stub=12
+    assert f.port("out") == (48, 0)
+    assert f.direction("in") == (-1, 0)
+    assert f.direction("out") == (1, 0)
+    d = Diagram(width=240, height=140)
+    d.add(parts.filter, "过滤器", loc=(120, 70))
+    d.render()
+
+
 def test_bowtie_valve_family():
     # 默认 w=76:端口在两三角竖边 x=±38,流向惯例 in=东口/out=西口
     assert parts.bowtie_valve.port("in") == (38, 0)
