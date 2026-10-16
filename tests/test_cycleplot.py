@@ -443,13 +443,12 @@ def test_render_every_part_and_hvac_symbol(tmp_path=None):
     from cycleplot.parts import Part
     tmp = tmp_path if tmp_path is not None else tempfile.mkdtemp()
 
-    # hvac 模块提供的是工厂函数(显式列举,避开它导入的 matplotlib 类)
-    hvac_factories = ("heat_pump", "water_pump", "thermal_tank", "fan_coil",
-                      "floor_heating", "supply_manifold", "return_manifold",
-                      "ball_valve", "anti_freeze_valve", "drain_valve",
-                      "makeup_valve", "safety_valve", "auto_vent",
-                      "electric_heater", "corrugated_pipe", "supply_pipe",
-                      "return_pipe")
+    # hvac 工厂函数自动发现:排除导入进来的 matplotlib 类/原语(模块名不同),
+    # 新增符号无需再手工登记;数量下限兜底防漏。
+    hvac_factories = [name for name, obj in vars(hvac).items()
+                      if callable(obj) and not name.startswith("_")
+                      and getattr(obj, "__module__", None) == hvac.__name__]
+    assert len(hvac_factories) >= 17, f"hvac 工厂过少:{hvac_factories}"
     items = [(k, v) for k, v in vars(parts).items() if isinstance(v, Part)
              and not k.startswith("_")]
     items += [(name, getattr(hvac, name)()) for name in hvac_factories]

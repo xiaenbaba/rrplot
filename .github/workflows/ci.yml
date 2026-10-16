@@ -28,7 +28,46 @@ jobs:
         run: python -c "import cycleplot; print(cycleplot.__name__)"
 
       - name: Run tests with coverage
-        run: python -m pytest --cov=cycleplot --cov-report=term-missing
+        run: >-
+          python -m pytest --cov=cycleplot --cov-report=term-missing
+          --cov-fail-under=90
+
+  examples:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install package
+        run: python -m pip install -e ".[test]"
+
+      - name: Run every example (smoke)
+        run: |
+          set -e
+          for f in examples/*.py; do
+            echo "== $f"
+            python "$f"
+          done
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install docs deps
+        run: python -m pip install -e ".[docs]"
+
+      - name: Build docs
+        run: python -m sphinx -b html docs docs/_build/html
 
   lint:
     runs-on: ubuntu-latest
@@ -40,7 +79,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install ruff
-        run: python -m pip install ruff
+        run: python -m pip install ruff==0.15.13
 
       - name: Ruff check
         run: ruff check cycleplot tests

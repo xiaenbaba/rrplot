@@ -1,5 +1,42 @@
 # cycleplot 项目审查报告
 
+> **2026-10-16 复审补充**:下方 2026-10-12 旧报告的规模数字(43 例 / 覆盖率
+> 96% / 版本 0.1.0 / 旧行数)已过时,仅作历史记录;当前状态以本节为准。
+
+## 2026-10-16 复审补充
+
+**现状**:53 例测试全绿;`ruff check cycleplot tests` 全绿;22 个 `examples/*.py`
+逐个跑通。包内覆盖率 **97%**(`core 98 / parts 98 / hvac 94 / svgparts 93 /
+style 96 / _primitives 100 / __init__ 100`)。
+
+**本轮整改(按优先级落地)**:
+
+1. CI 加固(`.github/workflows/ci.yml`):`pytest` 加 `--cov-fail-under=90`;
+   新增 `examples` 烟雾 job(逐个执行示例);新增 `docs` job(`sphinx-build`);
+   ruff 固定 `ruff==0.15.13`(原先装最新版,规则升级会突然弄红构建)。
+2. 测试去硬编码:`test_render_every_part_and_hvac_symbol` 的 17 个 hvac 工厂名
+   改为按 `__module__` 自动发现 + 数量下限,新增符号不再需要手工登记。
+3. 消除重复实现:原 `cycleplot/vrfpart.py` 是脱离库约定的第三套 SVG 引擎,
+   已**降级为 `references/vrfpart.py` 原型**(不进包、不进覆盖率、不进 API 文档);
+   根目录 `draw_gmv.py` 改为调用 `render_gmv()` 的薄封装,同图不再两处维护。
+4. 仓库整理:早期原型 `制冷循环示意图.*`、`涡旋压缩机循环示意图.*` 移入
+   `references/`;根目录只留元文件。生成物(`*.svg`/`*.png` 于 `references/`、
+   `examples/*.svg`)加入 `.gitignore`,不再入库。
+5. 依赖来源统一:`requirements.txt` 与 `pyproject.toml` 重复,已删除前者,以
+   `pyproject` 为唯一来源;新增 `docs` extra。
+6. 文档与协作:新增 `CONTRIBUTING.md`、`references/README.md`、`.readthedocs.yaml`;
+   修正 `docs/conf.py` 里 `sys.path` 用 cwd 推断仓库根的问题(改为按 `__file__`)。
+
+**遗留(未处理,按需)**:
+
+- `parts.py`(1014 行)拆成 `parts/` 包。
+- `Diagram` 资源管理(加 `close()` / 上下文管理器);`style.py` import 时改全局
+  `rcParams` 的副作用写进文档。
+- `svgparts.load_svg_part` 加载不受信任 SVG 时的实体展开防护(`defusedxml` 可选)。
+- `.pre-commit-config.yaml`、`CHANGELOG.md`、CI 矩阵补 Python 3.13。
+
+---
+
 **审查日期**: 2026-10-12
 **项目类型**: 制冷循环与 HVAC 示意图绘制库
 **技术栈**: Python 3.9+, Matplotlib 3.7+, NumPy 1.23+

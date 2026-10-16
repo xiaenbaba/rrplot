@@ -15,3 +15,10 @@ dist/
 
 # 文档构建产物
 docs/_build/
+
+# 示例生成的矢量图(矢量副本不入库;PNG 仍随示例入库)
+examples/*.svg
+
+# references/ 原型脚本就地生成的图(仅 references/ 顶层,不含 hvacsvg/symbols)
+references/*.svg
+references/*.png
