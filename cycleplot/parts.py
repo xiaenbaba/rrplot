@@ -572,6 +572,15 @@ def _economizer(ax, x, y, w=40, h=90, label="经济器", style="diag",
         txt(ax, x + w / 2 + 18, y + 30, label, ha="left", boxed=True)
 
 
+def _subcooler(ax, x, y, w=64, h=150, label="过冷器", **kw):
+    """过冷器:矩形外框 + 连接上下边中点的中央竖线,板式过冷器芯体符号。"""
+    ax.add_patch(Rectangle((x - w / 2, y - h / 2), w, h, facecolor=FILL,
+                           edgecolor=LINE, lw=LW_STRONG))
+    line(ax, [(x, y - h / 2), (x, y + h / 2)], lw=LW_PART)
+    if label:
+        txt(ax, x + w / 2 + 18, y, label, ha="left", boxed=True)
+
+
 def _capillary(ax, x, y, label="毛细管", w=18, h=80, n=5, **kw):
     """毛细管:竖直弹簧形小螺旋管(半圆弧交替左/右),表示细长节流管。"""
     seg = h / n
@@ -938,6 +947,26 @@ def make_economizer(w=40, h=90, style="diag", n_plates=8, name="经济器"):
 
 
 economizer_plate = make_economizer(style="plate")
+
+
+def make_subcooler(w=64, h=150, side_frac=0.25, name="过冷器"):
+    """过冷器部件:矩形外框 + 中央竖线,四接口画法,形状见 _subcooler。
+
+    端口:top 主路进、bottom 主路出(分别在外壳上下边中点,由中央竖线相连);
+    left / right 支路(过冷/喷气),沿竖向反相错开 ±side_frac*h,
+    以示逆流(默认 left 偏上、right 偏下)。
+    """
+    def draw(ax, x, y, label="过冷器", **kw):
+        _subcooler(ax, x, y, w=w, h=h, label=label)
+
+    return Part(name, draw,
+                {"top": (0, -h / 2), "bottom": (0, h / 2),
+                 "left": (-w / 2, -side_frac * h),
+                 "right": (w / 2, side_frac * h)},
+                {"top": "n", "bottom": "s", "left": "w", "right": "e"})
+
+
+subcooler = make_subcooler()
 
 
 def make_separator_utube(w=120, h=118, stub=16, flip=False,

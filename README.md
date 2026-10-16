@@ -78,7 +78,8 @@ head_at, color)` 连线。
 
 按名字取直接实例:`compressor`、`evaporator`、`condenser`、`separator`
 (气液分离器)、`receiver`(储液器)、`expansion_valve`、`capillary`(毛
-细管)、`filter_drier`、`plate_hex`、`economizer`、`four_way_valve`、
+细管)、`filter_drier`、`plate_hex`、`economizer`、`subcooler`(过冷器,矩形
++ 中央竖线四口,主路 top/bottom、支路 left/right 逆流错开)、`four_way_valve`、
 `four_way_round`(圆体菱形四通阀,端口 exhaust/condenser/evaporator/
 suction,自带 D/S/C/E 口别标注)、`vessel`(闪发罐,
 胶囊形)、`low_pressure_tank`(低压罐,顶平底圆 + 液位计/视镜,端口

@@ -25,13 +25,13 @@ from cycleplot.parts import (
     four_way_round,
     make_bowtie_valve,
     make_check_valve,
-    make_economizer,
     make_expansion_valve_eng,
     make_globe_valve,
     make_heat_exchanger,
     make_scroll_chord,
     make_separator_utube,
     make_solenoid_valve,
+    make_subcooler,
     oil_separator,
 )
 from cycleplot.style import LW_PIPE
@@ -71,9 +71,8 @@ filt = d.add(filter, "过滤器", loc=(830, 250))
 eev_p = make_expansion_valve_eng(r=26)
 hee = d.add(make_bowtie_valve(actuator="dome", w=60, h=34, dome_r=16,
                               stem=12), "制热膨胀阀", loc=(760, 340))
-# 过冷器:板式四接口(主管上进/下出,支管右进/左出)
-sub = d.add(make_economizer(w=64, h=150, style="plate", n_plates=9),
-            None, loc=(700, 560))
+# 过冷器:矩形 + 中央竖线四接口(主管上进/下出,支管右进/左出,逆流错开)
+sub = d.add(make_subcooler(w=64, h=150), None, loc=(700, 560))
 sub_eev = d.add(eev_p, "过冷膨胀阀", loc=(790, 660))
 bypass = d.add(make_solenoid_valve(r=26, stem=16, handle=32), "热气旁通阀",
                loc=(485, 610))
@@ -149,7 +148,7 @@ d.pipe(liq_stop["out"], (1010, 200), via=[(1010, 730)],
        color=BLUE, head_at=(0.7,))
 # 过冷支路:主管出口后分一路 → 过冷膨胀阀 → 过冷器支管进(右口)
 d.pipe((700, 660), sub_eev["in"], color=BLUE, head_at=(0.5,))
-d.pipe(sub_eev["out"], sub["right"], via=[(860, 660), (860, 560)],
+d.pipe(sub_eev["out"], sub["right"], via=[(860, 660), (860, 597.5)],
        color=BLUE, head_at=(0.3, 0.75))
 # 液管总管 → 两台室内机电子膨胀阀
 d.pipe((1010, 200), eev1["in"], color=BLUE, head_at=(0.5,))
@@ -184,7 +183,7 @@ d.pipe((140, 640), bypass["in"], via=[(400, 640), (400, 610)],
 d.pipe(bypass["out"], (390, 745), via=[(560, 610), (560, 745)],
        color=RED, head_at=(0.3,))
 # 喷气增焓(虚线):过冷器支管出(左口)→ 喷气膨胀阀 → 压缩机补气口
-d.pipe(sub["left"], gee["out"], via=[(650, 560), (650, 780)],
+d.pipe(sub["left"], gee["out"], via=[(650, 522.5), (650, 780)],
        color=SLATE, linestyle="dashed", head_at=(0.25, 0.75))
 d.pipe(gee["in"], comp["inj"],
        via=[(540, 780), (540, 960), (133.2, 960)],

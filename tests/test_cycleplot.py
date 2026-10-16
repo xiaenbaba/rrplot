@@ -535,6 +535,23 @@ def test_render_all_economizer_styles(tmp_path=None):
     plt.close(d.fig)
 
 
+def test_subcooler_ports_and_render(tmp_path=None):
+    """过冷器四口:主路 top/bottom 居中,支路 left/right 逆流错开。"""
+    import tempfile
+    sc = parts.make_subcooler(w=64, h=150)
+    assert sc.port("top") == (0, -75)
+    assert sc.port("bottom") == (0, 75)
+    assert sc.port("left") == (-32, -0.25 * 150)
+    assert sc.port("right") == (32, 0.25 * 150)
+    tmp = tmp_path if tmp_path is not None else tempfile.mkdtemp()
+    d = Diagram(width=300, height=300)
+    d.add(sc, "过冷器", loc=(150, 150))
+    png = d.save(os.path.join(tmp, "subcooler.png"))
+    assert os.path.getsize(png) > 1_500
+    import matplotlib.pyplot as plt
+    plt.close(d.fig)
+
+
 def test_render_all_labels_on_and_off(tmp_path=None):
     """每个部件在 label 有/无两种情况下都能渲染(覆盖 if label 分支)。"""
     import tempfile
