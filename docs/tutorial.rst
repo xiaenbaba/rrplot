@@ -363,7 +363,7 @@ Linux 装 ``fonts-noto-cjk``。详见 README 的"字体"一节。
 10. 现成示例
 ----------------------------------------
 
-``examples/`` 下 16 个脚本,每个都配一张同名 PNG,建议对照着改:
+``examples/`` 下 17 个脚本,每个都配一张同名 PNG,建议对照着改:
 
 .. list-table::
    :header-rows: 1
@@ -399,14 +399,16 @@ Linux 装 ``fonts-noto-cjk``。详见 README 的"字体"一节。
      - 低压罐图元(顶平底圆 + 液位计)
    * - ``globe_valve_demo.py``
      - 截止阀图元(沙漏 + 手轮)
-    * - ``solenoid_valve_demo.py``
-      - 电磁阀图元(圆体 + 圆内 X)
-    * - ``expansion_valve_eng_demo.py``
-      - 电子膨胀阀图元(工程画法)
-    * - ``check_valve_demo.py``
-      - 单向阀图元(实心三角,方向可选)
-    * - ``filter_demo.py``
-      - 过滤器图元(矩形 + 菱形网格)
+   * - ``solenoid_valve_demo.py``
+     - 电磁阀图元(圆体 + 圆内 X)
+   * - ``expansion_valve_eng_demo.py``
+     - 电子膨胀阀图元(工程画法)
+   * - ``check_valve_demo.py``
+     - 单向阀图元(实心三角,方向可选)
+   * - ``filter_demo.py``
+     - 过滤器图元(矩形 + 菱形网格)
+   * - ``vrf_system.py``
+     - 多联机(VRF)系统流程(室外机 + 双室内机,综合布线范例)
 
 
 下一步

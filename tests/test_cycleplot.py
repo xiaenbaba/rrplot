@@ -79,6 +79,15 @@ def test_pipe_records_color():
     assert p.points() == [(0.0, 0.0), (50.0, 0.0)]
 
 
+def test_pipe_records_linestyle():
+    d = Diagram(width=100, height=100)
+    p = d.pipe((0, 0), (50, 0), linestyle="dashed")
+    assert p.linestyle == "dashed"
+    p2 = d.pipe((0, 10), (50, 10))
+    assert p2.linestyle == "solid"
+    d.render()
+
+
 def test_load_svg_part_moves_override_port():
     sym = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                        "references", "hvacsvg", "symbols", "04_蓄热水箱.svg")
@@ -330,6 +339,19 @@ def test_separator_utube_ports():
     assert sep.direction("in") == (0, -1)
     assert sep.direction("out") == (0, -1)
     assert sep.direction("drain") == (0, 1)
+
+
+def test_separator_utube_flip_ports():
+    """flip=True 镜像:in 换到东侧 / out 换到西侧,drain 不动。"""
+    sep = parts.make_separator_utube(flip=True)
+    xin, yin = sep.port("in")
+    xout, yout = sep.port("out")
+    xd, yd = sep.port("drain")
+    assert (round(xin, 1), yin) == (43.8, -75.0)
+    assert (round(xout, 1), yout) == (-52.2, -75.0)
+    assert (xd, round(yd, 1)) == (0, 54.6)
+    assert sep.direction("in") == (0, -1)
+    assert sep.direction("out") == (0, -1)
 
 
 def test_part_unknown_port_error_lists_available():

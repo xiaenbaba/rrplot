@@ -204,7 +204,7 @@ def _orthogonalize(pts, first_along=None, last_along=None):
 
 class Pipe:
     def __init__(self, diagram, a, b, via, states, lw, head, head_at,
-                 color=LINE, head_size=8):
+                 color=LINE, head_size=8, linestyle="solid"):
         self.d = diagram
         self.a = a
         self.b = b
@@ -215,6 +215,7 @@ class Pipe:
         self.head_at = head_at
         self.head_size = head_size
         self.color = color
+        self.linestyle = linestyle
         self._pts = None
 
     def points(self):
@@ -257,7 +258,8 @@ class Pipe:
 
     def draw(self):
         pts = self.points()
-        _line(self.d.ax, pts, lw=self.lw, color=self.color)
+        _line(self.d.ax, pts, lw=self.lw, color=self.color,
+              linestyle=self.linestyle)
         if self.head:
             for f in self.head_at:
                 _draw_head(self.d.ax, pts, f, self.color, self.head_size)
@@ -310,8 +312,10 @@ class Diagram:
         return node
 
     def pipe(self, a, b, via=(), states=(), lw=LW_PIPE, head=True,
-             head_at=(0.55,), color=LINE, head_size=8):
-        """连线。head_size 为随线箭头大小(默认 8,论文粗箭头可用 16~20)。"""
+             head_at=(0.55,), color=LINE, head_size=8, linestyle="solid"):
+        """连线。head_size 为随线箭头大小(默认 8,论文粗箭头可用 16~20);
+        linestyle 传 matplotlib 线型("solid"/"dashed"/":" 等),虚线管用。
+        """
         a, b = _as_port(a), _as_port(b)
         if isinstance(states, State):
             states = (states,)
@@ -326,7 +330,7 @@ class Diagram:
             else:
                 norm.append(State(s[0], s[1]))
         p = Pipe(self, a, b, list(via), norm, lw, head, head_at, color,
-                 head_size)
+                 head_size, linestyle)
         self._pipes.append(p)
         return p
 

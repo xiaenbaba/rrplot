@@ -114,11 +114,12 @@ docstring。特殊端口定义可用 `make_partial(part, ports=..., dirs=...)`
 `cycleplot.svgparts.load_svg_part(path, ...)` 直接加载新 SVG。
 
 <details>
-<summary>看图:空气能供暖系统(带水箱)/ 四通阀圆体回路 / SVG 符号直接加载</summary>
+<summary>看图:空气能供暖系统(带水箱)/ 四通阀圆体回路 / SVG 符号直接加载 / 多联机(VRF)</summary>
 
 ![空气能供暖系统](examples/hvac_system.png)
 ![四通阀圆体回路](examples/four_way_round_demo.png)
 ![SVG 符号直接加载](examples/hvacsvg_demo.png)
+![多联机(VRF)系统](examples/vrf_system.png)
 
 </details>
 
@@ -145,6 +146,7 @@ docstring。特殊端口定义可用 `make_partial(part, ports=..., dirs=...)`
 | expansion_valve_eng_demo.py | 电子膨胀阀图元演示(工程画法,无执行机构) |
 | check_valve_demo.py | 单向阀图元演示(实心三角,方向可选) |
 | filter_demo.py | 过滤器图元演示(矩形 + 菱形网格) |
+| vrf_system.py | 多联机(VRF)系统流程(室外机 + 双室内机) |
 
 改完脚本直接重跑即覆盖同名 PNG:
 

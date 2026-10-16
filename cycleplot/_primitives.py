@@ -13,10 +13,10 @@ def txt(ax, x, y, s, size=18, ha="center", va="center", weight="normal",
             color=color, fontweight=weight, rotation=rot, **kw)
 
 
-def line(ax, pts, lw=1.0, color=LINE):
+def line(ax, pts, lw=1.0, color=LINE, linestyle="solid"):
     xs, ys = zip(*pts)
-    ax.plot(xs, ys, color=color, lw=lw, solid_capstyle="round",
-            solid_joinstyle="round")
+    ax.plot(xs, ys, color=color, lw=lw, linestyle=linestyle,
+            solid_capstyle="round", solid_joinstyle="round")
 
 
 def arrow(ax, x1, y1, x2, y2, size=8, lw=0.9, color=LINE):
