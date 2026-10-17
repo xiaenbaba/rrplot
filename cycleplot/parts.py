@@ -619,8 +619,8 @@ def make_rect(w, h, name="换热器"):
                 {"top": "n", "bottom": "s"})
 
 
-HEX_SHAPES = ("circle", "rect", "rect_diag", "rect_zigzag", "rect_zigzag7",
-              "rect_shell")
+HEX_SHAPES = ("circle", "rect", "rect_diag", "rect_x", "rect_zigzag",
+              "rect_zigzag7", "rect_shell")
 
 
 # =========================
@@ -637,6 +637,7 @@ def make_heat_exchanger(w=80, h=80, r=None, shape="rect", name="冷凝器",
       - ``rect_zigzag`` 矩形外壳 + 蛇形盘管(n_pts 段交替圆弧 S 弯,默认 5)
       - ``rect_zigzag7`` 矩形外壳 + 7 点之字盘管
       - ``rect_diag`` 矩形外壳 + 左上→右下对角线(简化符号)
+      - ``rect_x`` 矩形外壳 + 两条对角线交叉(X 形换热面)
       - ``rect_shell`` 管壳式:外框 + 中央竖管(壳程/管程分列两侧)
 
     端口落在四边中点。
@@ -659,6 +660,10 @@ def make_heat_exchanger(w=80, h=80, r=None, shape="rect", name="冷凝器",
                                    edgecolor=LINE, lw=LW_PART))
         if shape == "rect_diag":
             line(ax, [(x - rx, y - ry), (x + rx, y + ry)], lw=LW_OUTLINE)
+        elif shape == "rect_x":
+            for s in (-1, 1):
+                line(ax, [(x - rx, y - s * ry), (x + rx, y + s * ry)],
+                     lw=LW_OUTLINE)
         elif shape == "rect_zigzag":
             # 蛇形盘管:n 段交替圆弧 S 弯,左口中点起笔,右口中点收笔
             n = n_pts
@@ -779,6 +784,53 @@ def make_scroll_chord(r=85, name="涡旋压缩机"):
 
 
 scroll_chord = make_scroll_chord()
+
+
+def _compressor_capsule(ax, x, y, label=None, w=48, h=84, stub=12,
+                        label_size=None, **kw):
+    """立式胶囊壳体压缩机 + 竖排标签;接管短管:上/下中/右下弧三处。"""
+    rx = w / 2
+    ax.add_patch(FancyBboxPatch(
+        (x - rx, y - h / 2), w, h,
+        boxstyle=f"round,pad=0.02,rounding_size={rx}",
+        facecolor=FILL, edgecolor=LINE, lw=LW_STRONG))
+    ix = 0.85 * rx                                    # 补气口水平位置
+    iy = y + h / 2 - rx + math.sqrt(rx * rx - ix * ix)  # 壳体底弧上起点
+    line(ax, [(x, y - h / 2), (x, y - h / 2 - stub)], lw=LW_STRONG)
+    line(ax, [(x, y + h / 2), (x, y + h / 2 + stub)], lw=LW_STRONG)
+    line(ax, [(x + ix, iy), (x + ix, iy + stub)], lw=LW_STRONG)
+    if not label:
+        return
+    s = label if "\n" in label else "\n".join(str(label))
+    n = s.count("\n") + 1
+    size = label_size or min(20, (h - 12) / (n * 1.15))
+    txt(ax, x, y, s, size=size, linespacing=1.05)
+
+
+def make_compressor_capsule(w=48, h=84, stub=12, name="增焓压缩机"):
+    """立式胶囊机身压缩机(VRF / 喷气增焓参考图画法)。
+
+    圆角胶囊壳体,标签竖排逐字写于机身内;discharge 自顶竖直向上
+    (排气),suction 自底竖直向下(回气),inj 为喷气增焓补气口,
+    自壳体右下弧竖直向下引短管。与 make_scroll_chord 的差别在外形
+    (圆 vs 立式胶囊)与端口语义(左右中点 vs 上/下/右下)。
+    """
+    rx = w / 2
+    ix = 0.85 * rx
+    iy = h / 2 - rx + math.sqrt(rx * rx - ix * ix)
+
+    def draw(ax, x, y, label=None, label_size=None, **kw):
+        _compressor_capsule(ax, x, y, label=label, w=w, h=h, stub=stub,
+                            label_size=label_size)
+
+    return Part(name, draw,
+                {"discharge": (0, -h / 2 - stub),
+                 "suction": (0, h / 2 + stub),
+                 "inj": (ix, iy + stub)},
+                {"discharge": "n", "suction": "s", "inj": "s"})
+
+
+capsule_compressor = make_compressor_capsule()
 
 
 def make_vessel(w=66, h=150, liquid=0.42, name="闪发罐"):

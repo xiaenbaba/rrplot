@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """示例:多联机(VRF)系统流程图 —— 参考图风格的室外机 + 双室内机。
 
-室外机:涡旋压缩机 → 油分离器(底部毛细管回油至吸气管) → 四通阀 → 室外换热器
+室外机:立式胶囊压缩机(上排/下吸/右下补气) → 油分离器(底部毛细管回油至吸气管) → 四通阀 → 室外换热器
        (轴流风机)→ 过滤器 → 单向阀 → 过冷器主管(上进/下出)→ 液管总线截止阀 → 出机;
 室内机:液管总管 → 电子膨胀阀 → 换热器 → 气管并联汇入总管;
 气管:两室内机汇合 → 总线截止阀 → 四通阀 E 口;
@@ -19,16 +19,16 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from matplotlib.patches import Arc, Circle, Ellipse, Polygon, Rectangle
 
-from cycleplot import Diagram, make_partial, use_font
+from cycleplot import Diagram, use_font
 from cycleplot.parts import (
     filter,
     four_way_round,
     make_bowtie_valve,
     make_check_valve,
+    make_compressor_capsule,
     make_expansion_valve_eng,
     make_globe_valve,
     make_heat_exchanger,
-    make_scroll_chord,
     make_separator_utube,
     make_solenoid_valve,
     make_subcooler,
@@ -60,8 +60,8 @@ for bx, bw, name in ((60, 150, "室外机"), (1080, 165, "室内机 1"),
 d.text(780, 45, "多联机(VRF)系统原理图", ha="center", size=17)
 
 # ===================== 部件 =====================
-comp = d.add(make_partial(make_scroll_chord(), {"discharge": (0, -85)}),
-             "压缩机", loc=(140, 840), label_offset=(50, -140))
+comp = d.add(make_compressor_capsule(w=64, h=112, stub=13), "压缩机",
+             loc=(140, 840))
 oil = d.add(oil_separator, None, loc=(140, 470))
 fw = d.add(four_way_round, "", loc=(200, 230), mark=False)
 cond = d.add(make_heat_exchanger(240, 110, shape="rect_zigzag7"), None,
@@ -171,9 +171,9 @@ d.pipe(gas_stop["in"], fw["evaporator"],
 d.pipe(fw["suction"], acc["in"],
        via=[(85, 230), (85, 290), (420, 290), (420, 700), (373.8, 700)],
        color=GREEN, head_at=(0.2, 0.7))
-# 气液分离器 → 压缩机吸气(镜像件:out 在西侧,向西直接引出)
+# 气液分离器 → 压缩机吸气(吸气管口竖直向下,自下方上行接入)
 d.pipe(acc["out"], comp["suction"],
-       via=[(277.8, 660), (48, 660), (48, 840)],
+       via=[(277.8, 660), (48, 660), (48, 950), (140, 950)],
        color=GREEN, head_at=(0.35, 0.9))
 
 # ===================== 旁通与喷气(虚线除外的热气旁通) =====================
@@ -186,7 +186,7 @@ d.pipe(bypass["out"], (390, 745), via=[(560, 610), (560, 745)],
 d.pipe(sub["left"], gee["out"], via=[(650, 522.5), (650, 780)],
        color=SLATE, linestyle="dashed", head_at=(0.25, 0.75))
 d.pipe(gee["in"], comp["inj"],
-       via=[(540, 780), (540, 960), (133.2, 960)],
+       via=[(540, 780), (540, 960), (167.2, 960)],
        color=SLATE, linestyle="dashed", head_at=(0.5, 0.97))
 
 # ===================== T 型三通接点 =====================

@@ -309,6 +309,25 @@ def test_scroll_chord_ports_and_render():
     d.render()
 
 
+def test_capsule_compressor_ports_and_render():
+    cc = parts.make_compressor_capsule()
+    assert cc.port("discharge") == (0, -54)      # 默认 w=48 h=84 stub=12
+    assert cc.port("suction") == (0, 54)
+    ix, iy = cc.port("inj")
+    assert ix == 0.85 * 24
+    # 底弧上起点(y = h/2 - rx + sqrt(rx² - ix²)) + 竖直向下 stub
+    assert iy == 42 - 24 + 24 * (1 - 0.85 ** 2) ** 0.5 + 12
+    assert cc.direction("discharge") == (0, -1)
+    assert cc.direction("suction") == (0, 1)
+    assert cc.direction("inj") == (0, 1)
+    d = Diagram(width=480, height=200)
+    d.add(parts.capsule_compressor, "压缩机", loc=(90, 95))
+    d.add(parts.make_compressor_capsule(w=60, h=110), "变频压缩机",
+          loc=(250, 95))
+    d.add(parts.capsule_compressor, "", loc=(410, 95))
+    d.render()
+
+
 def test_separator_ports():
     assert parts.separator.port("left") == (-17, 0)
     assert parts.separator.port("right") == (17, 0)

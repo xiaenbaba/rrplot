@@ -76,7 +76,7 @@ Linux 装 ``fonts-noto-cjk``。详见 README 的"字体"一节。
 .. code-block:: powershell
 
    python examples/compressor_symbols.py      # 7 种压缩机画法
-   python examples/heat_exchanger_shapes.py   # 5 种换热器画法
+   python examples/heat_exchanger_shapes.py   # 换热器 7 种画法对照
 
 或者看 ``SVG/`` 目录下 37 张导出的部件单图,挑好之后 ``from cycleplot.svgparts`` 之外,
 用 ``python export_parts_svg.py`` 重新导出。
@@ -159,9 +159,12 @@ Linux 装 ``fonts-noto-cjk``。详见 README 的"字体"一节。
    * - 实例
      - 端口
      - 说明
-   * - ``compressor``
-     - ``suction`` ``discharge`` ``vapor_inj``
-     - 圆形压缩机,默认 centrifugal 画法
+   * - ``compressor``(工厂 ``make_compressor``)
+     - ``left`` ``right`` ``top`` ``bottom``
+     - 圆形压缩机,7 种型式标记(``COMPRESSOR_STYLES``)
+   * - ``capsule_compressor``(工厂 ``make_compressor_capsule``)
+     - ``discharge`` ``suction`` ``inj``
+     - 立式胶囊压缩机(VRF/喷气增焓):上排气、下回气、右下补气口,标签竖排机身内
    * - ``evaporator``
      - ``in`` ``out``
      - 竖长方形 + 双椭圆盘管
@@ -241,7 +244,7 @@ Linux 装 ``fonts-noto-cjk``。详见 README 的"字体"一节。
 ``make_compressor`` 的 ``style``:``centrifugal`` / ``rotor`` / ``axial`` /
 ``recip`` / ``screw`` / ``scroll`` / ``chord``;
 ``make_heat_exchanger`` 的 ``shape``:``circle`` / ``rect`` / ``rect_diag`` /
-``rect_zigzag`` / ``rect_zigzag7``。
+``rect_x`` / ``rect_zigzag`` / ``rect_zigzag7`` / ``rect_shell``。
 
 **只想改端口、不想重画图形**,用 ``make_partial``:
 
