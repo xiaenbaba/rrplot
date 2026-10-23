@@ -720,12 +720,6 @@ condenser = _part("冷凝器", {"left": (-32, 0), "right": (32, 0),
 four_way_valve = _part("四通阀", {"left": (-20, 0), "right": (20, 0),
                                   "top": (0, -14), "bottom": (0, 14)},
                        _four_way_valve, dirs={"top": "n", "bottom": "s"})
-four_way_round = _part("四通阀(圆菱形)",
-                       {"exhaust": (0, -40), "condenser": (40, 0),
-                        "evaporator": (0, 40), "suction": (-40, 0)},
-                       _four_way_round_valve,
-                       dirs={"exhaust": "n", "condenser": "e",
-                             "evaporator": "s", "suction": "w"})
 expansion_valve = _part("电子膨胀阀", {"in": (16, 0), "out": (-16, 0)},
                         _expansion_valve)
 filter_drier = _part("干燥过滤器", {"in": (35, 0), "out": (-35, 0)},
@@ -875,6 +869,27 @@ vessel = make_vessel()
 low_pressure_tank = make_low_pressure_tank()
 
 
+def make_four_way_round(r=40, mark=True, name="四通阀(圆菱形)"):
+    """四通换向阀部件(圆体 + 内菱形),r 为圆体半径,端口随 r 缩放。
+
+    端口落在菱形四角:exhaust 顶(D)/ condenser 右(C)/
+    evaporator 底(E)/ suction 左(S);mark=True 在四端点外侧
+    标注 D/S/C/E 口别字母。mark 等 add() 时同名词可覆盖。
+    """
+    def draw(ax, x, y, label=None, **kw):
+        _four_way_round_valve(ax, x, y, label=label,
+                              **{"r": r, "mark": mark, **kw})
+
+    return Part(name, draw,
+                {"exhaust": (0, -r), "condenser": (r, 0),
+                 "evaporator": (0, r), "suction": (-r, 0)},
+                {"exhaust": "n", "condenser": "e",
+                 "evaporator": "s", "suction": "w"})
+
+
+four_way_round = make_four_way_round()
+
+
 def make_globe_valve(w=64, h=48, stem=26, handle=44, name="截止阀"):
     """截止阀部件:左右对顶三角沙漏 + 贯穿阀杆 + 手轮横杆。端口 in/out。
 
@@ -973,8 +988,10 @@ def make_bowtie_valve(w=76, h=44, actuator="none", stem=14, dome_r=21,
     d.add(parts.bowtie_valve, "电磁阀", loc=..., actuator="solenoid")。
     """
     def draw(ax, x, y, label=None, **kw):
-        _bowtie_valve(ax, x, y, label=label, w=w, h=h, actuator=actuator,
-                      stem=stem, dome_r=dome_r, sol_len=sol_len)
+        _bowtie_valve(ax, x, y, label=label,
+                      **{"w": w, "h": h, "actuator": actuator,
+                         "stem": stem, "dome_r": dome_r,
+                         "sol_len": sol_len, **kw})
 
     return Part(name, draw, {"in": (w / 2, 0), "out": (-w / 2, 0)},
                 {"in": "e", "out": "w"})

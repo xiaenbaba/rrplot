@@ -201,6 +201,33 @@ def test_four_way_round_ports():
     assert parts.four_way_round.port("condenser") == (40, 0)
     assert parts.four_way_round.port("evaporator") == (0, 40)
     assert parts.four_way_round.port("suction") == (-40, 0)
+    # 工厂缩放:端口随 r 缩放,默认实例与工厂默认一致
+    fw = parts.make_four_way_round(r=30, mark=False)
+    assert fw.port("exhaust") == (0, -30)
+    assert fw.port("condenser") == (30, 0)
+    assert fw.port("evaporator") == (0, 30)
+    assert fw.port("suction") == (-30, 0)
+    assert fw.direction("exhaust") == (0, -1)
+    assert fw.direction("condenser") == (1, 0)
+    assert fw.direction("evaporator") == (0, 1)
+    assert fw.direction("suction") == (-1, 0)
+    d = Diagram(width=300, height=200)
+    d.add(fw, "", loc=(150, 100))
+    d.render()
+    # add() 时 mark=False 可覆盖工厂默认:无内置 D/S/C/E 文字,也不画标签
+    assert not d.ax.texts
+
+
+def test_four_way_round_add_time_mark_override():
+    """add() 时同名词覆盖工厂默认(mark=False 关闭口别字母)。"""
+    d = Diagram(width=300, height=200)
+    d.add(parts.four_way_round, "", loc=(150, 100), mark=False)
+    d.render()
+    assert not d.ax.texts
+    d2 = Diagram(width=300, height=200)
+    d2.add(parts.four_way_round, "", loc=(150, 100))
+    d2.render()
+    assert len(d2.ax.texts) == 4          # 内置 D/S/C/E
 
 
 def test_low_pressure_tank_ports():
@@ -290,6 +317,15 @@ def test_bowtie_valve_actuator_override_render():
     d.add(parts.bowtie_valve, "", loc=(160, 70), actuator="dome")
     d.add(parts.bowtie_valve_solenoid, "", loc=(260, 70))
     d.render()
+    # 覆盖必须真实生效:裸阀无执行机构线条,dome 多出阀杆 + 穹顶两条
+    bare = Diagram(width=120, height=120)
+    bare.add(parts.bowtie_valve, "", loc=(60, 60))
+    bare.render()
+    assert not bare.ax.lines
+    domed = Diagram(width=120, height=120)
+    domed.add(parts.bowtie_valve, "", loc=(60, 60), actuator="dome")
+    domed.render()
+    assert len(domed.ax.lines) == 2
 
 
 def test_scroll_chord_ports_and_render():

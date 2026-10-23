@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """示例:多联机(VRF)系统流程图 —— 参考图风格的室外机 + 双室内机。
 
-室外机:立式胶囊压缩机(上排/下吸/右下补气) → 油分离器(底部毛细管回油至吸气管) → 四通阀 → 室外换热器
-       (轴流风机)→ 过滤器 → 单向阀 → 过冷器主管(上进/下出)→ 液管总线截止阀 → 出机;
+室外机:立式胶囊压缩机(上排/下吸/右下补气) → 油分离器(底部毛细管回油至吸气管)
+       → 四通阀 → 室外换热器(轴流风机)→ 过滤器 → 单向阀 → 过冷器主管(上进/下出)
+       → 液管总线截止阀 → 出机;
 室内机:液管总管 → 电子膨胀阀 → 换热器 → 气管并联汇入总管;
 气管:两室内机汇合 → 总线截止阀 → 四通阀 E 口;
 吸气:四通阀 S 口 → 气液分离器 → 压缩机;热气旁通与喷气增焓用虚线表示
@@ -22,11 +23,11 @@ from matplotlib.patches import Arc, Circle, Ellipse, Polygon, Rectangle
 from cycleplot import Diagram, use_font
 from cycleplot.parts import (
     filter,
-    four_way_round,
     make_bowtie_valve,
     make_check_valve,
     make_compressor_capsule,
     make_expansion_valve_eng,
+    make_four_way_round,
     make_globe_valve,
     make_heat_exchanger,
     make_separator_utube,
@@ -63,26 +64,27 @@ d.text(780, 45, "多联机(VRF)系统原理图", ha="center", size=17)
 comp = d.add(make_compressor_capsule(w=64, h=112, stub=13), "压缩机",
              loc=(140, 840))
 oil = d.add(oil_separator, None, loc=(140, 470))
-fw = d.add(four_way_round, "", loc=(200, 230), mark=False)
+fw = d.add(make_four_way_round(r=34, mark=False), "", loc=(200, 230))
 cond = d.add(make_heat_exchanger(240, 110, shape="rect_zigzag7"), None,
              loc=(620, 250))
 filt = d.add(filter, "过滤器", loc=(830, 250))
-# 阀门统一用小号工厂参数(默认 r=34 偏大,取 ~75%)
-eev_p = make_expansion_valve_eng(r=26)
-hee = d.add(make_bowtie_valve(actuator="dome", w=60, h=34, dome_r=16,
-                              stem=12), "制热膨胀阀", loc=(760, 340))
+# 阀门统一用小号工厂参数(默认 r=34/w=64,两级缩小取 ~65%)
+eev_p = make_expansion_valve_eng(r=22)
+globe_p = make_globe_valve(w=54, h=40, stem=22, handle=38)
+hee = d.add(make_bowtie_valve(actuator="dome", w=52, h=30, dome_r=14,
+                              stem=10), "制热膨胀阀", loc=(760, 340))
 # 过冷器:矩形 + 中央竖线四接口(主管上进/下出,支管右进/左出,逆流错开)
 sub = d.add(make_subcooler(w=64, h=150), None, loc=(700, 560))
 sub_eev = d.add(eev_p, "过冷膨胀阀", loc=(790, 660))
-bypass = d.add(make_solenoid_valve(r=26, stem=16, handle=32), "热气旁通阀",
+bypass = d.add(make_solenoid_valve(r=22, stem=14, handle=28), "热气旁通阀",
                loc=(485, 610))
 acc = d.add(make_separator_utube(flip=True), None, loc=(330, 790))
 gee = d.add(eev_p, "喷气膨胀阀", loc=(600, 780))
 # 液管/气管总线:截止阀(检修隔离用,运行时常开),双向可通
-liq_stop = d.add(make_globe_valve(), "截止阀", loc=(935, 730))
-gas_stop = d.add(make_globe_valve(), None, loc=(895, 930))
+liq_stop = d.add(globe_p, "截止阀", loc=(935, 730))
+gas_stop = d.add(globe_p, None, loc=(895, 930))
 # 过滤器出口单向阀:挡住制热回液,使其只能走制热膨胀阀旁路进室外换热器
-ck_c = d.add(make_check_valve(w=44, h=24, stub=10), None, loc=(912, 250))
+ck_c = d.add(make_check_valve(w=38, h=20, stub=8), None, loc=(912, 250))
 eev1 = d.add(eev_p, "电子膨胀阀", loc=(1120, 200))
 coil1 = d.add(make_heat_exchanger(240, 100, shape="rect_zigzag7"), None,
               loc=(1360, 200))
@@ -102,10 +104,10 @@ d.ax.add_patch(Polygon([(612, 158), (628, 158), (634, 196), (606, 196)],
 d.text(46, 625, "油分离器", ha="left", size=15)
 d.text(326, 556, "回油毛细管", size=14)
 d.text(100, 170, "四通阀", ha="left", size=15)
-d.text(224, 178, "D", size=14)
-d.text(256, 206, "C", size=14)
-d.text(150, 266, "E", size=14, ha="right")
-d.text(140, 206, "S", size=14, ha="right")
+d.text(224, 184, "D", size=14)
+d.text(250, 206, "C", size=14)
+d.text(150, 260, "E", size=14, ha="right")
+d.text(146, 206, "S", size=14, ha="right")
 d.text(752, 210, "室外换热器", ha="left", size=15)
 d.text(742, 560, "过冷器", ha="left", size=15)
 d.text(400, 895, "气液分离器", ha="left", size=15)
