@@ -23,7 +23,7 @@ pip install -e .
 
 不安装也可用:在仓库根目录下直接 `import cycleplot`。
 
-跑回归测试(32 个用例,CI 覆盖 ubuntu/windows × Python 3.9/3.12):
+跑回归测试(56 个用例,CI 覆盖 ubuntu/windows × Python 3.9/3.12):
 
 ```powershell
 pip install -e ".[test]"
@@ -36,7 +36,7 @@ python -m pytest
 静态检查(CI 里跑同一条):
 
 ```powershell
-ruff check cycleplot tests
+ruff check cycleplot tests examples
 ```
 
 ## 快速上手
@@ -76,8 +76,10 @@ head_at, color)` 连线。
 
 ## 部件库(`cycleplot.parts`)
 
-按名字取直接实例:`compressor`、`evaporator`、`condenser`、`separator`
-(气液分离器)、`receiver`(储液器)、`expansion_valve`、`capillary`(毛
+按名字取直接实例:`compressor`、`capsule_compressor`(立式胶囊增焓压缩机,
+上排/下吸/右下补气)、`evaporator`、`condenser`、`separator`(气液分离器)、
+`separator_utube`(U 形管气液分离器)、`oil_separator`(油分离器)、
+`receiver`(储液器)、`expansion_valve`、`capillary`(毛
 细管)、`filter_drier`、`plate_hex`、`economizer`、`subcooler`(过冷器,矩形
 + 中央竖线四口,主路 top/bottom、支路 left/right 逆流错开)、`four_way_valve`、
 `four_way_round`(圆体菱形四通阀,端口 exhaust/condenser/evaporator/
@@ -94,13 +96,13 @@ top/bottom/left/right/vapor)、`globe_valve`(截止阀,左右对顶沙漏 + 阀�
 
 ```python
 from cycleplot.parts import make_compressor, make_vessel, make_heat_exchanger
-from cycleplot.parts import (make_low_pressure_tank, make_globe_valve,
-                             make_solenoid_valve)
+from cycleplot.parts import (make_four_way_round, make_globe_valve,
+                             make_low_pressure_tank, make_solenoid_valve)
 ```
 
-压缩机 `style` 支持 centrifugal/rotor/axial/recip/screw/scroll,换热器
-`shape` 支持 circle/rect/rect_diag/rect_zigzag/rect_zigzag7,详见各自
-docstring。特殊端口定义可用 `make_partial(part, ports=..., dirs=...)`
+压缩机 `style` 支持 centrifugal/rotor/axial/recip/screw/scroll/chord,换热器
+`shape` 支持 circle/rect/rect_diag/rect_x/rect_zigzag/rect_zigzag7/rect_shell,
+详见各自 docstring。特殊端口定义可用 `make_partial(part, ports=..., dirs=...)`
 从现有部件派生。
 
 ## HVAC 符号族(`cycleplot.hvac`)
@@ -137,11 +139,13 @@ docstring。特殊端口定义可用 `make_partial(part, ports=..., dirs=...)`
 | flash_tank_cycle.py | 闪发罐中间补气 |
 | split_cycle.py | 涡旋压缩机 + 过冷器 |
 | subcooler_cycle.py | 过冷器循环(主路 + 旁通过冷) |
+| heat_pump_cycle.py | 热泵制热循环(四通阀换向 + 油分离器回油) |
 | compressor_symbols.py / heat_exchanger_shapes.py | 符号速观 |
 | hvac_system.py / hvac_system_notank.py | 空气能供暖系统(带/无水箱) |
 | hvacsvg_demo.py | `load_svg_part` 直接加载 SVG 符号 |
 | four_way_round_demo.py | 四通阀圆体回路演示 |
 | low_pressure_tank_demo.py | 低压罐图元演示(顶平底圆 + 液位计) |
+| separator_utube_demo.py | U 形管气液分离器图元演示(镜像/翻转可选) |
 | globe_valve_demo.py | 截止阀图元演示(左右对顶沙漏 + 手轮) |
 | solenoid_valve_demo.py | 电磁阀图元演示(圆体 + 圆内 X + 电磁杠) |
 | expansion_valve_eng_demo.py | 电子膨胀阀图元演示(工程画法,无执行机构) |

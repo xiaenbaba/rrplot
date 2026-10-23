@@ -1,7 +1,70 @@
 # cycleplot 项目审查报告
 
-> **2026-10-16 复审补充**:下方 2026-10-12 旧报告的规模数字(43 例 / 覆盖率
-> 96% / 版本 0.1.0 / 旧行数)已过时,仅作历史记录;当前状态以本节为准。
+> **2026-10-24 复审补充**:当前状态以本节为准;下方 2026-10-16 与 2026-10-12
+> 两节中的规模数字(53 例 / 96~97% / 16~22 示例 / 旧行数)已过时,仅作历史记录。
+
+## 2026-10-24 复审
+
+**审查基线**:`29f4516` + 工作区未提交改动(vrf 阀件缩小一号、
+`make_four_way_round` 工厂)。
+
+**现状**:56 例测试全绿、**0 警告**;`ruff check cycleplot tests examples`
+全绿;22 个 `examples/*.py` 逐个跑通;包内覆盖率 **97%**
+(`core 98 / parts 98 / hvac 94 / svgparts 93 / style 96 / _primitives 100 /
+__init__ 100`);Sphinx 构建 0 警告;版本 1.2.0 单一来源(`pyproject` dynamic +
+`conf.py release = __version__`)。2026-10-16 轮的整改项(CI 三 job、覆盖率
+门槛 90%、ruff 钉版、hvac 工厂自动发现、依赖统一)全部落地且有效;
+tutorial 速查表与最新部件(胶囊压缩机、rect_x/rect_shell、chord、新阀件)
+同步到位。
+
+**本轮发现并已就地修复**:
+
+1. **P1 回归(未提交改动引入)**:`make_four_way_round` 工厂的 draw 吞掉
+   `**kw`,`examples/heat_pump_cycle.py:31` 依赖的 add() 时
+   `mark=False` 静默失效,重跑示例后四通阀出现双份 D/S/C/E 字母
+   (内置 + 手标)。已修复:draw 以 `**{"r": r, "mark": mark, **kw}`
+   透传(与旧实例语义一致,add() 时同名词可覆盖);新增
+   `test_four_way_round_add_time_mark_override` 锁行为;重跑后
+   `heat_pump_cycle.png` 与入库版逐字节一致。
+2. **P2 既有缺陷(同类根因)**:`make_bowtie_valve` 的 docstring 与
+   `test_bowtie_valve_actuator_override_render` 都声称 add() 时
+   actuator/stem 可覆盖,实际 draw 一直吞掉 kwargs,契约从未生效
+   (测试只烟雾渲染、无断言,故从未红过)。已修复:同样透传;测试补
+   真断言(裸阀 0 条线,`actuator="dome"` 覆盖后 2 条线)。
+3. `examples/vrf_system.py` docstring 超长行(E501,上轮提交遗留;
+   CI lint 只查 `cycleplot tests` 故未暴露)。
+
+**新发现(复审提出后,已按优先级全部整改)**:
+
+1. ✅ **P2 测试卫生**:`pytest` 原有 1 条 `RuntimeWarning: More than 20
+   figures have been opened`(`core.py` 的 `plt.subplots` 从不关闭)。
+   整改:`Diagram` 加 `close()`(内部 `plt.close`)与上下文管理器协议,
+   `test_diagram_close_and_context_manager` 锁行为;测试侧加 autouse
+   fixture 每例 `plt.close("all")`(try/except 守卫,`python
+   tests/test_cycleplot.py` 直跑不受影响)。pytest 输出现为 56 例 0 警告。
+2. ✅ **P3 README 滞后 4 处**:① 用例数 32 → 56;② 压缩机 style 清单补
+   `chord`;③ 换热器 shape 清单补 `rect_x` / `rect_shell`;④ 示例表补
+   `heat_pump_cycle.py` 与 `separator_utube_demo.py` 两行。顺带:部件
+   段落补 `capsule_compressor` / `separator_utube` / `oil_separator`,
+   工厂代码块补 `make_four_way_round`。
+3. ✅ **P3 examples 6 处 ruff 违规**:5 处 `--fix`(4 个文件导入排序 +
+   1 处文件尾换行)、`hvac_system_notank.py` 超长行注释上提手修;
+   CI lint job 扩为 `ruff check cycleplot tests examples`,
+   README / CONTRIBUTING 的检查命令同步。
+4. ✅ **P4 注释滞后**:`export_parts_svg.py` docstring "5 种换热面变体"
+   改为 7 种。
+
+**遗留项状态(对照 2026-10-16 轮)**:`Diagram` 资源管理已在本轮完成
+(见上 ✅);其余维持:`parts.py` 拆包(现 1083 行,仍在增长,建议提上
+日程)、`.pre-commit-config.yaml`、`CHANGELOG.md`、CI 矩阵补
+Python 3.13、`svgparts` 的 defusedxml 可选防护,按需。
+
+**结论**:结构性与正确性风险仅一处,即未提交改动引入的工厂覆盖回归,
+已修复并有测试锁定;其余发现(文档滞后、测试卫生、lint 盲区)已随本轮
+按优先级全部整改完毕,工作区相对 `29f4516` 的全部改动已验证
+(56 例 0 警告、22 示例跑通、`heat_pump_cycle.png` 重跑逐字节复原)。
+
+---
 
 ## 2026-10-16 复审补充
 

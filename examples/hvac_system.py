@@ -18,11 +18,21 @@ from matplotlib.patches import Rectangle
 
 from cycleplot import Diagram, use_font
 from cycleplot._primitives import line, txt
-from cycleplot.hvac import (auto_vent, ball_valve, corrugated_pipe,
-                            electric_heater, fan_coil, floor_heating,
-                            heat_pump, makeup_valve, return_manifold,
-                            safety_valve, supply_manifold, thermal_tank,
-                            water_pump)
+from cycleplot.hvac import (
+    auto_vent,
+    ball_valve,
+    corrugated_pipe,
+    electric_heater,
+    fan_coil,
+    floor_heating,
+    heat_pump,
+    makeup_valve,
+    return_manifold,
+    safety_valve,
+    supply_manifold,
+    thermal_tank,
+    water_pump,
+)
 from cycleplot.parts import Part
 from cycleplot.style import LINE
 

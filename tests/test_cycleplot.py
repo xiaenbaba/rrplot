@@ -6,6 +6,7 @@ import sys
 import matplotlib
 
 matplotlib.use("Agg")            # 无界面环境稳定出图
+import matplotlib.pyplot as plt  # noqa: E402  须在 use() 之后导入
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -19,6 +20,17 @@ from cycleplot.core import (
     make_partial,
 )
 from cycleplot.svgparts import load_svg_part
+
+try:
+    import pytest
+except ImportError:                      # 直跑模式无 pytest,fixture 跳过
+    pytest = None
+else:
+    @pytest.fixture(autouse=True)
+    def _close_figures():
+        """每例结束清空 figure,避免套件累积超 matplotlib 上限告警。"""
+        yield
+        plt.close("all")
 
 
 def _raises(exc, fn, *args, **kw):
@@ -656,6 +668,18 @@ def test_render():
     d.pipe(n["discharge"], n["suction"])
     fig = d.render()
     assert fig is d.fig
+
+
+def test_diagram_close_and_context_manager():
+    """close() 注销 figure;上下文管理器退出时自动关闭。"""
+    d = Diagram(width=120, height=90)
+    num = d.fig.number
+    assert num in plt.get_fignums()
+    d.close()
+    assert num not in plt.get_fignums()
+    with Diagram(width=120, height=90) as d2:
+        assert d2.fig.number in plt.get_fignums()
+    assert d2.fig.number not in plt.get_fignums()
 
 
 def test_sensor_and_text_helpers():

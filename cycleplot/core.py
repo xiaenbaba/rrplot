@@ -367,6 +367,16 @@ class Diagram:
         self.render()
         plt.show()
 
+    def close(self):
+        """关闭底层 figure(plt.close),批量出图/长会话防止 figure 堆积。"""
+        plt.close(self.fig)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
+
 
 def _as_port(p):
     """允许把裸坐标 (x, y) 当作固定管路端点(用于画总管/分支点)。"""

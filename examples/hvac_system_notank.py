@@ -25,10 +25,18 @@ from matplotlib.patches import FancyBboxPatch, Polygon, Rectangle
 
 from cycleplot import Diagram, use_font
 from cycleplot._primitives import line, txt
-from cycleplot.hvac import (anti_freeze_valve, auto_vent, ball_valve,
-                            corrugated_pipe, fan_coil, floor_heating,
-                            heat_pump, supply_manifold, water_pump,
-                            return_manifold)
+from cycleplot.hvac import (
+    anti_freeze_valve,
+    auto_vent,
+    ball_valve,
+    corrugated_pipe,
+    fan_coil,
+    floor_heating,
+    heat_pump,
+    return_manifold,
+    supply_manifold,
+    water_pump,
+)
 from cycleplot.parts import Part
 
 use_font()
@@ -181,7 +189,8 @@ d.pipe(fcu2["water_out"], bell2u["out"], color=PURPLE)
 d.pipe(bell2u["in"], (1530, 151.5), color=PURPLE)
 d.pipe((1530, 151.5), (1530, 90), color=PURPLE, head_at=(0.45,))
 d.pipe((1530, 90), (760, 90), color=PURPLE, head_at=(0.3, 0.75))
-d.pipe((760, 60), (760, 90), color=PURPLE, head_at=(0.8,))   # 起点插进排气阀引管,盖住端口间隙
+# 起点插进排气阀引管,盖住端口间隙
+d.pipe((760, 60), (760, 90), color=PURPLE, head_at=(0.8,))
 d.pipe((760, 90), (760, 432), color=PURPLE, head_at=(0.4,))
 
 # ---- 蓝色总管:汇合后西行 → 补水阀 → 水泵 → 主机 ----

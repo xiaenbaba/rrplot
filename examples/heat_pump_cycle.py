@@ -16,9 +16,14 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from matplotlib.patches import Circle
 
 from cycleplot import Diagram, use_font
-from cycleplot.parts import (bowtie_valve_dome, compressor, four_way_round,
-                             make_heat_exchanger, oil_separator,
-                             separator_utube)
+from cycleplot.parts import (
+    bowtie_valve_dome,
+    compressor,
+    four_way_round,
+    make_heat_exchanger,
+    oil_separator,
+    separator_utube,
+)
 
 use_font()
 
