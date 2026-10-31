@@ -1,6 +1,6 @@
 # 贡献指南
 
-感谢参与 `cycleplot`。本项目是"坐标式部件拼装 + 走线式连管"的制冷循环 / HVAC
+感谢参与 `rrplot`。本项目是"坐标式部件拼装 + 走线式连管"的制冷循环 / HVAC
 示意图库,输出 PNG / PDF / SVG。
 
 ## 环境
@@ -8,7 +8,7 @@
 ```powershell
 pip install -e ".[test]"     # 开发:装包 + pytest
 python -m pytest             # 全部用例
-ruff check cycleplot tests examples   # 静态检查(CI 同款)
+ruff check rrplot tests examples   # 静态检查(CI 同款)
 ```
 
 提交前这两条必须通过。CI 还会:跑 `pytest --cov`(覆盖率下限 90%)、逐个执行
@@ -17,7 +17,7 @@ ruff check cycleplot tests examples   # 静态检查(CI 同款)
 ## 目录约定
 
 ```
-cycleplot/     库本体:core(引擎)/ parts(部件)/ hvac、svgparts(HVAC)/
+rrplot/     库本体:core(引擎)/ parts(部件)/ hvac、svgparts(HVAC)/
                style(样式)/ _primitives(底层绘制)
 examples/      每张图一个脚本 + 同名 PNG(入库)
 tests/         pytest 回归测试
@@ -30,14 +30,14 @@ SVG/           export_parts_svg.py 导出的部件单图
 
 ## 加一个部件
 
-1. 在 `cycleplot/parts.py` 里写绘制函数 `_xxx(ax, x, y, label=None, **kw)`,
+1. 在 `rrplot/parts.py` 里写绘制函数 `_xxx(ax, x, y, label=None, **kw)`,
    以 `(x, y)` 为中心锚点,只用 `_primitives` 的 `line` / `txt` 和 matplotlib
    patch;线宽/颜色取 `style.py` 的常量。
 2. 用 `_part("名字", {"端口名": (dx, dy)}, _xxx, dirs={...})` 登记端口表。
    端口偏移 `(dx, dy)` 隐含接管方向;双轴非零的端口用 `dirs` 显式声明法向。
 3. 尺寸可变的部件写成工厂 `make_xxx(...)`,返回 `Part`,并在文件底部给出默认
    实例;特殊端口用 `make_partial(part, ports=..., dirs=...)` 派生。
-4. 在 `tests/test_cycleplot.py` 补端口断言(偏移 + `direction`)。
+4. 在 `tests/test_rrplot.py` 补端口断言(偏移 + `direction`)。
 5. 在 `examples/` 加一个同名演示脚本(见下)。
 6. 跑 `python export_parts_svg.py` 刷新 `SVG/` 单图(可选)。
 
@@ -54,7 +54,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from cycleplot import Diagram, parts
+from rrplot import Diagram, parts
 
 d = Diagram(width=..., height=...)
 # d.add(...) / d.pipe(...)

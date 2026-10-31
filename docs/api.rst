@@ -7,14 +7,14 @@ API 参考
 顶层入口
 --------
 
-.. automodule:: cycleplot
+.. automodule:: rrplot
    :members:
    :imported-members:
 
 引擎(core)
 ----------
 
-.. automodule:: cycleplot.core
+.. automodule:: rrplot.core
    :members:
 
 部件库(parts)
@@ -23,29 +23,38 @@ API 参考
 ``make_partial`` 语义上属于部件库,在 core 中定义并由 parts 重新导出
 (见下方 core 一节)。
 
-.. automodule:: cycleplot.parts
+.. automodule:: rrplot.parts
+   :members:
+
+部件模型(part)
+--------------
+
+.. automodule:: rrplot.part
    :members:
 
 HVAC 符号(hvac)
 ----------------
 
-.. automodule:: cycleplot.hvac
+.. automodule:: rrplot.hvac
    :members:
 
 SVG 加载(svgparts)
 -------------------
 
-.. automodule:: cycleplot.svgparts
+.. automodule:: rrplot.svgparts
    :members:
 
 样式(style)
 -----------
 
-.. automodule:: cycleplot.style
+.. automodule:: rrplot.style
    :members:
+
+样式隔离可使用 ``rrplot.context()``;需要恢复旧版全局行为时调用
+``rrplot.apply_style()``。
 
 底层原语(_primitives)
 ----------------------
 
-.. automodule:: cycleplot._primitives
+.. automodule:: rrplot._primitives
    :members:

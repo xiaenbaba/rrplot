@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""示例:SVG 图元 + cycleplot 走线(路线一)。
+"""示例:SVG 图元 + rrplot 走线(路线一)。
 
 部件来自 references/hvacsvg/symbols/ 的 SVG 符号,经 load_svg_part 变成
-cycleplot 部件;管路、拐角、标签仍由引擎编译。回路:
+rrplot 部件;管路、拐角、标签仍由引擎编译。回路:
   空气能主机 -> 球阀 -> 水泵 -> 蓄热水箱 -> (回水) -> 空气能主机
 """
 import os
@@ -10,7 +10,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from cycleplot import Diagram, load_svg_part, use_font
+from rrplot import Diagram, load_svg_part, use_font
 
 use_font()
 

@@ -20,8 +20,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from matplotlib.patches import Arc, Circle, Ellipse, Polygon, Rectangle
 
-from cycleplot import Diagram, use_font
-from cycleplot.parts import (
+from rrplot import Diagram, use_font
+from rrplot.parts import (
     filter,
     make_bowtie_valve,
     make_check_valve,
@@ -35,7 +35,7 @@ from cycleplot.parts import (
     make_subcooler,
     oil_separator,
 )
-from cycleplot.style import LW_PIPE
+from rrplot.style import LW_PIPE
 
 use_font()
 

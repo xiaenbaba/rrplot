@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""示例:闪发罐双级压缩循环 —— 用 cycleplot 引擎 + 标准 PFD 符号组装。
+"""示例:闪发罐双级压缩循环 —— 用 rrplot 引擎 + 标准 PFD 符号组装。
 
 回路:冷凝器 -> EEV1 -> 闪发罐 -> 底部出液 EEV2 -> 蒸发器
                         -> 顶部闪发气 -> 两级压缩机之间的混合点
@@ -13,7 +13,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from cycleplot import Diagram, parts, use_font
+from rrplot import Diagram, parts, use_font
 
 use_font()
 

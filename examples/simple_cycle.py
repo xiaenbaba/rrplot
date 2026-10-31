@@ -9,7 +9,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from cycleplot import Diagram, make_partial, parts, use_font
+from rrplot import Diagram, make_partial, parts, use_font
 
 use_font()
 

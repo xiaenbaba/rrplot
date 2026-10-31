@@ -19,13 +19,13 @@
    python -m pytest              # 跑回归测试
 
 只依赖 numpy 与 matplotlib,Python ≥ 3.9。不装包也能在仓库根目录直接
-``import cycleplot``。
+``import rrplot``。
 
 先确认字体(中文渲染成方框时必看):
 
 .. code-block:: powershell
 
-   python -c "from cycleplot import use_font; use_font()"
+   python -c "from rrplot import use_font; use_font()"
 
 会打印当前生效的字体和回退栈。Windows 装宋体,macOS 装 Songti SC,
 Linux 装 ``fonts-noto-cjk``。详见 README 的"字体"一节。
@@ -34,12 +34,12 @@ Linux 装 ``fonts-noto-cjk``。详见 README 的"字体"一节。
 2. 五行画出一条管线
 ----------------------------------------
 
-整张图是 :class:`cycleplot.core.Diagram`。三个动作:``add()`` 放部件、
+整张图是 :class:`rrplot.core.Diagram`。三个动作:``add()`` 放部件、
 ``pipe()`` 连线、``save()`` 出图。
 
 .. code-block:: python
 
-   from cycleplot import Diagram, parts
+   from rrplot import Diagram, parts
 
    d = Diagram(width=780, height=500)          # 画布 780×500 像素
 
@@ -78,7 +78,7 @@ Linux 装 ``fonts-noto-cjk``。详见 README 的"字体"一节。
    python examples/compressor_symbols.py      # 7 种压缩机画法
    python examples/heat_exchanger_shapes.py   # 换热器 7 种画法对照
 
-或者看 ``SVG/`` 目录下 37 张导出的部件单图,挑好之后 ``from cycleplot.svgparts`` 之外,
+或者看 ``SVG/`` 目录下 37 张导出的部件单图,挑好之后 ``from rrplot.svgparts`` 之外,
 用 ``python export_parts_svg.py`` 重新导出。
 
 
@@ -150,7 +150,7 @@ Linux 装 ``fonts-noto-cjk``。详见 README 的"字体"一节。
 6. 部件速查
 ----------------------------------------
 
-按名字直接取实例(``from cycleplot import parts``):
+按名字直接取实例(``from rrplot import parts``):
 
 .. list-table::
    :header-rows: 1
@@ -230,7 +230,7 @@ Linux 装 ``fonts-noto-cjk``。详见 README 的"字体"一节。
 
 .. code-block:: python
 
-   from cycleplot.parts import (make_compressor, make_heat_exchanger,
+   from rrplot.parts import (make_compressor, make_heat_exchanger,
                                 make_vessel, make_low_pressure_tank,
                                 make_globe_valve, make_solenoid_valve,
                                 make_expansion_valve_eng, make_bowtie_valve,
@@ -250,7 +250,7 @@ Linux 装 ``fonts-noto-cjk``。详见 README 的"字体"一节。
 
 .. code-block:: python
 
-   from cycleplot import make_partial, parts
+   from rrplot import make_partial, parts
 
    comp_part = make_partial(parts.make_compressor(80, style="centrifugal"),
                             {"discharge": (0, -80), "suction": (0, 80)})
@@ -268,11 +268,11 @@ Linux 装 ``fonts-noto-cjk``。详见 README 的"字体"一节。
 7. HVAC 符号族
 ----------------------------------------
 
-:mod:`cycleplot.hvac` 里是 17 个暖通符号,工厂参数与 SVG 加载器一致:
+:mod:`rrplot.hvac` 里是 17 个暖通符号,工厂参数与 SVG 加载器一致:
 
 .. code-block:: python
 
-   from cycleplot import hvac
+   from rrplot import hvac
 
    tank = hvac.thermal_tank(scale=1.5, bridge=44,
                            moves={"right": (160, 72)}, label_dy=-97)
@@ -306,7 +306,7 @@ Linux 装 ``fonts-noto-cjk``。详见 README 的"字体"一节。
 
 .. code-block:: python
 
-   from cycleplot import load_svg_part
+   from rrplot import load_svg_part
 
    host = d.add(load_svg_part("symbols/01_空气能主机.svg", bridge=24),
                 "空气能主机", loc=(130, 180))
@@ -331,7 +331,13 @@ Linux 装 ``fonts-noto-cjk``。详见 README 的"字体"一节。
 尺寸参数即可,不用改字号。
 
 ``save`` 默认 ``tight=True`` 会裁掉四周空白,**输出尺寸略小于**
-``Diagram`` 声明的尺寸;需要严格 1:1 时传 ``tight=False``。
+``Diagram`` 声明的尺寸;需要严格 1:1 时传 ``tight=False``。一次想出
+多种格式,把多个路径一起传进来::
+
+   d.save("out.png", "out.svg", "out.pdf")
+
+在 Jupyter 里,把 ``Diagram`` 实例放在单元格最后一行即内嵌显示(SVG
+矢量,可无限放大)。
 
 
 9. 排错
@@ -341,7 +347,7 @@ Linux 装 ``fonts-noto-cjk``。详见 README 的"字体"一节。
    跑 ``use_font()``。只匹配到 DejaVu Serif 说明系统没装中文字体,
    按 README"字体"一节装宋体 / Songti SC / Noto CJK,或用
    ``matplotlib.font_manager.fontManager.addfont()`` 注册自备字体,
-   再把族名加进 ``cycleplot.style.FONT_CANDIDATES`` 头部。
+   再把族名加进 ``rrplot.style.FONT_CANDIDATES`` 头部。
 
 **端口名报错**
    错误信息会列出全部可用端口,照抄即可。
@@ -361,6 +367,25 @@ Linux 装 ``fonts-noto-cjk``。详见 README 的"字体"一节。
 
 **画布太小 / 内容被裁**
    放大 ``Diagram(width, height)``;``aspect="equal"`` 不会自动扩展。
+
+**管线出入方向不对 / 想看端口在哪**
+   在 ``save()`` 之前调一次 :meth:`~rrplot.core.Diagram.debug`,叠加层
+   会画出每个端口的红点、沿外法向的红色短箭头和每根管线的蓝色拐点
+   方块,端口在哪、管线怎么拐一目了然:
+
+   .. code-block:: python
+
+      d.pipe(evap["out"], comp["suction"], via=[("e", 200)])
+      d.debug(names=True)      # names=True 连端口名一起标
+      d.save("out.png")        # 调试层会随图输出,正式出图前删掉这行
+
+如果在出图后修改了节点位置或样式,先清空旧图层再重新绘制::
+
+   node.loc = (420, 180)
+   d.clear_render().render()
+
+``clear_render()`` 会保留节点和管线定义,同时清除之前的 Matplotlib 图元;
+通过 ``sensor()``、``text()`` 和 ``debug()`` 添加的临时图层也会随之清除。
 
 
 10. 现成示例
@@ -419,6 +444,6 @@ Linux 装 ``fonts-noto-cjk``。详见 README 的"字体"一节。
 
 - 想加新部件:见 :doc:`design` 的"扩展:三条路"
 - 想知道 ``via`` / ``states`` / ``bridge`` 的完整参数:见 :doc:`api`
-- 想加测试:``tests/test_cycleplot.py`` 里有端口定义、走线算法、
+- 想加测试:``tests/test_rrplot.py`` 里有端口定义、走线算法、
   错误提示、全件渲染四类现成范式,照着写即可
-- 改了代码先跑 ``python -m pytest`` 和 ``ruff check cycleplot tests``
+- 改了代码先跑 ``python -m pytest`` 和 ``ruff check rrplot tests``

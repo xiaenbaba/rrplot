@@ -6,7 +6,7 @@
   → C → 冷凝器(3→4) → 膨胀阀 → 蒸发器(5) → 四通阀 E
   → S → 气液分离器(U 形管液封,防液击) → 压缩机吸气(1)。
 四通阀口别字母手工标注在接管侧(部件自动标注会压在管上);
-部件全部来自 cycleplot.parts,压缩机为圆形符号(顶部吸气/底部排气)。
+部件全部来自 rrplot.parts,压缩机为圆形符号(顶部吸气/底部排气)。
 """
 import os
 import sys
@@ -15,8 +15,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from matplotlib.patches import Circle
 
-from cycleplot import Diagram, use_font
-from cycleplot.parts import (
+from rrplot import Diagram, use_font
+from rrplot.parts import (
     bowtie_valve_dome,
     compressor,
     four_way_round,

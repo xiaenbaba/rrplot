@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""示例:涡旋压缩机 + 过冷器(经济器)补气循环 —— 用 cycleplot 库组装。
+"""示例:涡旋压缩机 + 过冷器(经济器)补气循环 —— 用 rrplot 库组装。
 
 状态点:1 吸气 / 4 排气 / 5 分流点 / 6 过冷器主路出口 / 7 膨胀阀后
        8 膨胀器后补气 / 9 补气口回压缩机
@@ -9,7 +9,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from cycleplot import Diagram, make_partial, parts, use_font
+from rrplot import Diagram, make_partial, parts, use_font
 
 use_font()
 

@@ -23,9 +23,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from matplotlib.patches import FancyBboxPatch, Polygon, Rectangle
 
-from cycleplot import Diagram, use_font
-from cycleplot._primitives import line, txt
-from cycleplot.hvac import (
+from rrplot import Diagram, use_font
+from rrplot._primitives import line, txt
+from rrplot.hvac import (
     anti_freeze_valve,
     auto_vent,
     ball_valve,
@@ -37,7 +37,7 @@ from cycleplot.hvac import (
     supply_manifold,
     water_pump,
 )
-from cycleplot.parts import Part
+from rrplot.parts import Part
 
 use_font()
 

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""示例:带经济器(EEV1/EEV2 两级节流)的制冷循环 —— 用 cycleplot 库组装。
+"""示例:带经济器(EEV1/EEV2 两级节流)的制冷循环 —— 用 rrplot 库组装。
 
 回路:压缩机排气 -> 冷凝器 -> 分流
         主路: EEV1 -> 经济器 -> EEV2 -> 蒸发器 -> 压缩机吸气
@@ -10,7 +10,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from cycleplot import Diagram, make_partial, parts, use_font
+from rrplot import Diagram, make_partial, parts, use_font
 
 use_font()
 

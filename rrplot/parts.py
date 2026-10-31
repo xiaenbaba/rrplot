@@ -8,7 +8,6 @@
 多口/换热类部件用 left/right/top/bottom 表示边中点。
 """
 import math
-from dataclasses import dataclass, field
 
 import numpy as np
 from matplotlib.patches import (
@@ -22,40 +21,10 @@ from matplotlib.patches import (
 
 from ._primitives import line, txt
 from .core import make_partial  # noqa: F401  重新导出,维持 from parts import 路径
+from .part import Part, make_part
 from .style import COIL, FILL, GRID, LINE, LW_FINE, LW_OUTLINE, LW_PART, LW_STRONG
 
-_PORT_DIR = {"n": (0, -1), "s": (0, 1), "e": (1, 0), "w": (-1, 0)}
-
-
-@dataclass
-class Part:
-    name: str
-    draw: object                       # f(ax, x, y, label=None, **kw)
-    ports: dict = field(default_factory=dict)
-    _dirs: dict = field(default_factory=dict)
-
-    def port(self, key):
-        try:
-            return self.ports[key]
-        except KeyError:
-            raise KeyError(f"部件 {self.name!r} 没有端口 {key!r},"
-                           f"可用端口:{', '.join(sorted(self.ports)) or '(无)'}"
-                           ) from None
-
-    def direction(self, key):
-        """端口外法向单位向量,优先取显式声明。"""
-        if key in self._dirs:
-            return _PORT_DIR[self._dirs[key]]
-        dx, dy = self.port(key)
-        if dx == 0 and dy == 0:
-            return (0, 0)
-        if abs(dx) >= abs(dy):
-            return (1 if dx > 0 else -1, 0)
-        return (0, 1 if dy > 0 else -1)
-
-
-def _part(name, ports, draw, dirs=None):
-    return Part(name, draw, ports, dirs or {})
+_part = make_part
 
 
 # =========================
@@ -92,8 +61,8 @@ def _oil_separator(ax, x, y, label="油分离器", w=64, h=176, stub=16,
                    **kw):
     """油分离器:瘦长矩形壳 + 顶/底/侧三根接管(参考图画法,内部无构件)。
 
-    进气自顶管(接压缩机排气),干燥气自上部侧管出(接冷凝器),
-    回油自底管出(接压缩机曲轴箱)。
+    进气自上部侧管(接压缩机排气),干燥气自顶管出(接四通阀 D 口),
+    回油自底管出(经毛细管接回吸气管)。
     """
     ax.add_patch(Rectangle((x - w / 2, y - h / 2), w, h,
                            facecolor=FILL, edgecolor=LINE, lw=LW_PART))
@@ -746,7 +715,11 @@ capillary = _part("毛细管", {"in": (0, -40), "out": (0, 40)}, _capillary,
 # 按尺寸生成端口的部件工厂
 # =========================
 def make_compressor(r=95, style="centrifugal", name="压缩机", n_blades=3):
-    """压缩机部件,style 见 COMPRESSOR_STYLES。"""
+    """压缩机部件,style 见 COMPRESSOR_STYLES。
+
+    参考图画法端口约定:top 排气(出)、bottom 回气/吸气(回)、
+    left 补气/增焓入口、right 备用。
+    """
     def draw(ax, x, y, label="压缩机", label_offset=None, label_ha="center",
              **kw):
         _compressor(ax, x, y, label=label, r=r, style=style,
@@ -939,6 +912,38 @@ def make_expansion_valve_eng(r=34, name="电子膨胀阀"):
 expansion_valve_eng = make_expansion_valve_eng()
 
 
+def make_expansion_valve_x(r=10, orient="h", name="膨胀阀(圆X)"):
+    """膨胀阀部件(圆 + 内接 X,参考图叠画法,圆周上无接管短管)。
+
+    圆体与内接 X 旋转对称,水平/竖直管路通用;端口落在圆周上,
+    管线分两段接入。orient="h" 时 in 西口/out 东口(流向西→东),
+    orient="v" 时 in 顶口/out 底口(流向自上而下)。
+    """
+    if orient not in ("h", "v"):
+        raise ValueError(f"未知 orient={orient!r},可用:'h' / 'v'")
+
+    def draw(ax, x, y, label=None, **kw):
+        ax.add_patch(Circle((x, y), r, facecolor=FILL, edgecolor=LINE,
+                            lw=LW_OUTLINE))
+        c = 0.72 * r
+        for s in (-1, 1):
+            line(ax, [(x - c, y - s * c), (x + c, y + s * c)],
+                 lw=LW_PART)
+        if label:
+            txt(ax, x, y + r + 24, label)
+
+    if orient == "h":
+        ports = {"in": (-r, 0), "out": (r, 0)}
+        dirs = {"in": "w", "out": "e"}
+    else:
+        ports = {"in": (0, -r), "out": (0, r)}
+        dirs = {"in": "n", "out": "s"}
+    return Part(name, draw, ports, dirs)
+
+
+expansion_valve_x = make_expansion_valve_x()
+
+
 def make_check_valve(w=56, h=32, stub=12, point="e", name="单向阀"):
     """单向阀部件:实心三角 + 尖端挡条,point 见 _check_valve。
 
@@ -1066,8 +1071,8 @@ separator_utube = make_separator_utube()
 def make_oil_separator(w=64, h=176, stub=16, name="油分离器"):
     """油分离器部件:瘦长矩形壳 + 顶/底/侧三接管(参考图画法)。
 
-    端口:top 进气(接压缩机排气)、left 干燥气出口(壳顶下 1/4,接冷凝器)、
-    bottom 回油口(接曲轴箱)。
+    端口:left 进气(壳顶下 1/4,接压缩机排气)、top 出气(接四通阀 D 口)、
+    bottom 回油口(经毛细管接回吸气管)。
     """
     y_port = -h / 2 - stub
 

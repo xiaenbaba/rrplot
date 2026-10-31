@@ -1,7 +1,7 @@
 设计说明
 ========
 
-这一页解释 cycleplot **为什么这样设计**。读完你应该能回答三个问题:
+这一页解释 rrplot **为什么这样设计**。读完你应该能回答三个问题:
 坐标系是怎么定的、端口方向从哪来、管线为什么总是直角且贴着端口出入。
 
 API 逐项说明见 :doc:`api`,动手画图见 :doc:`tutorial`。
@@ -14,7 +14,7 @@ API 逐项说明见 :doc:`api`,动手画图见 :doc:`tutorial`。
 1. 坐标系:1 单位 = 1 像素,y 向下
 ----------------------------------------
 
-整张图只有一个坐标系,定义在 :class:`cycleplot.core.Diagram.__init__`:
+整张图只有一个坐标系,定义在 :class:`rrplot.core.Diagram.__init__`:
 
 .. code-block:: python
 
@@ -48,7 +48,7 @@ API 逐项说明见 :doc:`api`,动手画图见 :doc:`tutorial`。
 2. 端口:相对偏移 + 外法向
 ----------------------------------------
 
-每个部件是一个 :class:`cycleplot.parts.Part` 数据类,只有四个字段:
+每个部件是一个 :class:`rrplot.part.Part` 数据类,只有四个字段:
 
 .. code-block:: python
 
@@ -61,7 +61,7 @@ API 逐项说明见 :doc:`api`,动手画图见 :doc:`tutorial`。
 
 ``ports`` 用**相对锚点的偏移**而不是绝对坐标,是为了让同一个部件实例
 能被放到画布任意位置。:meth:`Part.port` 返回偏移,:meth:`Part.direction`
-返回单位外法向,两者组合成 :class:`cycleplot.core.Port`:
+返回单位外法向,两者组合成 :class:`rrplot.core.Port`:
 
 .. code-block:: python
 
@@ -85,7 +85,7 @@ API 逐项说明见 :doc:`api`,动手画图见 :doc:`tutorial`。
 .. important::
 
    覆盖某个端口的**位置**时,它在 ``_dirs`` 里的**旧方向声明会一并作废**,
-   回落到按偏移推断;:func:`cycleplot.core.make_partial` 实现了这个规则
+   回落到按偏移推断;:func:`rrplot.core.make_partial` 实现了这个规则
    (见 ``new_dirs.pop(k, None)``)。需要固定方向就在 ``dirs=`` 里显式补回来。
 
 ### 命名约定
@@ -109,7 +109,7 @@ API 逐项说明见 :doc:`api`,动手画图见 :doc:`tutorial`。
 3. 走线:三个阶段
 ----------------------------------------
 
-:func:`cycleplot.core.Pipe.points` 是纯几何的,分三步,结果缓存在
+:func:`rrplot.core.Pipe.points` 是纯几何的,分三步,结果缓存在
 ``_pts`` 里(同一条管线重复 ``render()`` 不会重算):
 
 .. code-block:: text
@@ -148,7 +148,7 @@ API 逐项说明见 :doc:`api`,动手画图见 :doc:`tutorial`。
 ### 3.2 端口吸附(_fit_end)
 
 部件是按坐标摆的,端口旁的第一段很容易和端口差几像素,画出来就是一根
-**接缝碎块**。:func:`cycleplot.core._fit_end` 处理两种情况:
+**接缝碎块**。:func:`rrplot.core._fit_end` 处理两种情况:
 
 **斜接**(邻段与端口既不同轴也不同轴)。错位在 ``SNAP_TOL = 10`` 以内 →
 优先吸附**切向**坐标,让管线沿法向笔直切入;其次吸附法向坐标。错位
@@ -164,7 +164,7 @@ API 逐项说明见 :doc:`api`,动手画图见 :doc:`tutorial`。
 ### 3.3 正交化(_orthogonalize)
 
 展开后的折点里可能有斜线段,直接画出来是斜的示意图,不好看也不符合
-PFD 惯例。:func:`cycleplot.core._orthogonalize` 遍历相邻点,发现方向
+PFD 惯例。:func:`rrplot.core._orthogonalize` 遍历相邻点,发现方向
 突变就插入一个拐点,并用两条规则决定拐点位置:
 
 - 进入段水平 → 先横后竖,拐点在 ``(cur.x, prev.y)``;
@@ -176,7 +176,7 @@ PFD 惯例。:func:`cycleplot.core._orthogonalize` 遍历相邻点,发现方向
 
 .. code-block:: python
 
-   >>> from cycleplot.core import _orthogonalize
+   >>> from rrplot.core import _orthogonalize
    >>> _orthogonalize([(0, 0), (108, 30)])
    [(0.0, 0.0), (0.0, 30.0), (108.0, 30.0)]          # 进入段竖直 → 先竖后横
    >>> _orthogonalize([(0, 0), (108, 30)], "h")
@@ -205,12 +205,12 @@ PFD 惯例。:func:`cycleplot.core._orthogonalize` 遍历相邻点,发现方向
      - ``side`` = ±1,标注画在线的哪一侧(默认 -1)
 
 **状态点 vs 传感器** 由文本自动判定:首字母是字母就画成 T/P 传感器圆圈
-(:func:`cycleplot.core._is_sensor` 会剥掉 ``$`` 再判断,所以
+(:func:`rrplot.core._is_sensor` 会剥掉 ``$`` 再判断,所以
 ``r"$T_0$"`` 也认)。圆圈半径 ``SENSOR_R``、内文 ``SENSOR_SIZE`` 都在
-:mod:`cycleplot.style` 里,改一处即可全局调大调小。
+:mod:`rrplot.style` 里,改一处即可全局调大调小。
 
 **随线箭头** 由 ``head_at`` 控制,默认 ``(0.55,)``,即每条线在 55% 处放
-一个流向箭头;:func:`cycleplot.core._draw_head` 会把箭头整体夹在所在段内
+一个流向箭头;:func:`rrplot.core._draw_head` 会把箭头整体夹在所在段内
 (``ARROW_HALF`` 半长),段太短就自动缩短,不会骑到拐角上。``head=False``
 关闭,``head_size`` 控制大小(论文粗箭头可用 16~20)。
 
@@ -221,12 +221,12 @@ PFD 惯例。:func:`cycleplot.core._orthogonalize` 遍历相邻点,发现方向
 5. 渲染与出图
 ----------------------------------------
 
-:meth:`cycleplot.core.Diagram.render` 先画所有部件、再画所有管线,返回
+:meth:`rrplot.core.Diagram.render` 先画所有部件、再画所有管线,返回
 ``fig``。部件的 ``**style`` 参数透传给绘制函数,所以
 ``d.add(parts.compressor, "压缩机", loc=..., style="scroll")`` 里
-``style`` 是绘制函数的参数名,不是 :class:`cycleplot.core.Pipe` 的线型。
+``style`` 是绘制函数的参数名,不是 :class:`rrplot.core.Pipe` 的线型。
 
-:meth:`cycleplot.core.Diagram.save` 默认 ``tight=True``,会用
+:meth:`rrplot.core.Diagram.save` 默认 ``tight=True``,会用
 ``bbox_inches="tight"`` 裁掉四周空白 —— 也就是**输出尺寸会略小于**
 ``Diagram(width, height)``。需要严格尺寸时传 ``tight=False``。
 
@@ -238,22 +238,22 @@ PFD 惯例。:func:`cycleplot.core._orthogonalize` 遍历相邻点,发现方向
 6. 扩展:三条路
 ----------------------------------------
 
-**路线一:改端口不动图形。** :func:`cycleplot.core.make_partial` 从现有
+**路线一:改端口不动图形。** :func:`rrplot.core.make_partial` 从现有
 部件派生,只覆盖端口表(复用同一个 ``draw`` 函数):
 
 .. code-block:: python
 
-   from cycleplot import make_partial, parts
+   from rrplot import make_partial, parts
 
    rect = parts.make_rect(260, 110)
    evap2 = make_partial(rect, {"vapor_out": (-65, -55)}, dirs={"vapor_out": "n"})
 
-**路线二:新写一个绘制函数 + 端口表。** 在 :mod:`cycleplot.parts` 里加
+**路线二:新写一个绘制函数 + 端口表。** 在 :mod:`rrplot.parts` 里加
 ``def _xxx(ax, x, y, label="新部件", **kw): ...``,再 ``xxx = _part("新部件",
 {"in": (-40, 0), "out": (40, 0)}, _xxx)``。尺寸要可调就写成工厂函数
 ``make_xxx(w=..., h=...)``,返回一个闭包包住尺寸的 ``Part``。
 
-**路线三:直接加载 SVG。** :func:`cycleplot.svgparts.load_svg_part` 解析
+**路线三:直接加载 SVG。** :func:`rrplot.svgparts.load_svg_part` 解析
 hvacsvg 风格的 SVG 子集(``path`` 的 M/m/L/l/H/h/V/v/C/c/Z/z,以及
 circle / ellipse / rect / g),连接点读根属性 ``data-connection-points``,
 锚点取 viewBox 中心。
@@ -263,7 +263,7 @@ circle / ellipse / rect / g),连接点读根属性 ``data-connection-points``,
 
 .. note::
 
-   :mod:`cycleplot.hvac` 里的 17 个符号是 ``load_svg_part`` 的**代码版**,
+   :mod:`rrplot.hvac` 里的 17 个符号是 ``load_svg_part`` 的**代码版**,
    形状与 SVG 原件逐像素一致,但不依赖文件存在、可直接改参数。两条路线
-   互为验证:``tests/test_cycleplot.py`` 里的
+   互为验证:``tests/test_rrplot.py`` 里的
    ``test_hvac_factory_ports_match_svg_part`` 会比对两者端口定义是否一致。

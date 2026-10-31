@@ -1,7 +1,7 @@
 # references —— 原型与参考脚本
 
-本目录存放**早期原型、符号源与一次性验证脚本**,不属于 `cycleplot` 库本体,
-不受 CI 的 lint/覆盖率约束。库的正式能力见 `cycleplot/` 与 `examples/`。
+本目录存放**早期原型、符号源与一次性验证脚本**,不属于 `rrplot` 库本体,
+不受 CI 的 lint/覆盖率约束。库的正式能力见 `rrplot/` 与 `examples/`。
 
 生成物(`*.svg` / `*.png`)默认就地写在脚本旁边,已被 `.gitignore` 忽略。
 
@@ -9,7 +9,7 @@
 
 | 文件 | 用途 |
 | --- | --- |
-| `pfd_symbols.py` | 标准 PFD 符号库(ISA-5.1 / ISO 10628,基于 schemdraw);`cycleplot.parts` 部分图元由此移植 |
+| `pfd_symbols.py` | 标准 PFD 符号库(ISA-5.1 / ISO 10628,基于 schemdraw);`rrplot.parts` 部分图元由此移植 |
 | `compressor_symbols.py` | 压缩机 6 种型式符号对照图 |
 | `pfd_symbol_palette.py` | PFD 符号总览 |
 | `refcycle_schematic.py` | 制冷循环系统流程图生成器(标准 PFD 符号版) |
@@ -23,7 +23,7 @@
 | `vrfpart.py` | VRF / GMV 系统图生成原型:`Builder` 拼 SVG 字符串,含 `render_vrf_system()` / `render_gmv()` |
 | `draw_gmv.py` | GMV 系统图入口(薄封装,调用 `vrfpart.render_gmv`) |
 
-## 部件对照图(用 `cycleplot` 库渲染)
+## 部件对照图(用 `rrplot` 库渲染)
 
 | 文件 | 用途 |
 | --- | --- |
@@ -47,7 +47,7 @@
 ## 运行
 
 ```powershell
-# 依赖 cycleplot 的脚本(库已安装或从仓库根运行):
+# 依赖 rrplot 的脚本(库已安装或从仓库根运行):
 pip install -e .
 python references/render_valves.py
 

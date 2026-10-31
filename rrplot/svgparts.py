@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""把 hvacsvg 式的 SVG 符号加载成 cycleplot 部件(路线一)。
+"""把 hvacsvg 式的 SVG 符号加载成 rrplot 部件(路线一)。
 
 只解析本仓库 ``symbols/`` 用到的 SVG 子集:``path`` 指令
 M/m/L/l/H/h/V/v/C/c/Z/z,以及标签 circle / ellipse / rect / g。
@@ -11,12 +11,13 @@ M/m/L/l/H/h/V/v/C/c/Z/z,以及标签 circle / ellipse / rect / g。
 import json
 import re
 import xml.etree.ElementTree as ET
+from pathlib import Path as FilePath
 
 from matplotlib.patches import Circle, Ellipse, FancyBboxPatch, PathPatch, Rectangle
-from matplotlib.path import Path
+from matplotlib.path import Path as MplPath
 
 from ._primitives import line, txt
-from .parts import Part
+from .part import Part
 from .style import LINE, LW_PIPE
 
 _NS = "{http://www.w3.org/2000/svg}"
@@ -24,6 +25,8 @@ _TOKEN = re.compile(r"[MmLlHhVvCcZz]|[-+]?(?:\d*\.\d+|\d+)(?:[eE][-+]?\d+)?")
 _ARITY = {"M": 2, "L": 2, "H": 1, "V": 1, "C": 6, "Z": 0}
 # SVG 默认 fill=black,但 hvacsvg 里的纯描边 path 常不写 fill —— 落成 none 更符合画意
 _DEFAULT_STYLE = {"fill": "none", "stroke": "black", "stroke-width": "1"}
+_MAX_SVG_BYTES = 10 * 1024 * 1024
+_UNSAFE_XML = re.compile(br"<!\s*(?:DOCTYPE|ENTITY)\b", re.IGNORECASE)
 
 
 def _tag(el):
@@ -56,7 +59,7 @@ def _path_verts(d):
             i += 1
             if cmd in "Zz":
                 verts.append((0.0, 0.0))
-                codes.append(Path.CLOSEPOLY)
+                codes.append(MplPath.CLOSEPOLY)
                 x, y = sx, sy
             continue
         if cmd is None:
@@ -75,7 +78,7 @@ def _path_verts(d):
                 nx, ny = x + nx, y + ny
             x, y = sx, sy = nx, ny
             verts.append((x, y))
-            codes.append(Path.MOVETO)
+            codes.append(MplPath.MOVETO)
             cmd = "l" if rel else "L"     # M 后的裸坐标对是隐式 L
         elif op == "L":
             nx, ny = nums
@@ -83,22 +86,22 @@ def _path_verts(d):
                 nx, ny = x + nx, y + ny
             x, y = nx, ny
             verts.append((x, y))
-            codes.append(Path.LINETO)
+            codes.append(MplPath.LINETO)
         elif op == "H":
             x = nums[0] + (x if rel else 0)
             verts.append((x, y))
-            codes.append(Path.LINETO)
+            codes.append(MplPath.LINETO)
         elif op == "V":
             y = nums[0] + (y if rel else 0)
             verts.append((x, y))
-            codes.append(Path.LINETO)
+            codes.append(MplPath.LINETO)
         elif op == "C":
             x1, y1, x2, y2, nx, ny = nums
             if rel:
                 x1, y1, x2, y2, nx, ny = (x + x1, y + y1, x + x2, y + y2,
                                           x + nx, y + ny)
             verts += [(x1, y1), (x2, y2), (nx, ny)]
-            codes += [Path.CURVE4, Path.CURVE4, Path.CURVE4]
+            codes += [MplPath.CURVE4, MplPath.CURVE4, MplPath.CURVE4]
             x, y = nx, ny
         else:
             break
@@ -120,7 +123,7 @@ def _draw(ax, el, inherited, dx, dy, s):
         verts, codes = _path_verts(el.get("d", ""))
         if verts:
             verts = [(vx * s + dx, vy * s + dy) for vx, vy in verts]
-            ax.add_patch(PathPatch(Path(verts, codes), facecolor=face,
+            ax.add_patch(PathPatch(MplPath(verts, codes), facecolor=face,
                                    edgecolor=edge, linewidth=lw,
                                    joinstyle="round", capstyle="round",
                                    zorder=1))
@@ -165,12 +168,26 @@ def load_svg_part(file, ports=None, name=None, scale=1.0, bridge=0, moves=None,
         传 0 表示画在符号中心(如风机盘管、水箱把字压在图元上)。
     :param bridge: hvacsvg 的连接点落在 viewBox 边缘、符号图形并不画到边,
         给一个正数就从每个连接点沿边缘法向朝内补一段引管(符号单位),
-        让 cycleplot 的管路与符号图形接上。
+        让 rrplot 的管路与符号图形接上。
 
     锚点取 viewBox 中心,端口偏移 = (x-w/2, y-h/2) * scale。
     标签按 Part 惯例画制;传 label=None/"" 时不画。
     """
-    root = ET.parse(file).getroot()
+    path = FilePath(file)
+    try:
+        raw_svg = path.read_bytes()
+    except OSError as exc:
+        raise OSError(f"无法读取 SVG 文件: {path}") from exc
+    if len(raw_svg) > _MAX_SVG_BYTES:
+        raise ValueError(
+            f"SVG 文件过大({len(raw_svg)} bytes),上限为 {_MAX_SVG_BYTES} bytes"
+        )
+    if _UNSAFE_XML.search(raw_svg):
+        raise ValueError("SVG 不允许包含 DOCTYPE 或 ENTITY 声明")
+    try:
+        root = ET.fromstring(raw_svg)
+    except ET.ParseError as exc:
+        raise ValueError(f"SVG XML 无法解析: {path}") from exc
     vb = root.get("viewBox", "0 0 160 100").split()
     w, h = float(vb[2]), float(vb[3])
     cx, cy = w / 2.0, h / 2.0

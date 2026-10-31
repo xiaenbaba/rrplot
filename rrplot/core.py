@@ -3,6 +3,9 @@
 
 坐标系与旧脚本一致:x 向右, y 向下(ax.set_ylim(H, 0))。
 """
+import io
+import math
+
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 
@@ -18,6 +21,9 @@ _DIR_TOKENS = {
 
 SNAP_TOL = 10        # 端口附近小于此值的错位视为笔误,吸附消除接缝碎块
 ARROW_HALF = 20      # 随线箭头线长的一半(px)
+
+_DBG_PORT = "#d62728"    # debug 叠加层:端口点/法向箭头
+_DBG_PIPE = "#1f77b4"    # debug 叠加层:管线拐点
 
 _AT_TOKENS = {"start": 0.0, "mid": 0.5, "end": 1.0}
 
@@ -131,7 +137,13 @@ def _resolve_at(at):
             raise ValueError(f"at={at!r} 不是合法位置,"
                              f"可用:{'/'.join(sorted(_AT_TOKENS))} 或 0~1 的数值")
         at = _AT_TOKENS[key]
-    return float(at)
+    try:
+        at = float(at)
+    except (TypeError, ValueError):
+        raise ValueError(f"at={at!r} 必须是 0~1 的数值") from None
+    if not math.isfinite(at) or not 0.0 <= at <= 1.0:
+        raise ValueError(f"at={at!r} 超出范围,必须在 0~1 之间")
+    return at
 
 
 def _polyline_span(pts, frac):
@@ -288,6 +300,20 @@ class Diagram:
     """一张示意图。add() 放部件,pipe() 连线,最后 save() 出图。"""
 
     def __init__(self, width=800, height=600, default_step=100):
+        for name, value, allow_zero in (
+            ("width", width, True),
+            ("height", height, True),
+            ("default_step", default_step, False),
+        ):
+            try:
+                valid = math.isfinite(float(value)) and (
+                    value >= 0 if allow_zero else value > 0
+                )
+            except (TypeError, ValueError):
+                valid = False
+            if not valid:
+                bound = ">= 0" if allow_zero else "> 0"
+                raise ValueError(f"{name} 必须是有限数值且 {bound}")
         self.W, self.H = width, height
         self.default_step = default_step
         self.fig, self.ax = plt.subplots(figsize=(width / 100, height / 100),
@@ -304,6 +330,8 @@ class Diagram:
         self.fig.patch.set_facecolor("white")
         self._nodes = []
         self._pipes = []
+        self._drawn_nodes = set()   # render 增量绘制:已上屏的不再重画
+        self._drawn_pipes = set()
 
     # ---------- 组装 ----------
     def add(self, part, label=None, loc=(0, 0), **style):
@@ -344,24 +372,108 @@ class Diagram:
     def text(self, x, y, s, **kw):
         txt(self.ax, x, y, s, **kw)
 
+    def debug(self, ports=True, normals=True, pipe_points=True, names=False):
+        """叠加调试层,自查端口位置、法向与走线拐点(随图一起输出)。
+
+        ports       每个部件的端口画红点
+        normals     沿端口外法向画红色短箭头(检查管线出入方向)
+        pipe_points 每根管线折线的拐点画蓝色小方块
+        names       端口旁标注端口名(写部件端口表时定位用)
+
+        只覆盖调用当时已 add()/pipe() 的内容,在 save()/show() 之前调用;
+        正式出图前删掉这行即可。
+        """
+        self.render()
+        if ports:
+            for n in self._nodes:
+                for key in n.part.ports:
+                    p = n.port(key)
+                    self.ax.add_patch(Circle(p.point, 4.5,
+                                             facecolor=_DBG_PORT,
+                                             edgecolor="none", zorder=7))
+                    if names:
+                        off = 48 if p.dir != (0, 0) else 14
+                        self.text(p.point[0] + p.dir[0] * off,
+                                  p.point[1] + p.dir[1] * off, key,
+                                  size=9, color=_DBG_PORT)
+        if normals:
+            for n in self._nodes:
+                for key in n.part.ports:
+                    p = n.port(key)
+                    if p.dir == (0, 0):
+                        continue
+                    arrow(self.ax, p.point[0], p.point[1],
+                          p.point[0] + p.dir[0] * 30,
+                          p.point[1] + p.dir[1] * 30,
+                          size=10, lw=1.0, color=_DBG_PORT)
+        if pipe_points:
+            for p in self._pipes:
+                xs, ys = zip(*p.points())
+                self.ax.plot(xs, ys, linestyle="none", marker="s", ms=4,
+                             color=_DBG_PIPE, zorder=7)
+        return self.fig
+
     # ---------- 出图 ----------
     def render(self):
+        """画出全部部件与管线;重复调用只补画新增内容,可安全多次调用。"""
         for n in self._nodes:
+            if id(n) in self._drawn_nodes:
+                continue
             kw = dict(n.style)
             # label=None/"" 一律不画,不回落到部件绘制函数的默认标签
             kw["label"] = n.label
             n.part.draw(self.ax, n.loc[0], n.loc[1], **kw)
+            self._drawn_nodes.add(id(n))
         for p in self._pipes:
+            if id(p) in self._drawn_pipes:
+                continue
             p.draw()
+            self._drawn_pipes.add(id(p))
         return self.fig
 
-    def save(self, path, dpi=100, tight=True):
+    def clear_render(self):
+        """清空当前 Matplotlib 图层,保留节点和管线以便重新绘制。
+
+        ``render()`` 为了支持重复调用会缓存已经绘制的节点和管线。如果
+        修改了 ``Node.loc``、``Node.style`` 或管线参数,先调用本方法再
+        ``render()`` 可避免旧图元残留。手工调用 ``sensor()``、``text()``
+        或 ``debug()`` 添加的临时图层也会被清除。
+        """
+        self.ax.clear()
+        self.fig.subplots_adjust(0, 0, 1, 1)
+        if self.W > 0:
+            self.ax.set_xlim(0, self.W)
+        if self.H > 0:
+            self.ax.set_ylim(self.H, 0)
+        self.ax.set_aspect("equal")
+        self.ax.axis("off")
+        self.fig.patch.set_facecolor("white")
+        self._drawn_nodes.clear()
+        self._drawn_pipes.clear()
+        return self
+
+    def save(self, *paths, dpi=100, tight=True):
+        """出图。可一次传多个路径输出多种格式,如 ``save("out.png", "out.svg")``。
+
+        传单个路径返回该路径字符串,多个则返回路径元组。
+        """
+        if not paths:
+            raise TypeError(
+                "save() 至少需要一个输出路径,如 save('out.png')")
         self.render()
         kw = dict(dpi=dpi)
         if tight:
             kw.update(bbox_inches="tight", pad_inches=0.05)
-        self.fig.savefig(path, **kw)
-        return path
+        for path in paths:
+            self.fig.savefig(path, **kw)
+        return paths[0] if len(paths) == 1 else paths
+
+    def _repr_svg_(self):
+        """Jupyter/IPython 富显示:把整张图作为 SVG 内嵌输出。"""
+        self.render()
+        buf = io.StringIO()
+        self.fig.savefig(buf, format="svg")
+        return buf.getvalue()
 
     def show(self):
         self.render()
@@ -391,7 +503,7 @@ def make_partial(part, ports=None, dirs=None):
     覆盖某个端口位置时,其旧方向声明一并作废(回落到按偏移推断);
     需要固定方向就显式传 dirs。
     """
-    from .parts import Part
+    from .part import Part
     new_ports = dict(part.ports)
     new_dirs = dict(part._dirs)
     if ports:

@@ -1,0 +1,50 @@
+name: Publish
+
+# 打 GitHub Release 时构建 sdist/wheel 并发布到 PyPI。
+# 首次使用需在 PyPI 上为本仓库配置一次 Trusted Publisher(无需 token):
+#   Publishing -> Add a new pending publisher:
+#     owner: xiaenbaba  repository: <本仓库名>  workflow: publish.yml
+#     environment: pypi
+# 同时在 GitHub 仓库 Settings -> Environments 里建一个名为 pypi 的环境。
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:          # 允许手动触发重发同一版本
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build sdist and wheel
+        run: |
+          python -m pip install build twine
+          python -m build
+          python -m twine check dist/*
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write         # PyPI Trusted Publishing(OIDC)
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

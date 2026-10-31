@@ -1,4 +1,4 @@
-# cycleplot —— 通用制冷循环/HVAC 示意图库
+# rrplot —— 通用制冷循环/HVAC 示意图库
 
 [![CI](https://github.com/xiaenbaba/cycle-plot/actions/workflows/ci.yml/badge.svg)](https://github.com/xiaenbaba/cycle-plot/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
@@ -21,7 +21,10 @@ y 向下),所见即所得。
 pip install -e .
 ```
 
-不安装也可用:在仓库根目录下直接 `import cycleplot`。
+不安装也可用:在仓库根目录下直接 `import rrplot`。
+
+从旧版 `cycleplot` 升级时,旧包名仍提供兼容导入;新代码建议统一使用
+`rrplot`。
 
 跑回归测试(56 个用例,CI 覆盖 ubuntu/windows × Python 3.9/3.12):
 
@@ -30,19 +33,19 @@ pip install -e ".[test]"
 python -m pytest
 ```
 
-`tests/test_cycleplot.py` 也可以直接 `python tests/test_cycleplot.py` 跑,
+`tests/test_rrplot.py` 也可以直接 `python tests/test_rrplot.py` 跑,
 不带 pytest 环境也能用。
 
 静态检查(CI 里跑同一条):
 
 ```powershell
-ruff check cycleplot tests examples
+ruff check rrplot tests examples
 ```
 
 ## 快速上手
 
 ```python
-from cycleplot import Diagram, parts
+from rrplot import Diagram, parts
 
 d = Diagram(width=1491, height=1055)
 comp = d.add(parts.compressor, "压缩机", loc=(330, 140))
@@ -73,8 +76,12 @@ head_at, color)` 连线。
   0.3}` 局部处 T/P 传感器(自动识别字母开头文本,画成圆圈);随线箭头由
   `head_at` 控制位置,默认 `(0.55,)`,`head=False` 关闭。
 - 两个端口平面不在一个水平/竖直线时,管线默认从端口法向出入。
+- 在 Jupyter 中把 `Diagram` 实例放在单元格末尾即内嵌显示(SVG);
+  连管拿不准时先 `d.debug()` 叠加端口点/法向箭头/拐点标记;
+  `save("out.png", "out.svg")` 可一次输出多种格式。修改节点位置或样式后,
+  调用 `d.clear_render().render()` 重建图层。
 
-## 部件库(`cycleplot.parts`)
+## 部件库(`rrplot.parts`)
 
 按名字取直接实例:`compressor`、`capsule_compressor`(立式胶囊增焓压缩机,
 上排/下吸/右下补气)、`evaporator`、`condenser`、`separator`(气液分离器)、
@@ -95,8 +102,8 @@ top/bottom/left/right/vapor)、`globe_valve`(截止阀,左右对顶沙漏 + 阀�
 尺寸不合适时用工厂生成:
 
 ```python
-from cycleplot.parts import make_compressor, make_vessel, make_heat_exchanger
-from cycleplot.parts import (make_four_way_round, make_globe_valve,
+from rrplot.parts import make_compressor, make_vessel, make_heat_exchanger
+from rrplot.parts import (make_four_way_round, make_globe_valve,
                              make_low_pressure_tank, make_solenoid_valve)
 ```
 
@@ -105,7 +112,7 @@ from cycleplot.parts import (make_four_way_round, make_globe_valve,
 详见各自 docstring。特殊端口定义可用 `make_partial(part, ports=..., dirs=...)`
 从现有部件派生。
 
-## HVAC 符号族(`cycleplot.hvac`)
+## HVAC 符号族(`rrplot.hvac`)
 
 `references/hvacsvg/symbols` 全部 17 个 SVG 已转成代码图元,与 SVG 原件
 逐像素一致:`heat_pump`、`water_pump`、`thermal_tank`、`fan_coil`、
@@ -114,7 +121,7 @@ from cycleplot.parts import (make_four_way_round, make_globe_valve,
 
 工厂参数:`scale` 整体缩放、`moves` 覆盖连接点坐标、`bridge` 在边缘连
 接点内侧补引管、`label_dy` 调标签位置。也可用
-`cycleplot.svgparts.load_svg_part(path, ...)` 直接加载新 SVG。
+`rrplot.svgparts.load_svg_part(path, ...)` 直接加载新 SVG。
 
 <details>
 <summary>看图:空气能供暖系统(带水箱)/ 四通阀圆体回路 / SVG 符号直接加载 / 多联机(VRF)</summary>
@@ -162,8 +169,10 @@ python examples/hvac_system.py
 
 ## 字体
 
-`cycleplot.style` 依安装列表自动选 Times New Roman + 宋体栈
+`rrplot.style` 依安装列表自动选 Times New Roman + 宋体栈
 (`fontfamily` 交给 matplotlib 逐字回退),`use_font()` 打印当前生效字体。
+需要临时隔离 Matplotlib 全局样式时可使用
+`with rrplot.context(): ...`。
 
 中文渲染成方框时按下面排查:
 
@@ -171,12 +180,12 @@ python examples/hvac_system.py
 2. Windows 装宋体/新宋体,macOS 装 Songti SC,Linux 装
    `fonts-noto-cjk` 或思源宋体,装完重启 Python 进程;
 3. 自备字体文件时用 `matplotlib.font_manager.fontManager.addfont()`
-   注册,再把族名加进 `cycleplot.style.FONT_CANDIDATES` 头部。
+   注册,再把族名加进 `rrplot.style.FONT_CANDIDATES` 头部。
 
 ## 目录结构
 
 ```
-cycleplot/     库本体:core(引擎)/ parts(部件)/ hvac、svgparts(HVAC)/
+rrplot/     库本体:core(引擎)/ part(部件模型)/ parts(部件)/ hvac、svgparts(HVAC)/
                style(样式)/ _primitives(底层绘制)
 examples/      每张图一个脚本 + 同名 PNG
 tests/         pytest 回归测试(端口/走线/错误提示/全件渲染)
@@ -204,10 +213,10 @@ python -m sphinx -b html docs docs/_build/html
 
 ## 贡献
 
-新增部件请在 `cycleplot/parts.py` 里写绘制函数 + 端口表(或用
-`make_partial` 派生),并在 `tests/test_cycleplot.py` 补端口断言、
+新增部件请在 `rrplot/parts.py` 里写绘制函数 + 端口表(或用
+`make_partial` 派生),并在 `tests/test_rrplot.py` 补端口断言、
 在 `examples/` 加一个演示脚本;提交前跑通 `python -m pytest` 与
-`ruff check cycleplot tests`。
+`ruff check rrplot tests`。
 
 ## 许可
 

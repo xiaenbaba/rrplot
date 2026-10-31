@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-"""cycleplot —— 通用制冷循环示意图库。
+"""rrplot —— 通用制冷循环示意图库。
 
 用法示例::
 
-    from cycleplot import Diagram, parts
+    from rrplot import Diagram, parts
 
     d = Diagram(width=1491, height=1055)
     comp = d.add(parts.compressor, "压缩机", loc=(330, 140))
@@ -17,12 +17,12 @@
 from . import hvac, parts, style
 from .core import Diagram, Node, Pipe, Port, State, make_partial, use_font
 from .parts import COMPRESSOR_STYLES, ECONOMIZER_STYLES, HEX_SHAPES
-from .style import FONT, FONT_STACK, LINE
+from .style import FONT, FONT_STACK, LINE, apply_style, context
 from .svgparts import load_svg_part
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 
 __all__ = ["__version__", "Diagram", "Node", "Pipe", "Port", "State",
            "make_partial", "use_font", "parts", "hvac", "style", "FONT",
-           "FONT_STACK", "LINE", "HEX_SHAPES", "COMPRESSOR_STYLES",
-           "ECONOMIZER_STYLES", "load_svg_part"]
+           "FONT_STACK", "LINE", "apply_style", "context", "HEX_SHAPES",
+           "COMPRESSOR_STYLES", "ECONOMIZER_STYLES", "load_svg_part"]

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""把 cycleplot.parts 里的全部图元各自导出为一张独立 SVG 到 SVG/。
+"""把 rrplot.parts 里的全部图元各自导出为一张独立 SVG 到 SVG/。
 
 每张 SVG 按部件实际外形紧裁(bbox_inches="tight"),可直接单张拷进论文/PPT。
 覆盖三类:
@@ -16,8 +16,8 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import matplotlib.pyplot as plt
-from cycleplot import Diagram, parts, use_font
-from cycleplot.parts import (COMPRESSOR_STYLES, HEX_SHAPES, Part,
+from rrplot import Diagram, parts, use_font
+from rrplot.parts import (COMPRESSOR_STYLES, HEX_SHAPES, Part,
                              make_compressor, make_heat_exchanger)
 
 CANVAS = 600                     # 部件居中放置,紧裁后无留白

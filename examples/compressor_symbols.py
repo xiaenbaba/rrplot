@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 """示例:压缩机 6 种型式符号对照(标准 PFD 画法)。
 
-对照 references/compressor_symbols.py,符号已移植进 cycleplot.parts。
+对照 references/compressor_symbols.py,符号已移植进 rrplot.parts。
 """
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from cycleplot import Diagram, parts, use_font
+from rrplot import Diagram, parts, use_font
 
 use_font()
 

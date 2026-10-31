@@ -1,5 +1,7 @@
 __pycache__/
 *.pyc
+.venv/
+venv/
 .claude/
 .workbuddy/
 examples/_ref_crops/

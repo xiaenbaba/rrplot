@@ -14,8 +14,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from cycleplot import Diagram, use_font
-from cycleplot.parts import make_separator_utube, separator_utube
+from rrplot import Diagram, use_font
+from rrplot.parts import make_separator_utube, separator_utube
 
 use_font()
 

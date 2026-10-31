@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """示例:空气能 + 蓄热水箱 + 风机盘管/地暖 家用供暖系统。
 
-部件用 cycleplot.hvac 的代码图元(由 references/hvacsvg 的 SVG 符号转换),
+部件用 rrplot.hvac 的代码图元(由 references/hvacsvg 的 SVG 符号转换),
 管路按功能配色 —— 红 = 供水(热)  紫 = 回水干管  蓝 = 就地回水  绿 = 补水/安全。
 两个回路:
   ① 主机 ↔ 水箱:主机热水进水箱上口,水箱下口经水泵回主机。
@@ -16,9 +16,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from matplotlib.patches import Rectangle
 
-from cycleplot import Diagram, use_font
-from cycleplot._primitives import line, txt
-from cycleplot.hvac import (
+from rrplot import Diagram, use_font
+from rrplot._primitives import line, txt
+from rrplot.hvac import (
     auto_vent,
     ball_valve,
     corrugated_pipe,
@@ -33,8 +33,8 @@ from cycleplot.hvac import (
     thermal_tank,
     water_pump,
 )
-from cycleplot.parts import Part
-from cycleplot.style import LINE
+from rrplot.parts import Part
+from rrplot.style import LINE
 
 use_font()
 

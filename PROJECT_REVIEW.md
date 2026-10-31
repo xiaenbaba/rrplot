@@ -1,4 +1,4 @@
-# cycleplot 项目审查报告
+# rrplot 项目审查报告
 
 > **2026-10-24 复审补充**:当前状态以本节为准;下方 2026-10-16 与 2026-10-12
 > 两节中的规模数字(53 例 / 96~97% / 16~22 示例 / 旧行数)已过时,仅作历史记录。
@@ -8,10 +8,10 @@
 **审查基线**:`29f4516` + 工作区未提交改动(vrf 阀件缩小一号、
 `make_four_way_round` 工厂)。
 
-**现状**:56 例测试全绿、**0 警告**;`ruff check cycleplot tests examples`
+**现状**:64 例测试全绿、**0 代码警告**;`ruff check rrplot tests examples`
 全绿;22 个 `examples/*.py` 逐个跑通;包内覆盖率 **97%**
 (`core 98 / parts 98 / hvac 94 / svgparts 93 / style 96 / _primitives 100 /
-__init__ 100`);Sphinx 构建 0 警告;版本 1.2.0 单一来源(`pyproject` dynamic +
+__init__ 100`);Sphinx 构建 0 警告;版本 1.3.0 单一来源(`pyproject` dynamic +
 `conf.py release = __version__`)。2026-10-16 轮的整改项(CI 三 job、覆盖率
 门槛 90%、ruff 钉版、hvac 工厂自动发现、依赖统一)全部落地且有效;
 tutorial 速查表与最新部件(胶囊压缩机、rect_x/rect_shell、chord、新阀件)
@@ -32,7 +32,7 @@ tutorial 速查表与最新部件(胶囊压缩机、rect_x/rect_shell、chord、
    (测试只烟雾渲染、无断言,故从未红过)。已修复:同样透传;测试补
    真断言(裸阀 0 条线,`actuator="dome"` 覆盖后 2 条线)。
 3. `examples/vrf_system.py` docstring 超长行(E501,上轮提交遗留;
-   CI lint 只查 `cycleplot tests` 故未暴露)。
+   CI lint 只查 `rrplot tests` 故未暴露)。
 
 **新发现(复审提出后,已按优先级全部整改)**:
 
@@ -41,7 +41,7 @@ tutorial 速查表与最新部件(胶囊压缩机、rect_x/rect_shell、chord、
    整改:`Diagram` 加 `close()`(内部 `plt.close`)与上下文管理器协议,
    `test_diagram_close_and_context_manager` 锁行为;测试侧加 autouse
    fixture 每例 `plt.close("all")`(try/except 守卫,`python
-   tests/test_cycleplot.py` 直跑不受影响)。pytest 输出现为 56 例 0 警告。
+   tests/test_rrplot.py` 直跑不受影响)。pytest 输出现为 56 例 0 警告。
 2. ✅ **P3 README 滞后 4 处**:① 用例数 32 → 56;② 压缩机 style 清单补
    `chord`;③ 换热器 shape 清单补 `rect_x` / `rect_shell`;④ 示例表补
    `heat_pump_cycle.py` 与 `separator_utube_demo.py` 两行。顺带:部件
@@ -49,7 +49,7 @@ tutorial 速查表与最新部件(胶囊压缩机、rect_x/rect_shell、chord、
    工厂代码块补 `make_four_way_round`。
 3. ✅ **P3 examples 6 处 ruff 违规**:5 处 `--fix`(4 个文件导入排序 +
    1 处文件尾换行)、`hvac_system_notank.py` 超长行注释上提手修;
-   CI lint job 扩为 `ruff check cycleplot tests examples`,
+   CI lint job 扩为 `ruff check rrplot tests examples`,
    README / CONTRIBUTING 的检查命令同步。
 4. ✅ **P4 注释滞后**:`export_parts_svg.py` docstring "5 种换热面变体"
    改为 7 种。
@@ -68,7 +68,7 @@ Python 3.13、`svgparts` 的 defusedxml 可选防护,按需。
 
 ## 2026-10-16 复审补充
 
-**现状**:53 例测试全绿;`ruff check cycleplot tests` 全绿;22 个 `examples/*.py`
+**现状**:53 例测试全绿;`ruff check rrplot tests` 全绿;22 个 `examples/*.py`
 逐个跑通。包内覆盖率 **97%**(`core 98 / parts 98 / hvac 94 / svgparts 93 /
 style 96 / _primitives 100 / __init__ 100`)。
 
@@ -79,7 +79,7 @@ style 96 / _primitives 100 / __init__ 100`)。
    ruff 固定 `ruff==0.15.13`(原先装最新版,规则升级会突然弄红构建)。
 2. 测试去硬编码:`test_render_every_part_and_hvac_symbol` 的 17 个 hvac 工厂名
    改为按 `__module__` 自动发现 + 数量下限,新增符号不再需要手工登记。
-3. 消除重复实现:原 `cycleplot/vrfpart.py` 是脱离库约定的第三套 SVG 引擎,
+3. 消除重复实现:原 `rrplot/vrfpart.py` 是脱离库约定的第三套 SVG 引擎,
    已**降级为 `references/vrfpart.py` 原型**(不进包、不进覆盖率、不进 API 文档);
    根目录 `draw_gmv.py` 改为调用 `render_gmv()` 的薄封装,同图不再两处维护。
 4. 仓库整理:早期原型 `制冷循环示意图.*`、`涡旋压缩机循环示意图.*` 移入
@@ -115,10 +115,10 @@ style 96 / _primitives 100 / __init__ 100`)。
 复审报告列出的 17 条问题中,已就地修掉 8 条(下方各条已标注):
 
 - **P1.1 版本号单一来源**:`__init__.py` 加 `__version__ = "0.1.0"`,
-  `docs/conf.py` 改为 `from cycleplot import __version__`,
+  `docs/conf.py` 改为 `from rrplot import __version__`,
   `pyproject.toml` 用 `dynamic = ["version"]` + `[tool.setuptools.dynamic]`。
-- **P1.2 打包清单**:`packages = ["cycleplot"]` 换成
-  `[tool.setuptools.packages.find] include = ["cycleplot*"]`,将来拆包不会漏装。
+- **P1.2 打包清单**:`packages = ["rrplot"]` 换成
+  `[tool.setuptools.packages.find] include = ["rrplot*"]`,将来拆包不会漏装。
 - **P1.3 零尺寸画布**:`Diagram(width=0, height=0)` 跳过 `set_xlim`/`set_ylim`,
   不再触发 matplotlib 的 identical-limits 警告,测试输出干净。
 - **P2.4/5/6/7 测试盲区**:新增 7 个用例(压缩机 7 style、换热器 5 shape、
@@ -139,7 +139,7 @@ style 96 / _primitives 100 / __init__ 100`)。
 
 ## 一、项目概况
 
-`cycleplot` 用坐标式部件拼装 + 走线式连管生成制冷循环 / HVAC 原理图,
+`rrplot` 用坐标式部件拼装 + 走线式连管生成制冷循环 / HVAC 原理图,
 输出 PNG / PDF / SVG。核心约定是 **1 画图单位 = 1 画布像素,x 向右、y 向下**,
 因此在画图脚本里可以"所见即所得"地摆位。
 
@@ -159,25 +159,25 @@ style 96 / _primitives 100 / __init__ 100`)。
 
 | 文件 | 行数 | 职责 |
 | --- | ---: | --- |
-| `cycleplot/parts.py` | 763 | 部件库:绘制函数 + 端口表 + 尺寸工厂 |
-| `cycleplot/core.py` | 393 | 引擎:`Diagram` / `Pipe` / `Port` / 走线算法 |
-| `cycleplot/hvac.py` | 305 | 17 个 HVAC 符号(160×100 viewBox 坐标图元) |
-| `cycleplot/svgparts.py` | 213 | SVG 子集解析器,直接加载外部符号 |
-| `cycleplot/style.py` | 46 | 字体栈、颜色、线宽、字号常量 |
-| `cycleplot/_primitives.py` | 25 | 底层原语:`txt` / `line` / `arrow` |
-| `cycleplot/__init__.py` | 28 | 顶层导出 + `__version__` |
+| `rrplot/parts.py` | 1083 | 部件库:绘制函数 + 端口表 + 尺寸工厂 |
+| `rrplot/core.py` | 477 | 引擎:`Diagram` / `Pipe` / `Port` / 走线算法 |
+| `rrplot/hvac.py` | 305 | 17 个 HVAC 符号(160×100 viewBox 坐标图元) |
+| `rrplot/svgparts.py` | 213 | SVG 子集解析器,直接加载外部符号 |
+| `rrplot/style.py` | 46 | 字体栈、颜色、线宽、字号常量 |
+| `rrplot/_primitives.py` | 25 | 底层原语:`txt` / `line` / `arrow` |
+| `rrplot/__init__.py` | 28 | 顶层导出 + `__version__` |
 
 ### 覆盖率分布(实测)
 
 ```
 Name                       Stmts   Miss  Cover
-cycleplot\__init__.py          7      0   100%
-cycleplot\_primitives.py      11      0   100%
-cycleplot\core.py            264      5    98%
-cycleplot\hvac.py            162     10    94%
-cycleplot\parts.py           378      8    98%
-cycleplot\style.py            28      1    96%
-cycleplot\svgparts.py        149     11    93%
+rrplot\__init__.py          7      0   100%
+rrplot\_primitives.py      11      0   100%
+rrplot\core.py            264      5    98%
+rrplot\hvac.py            162     10    94%
+rrplot\parts.py           378      8    98%
+rrplot\style.py            28      1    96%
+rrplot\svgparts.py        149     11    93%
 TOTAL                        999     35    96%
 ```
 
@@ -244,11 +244,11 @@ TOTAL                        999     35    96%
 #### 1. ✅ 版本号三处硬编码,库内无 `__version__`(已修复)
 
 `pyproject.toml` 的 `version = "0.1.0"`、`docs/conf.py` 的 `release = "0.1.0"`
-各自独立,`cycleplot/__init__.py` 也没有暴露 `__version__`。升级时容易漏改,
-下游也无法 `cycleplot.__version__` 做能力判断。
+各自独立,`rrplot/__init__.py` 也没有暴露 `__version__`。升级时容易漏改,
+下游也无法 `rrplot.__version__` 做能力判断。
 
 **建议**:在 `__init__.py` 加 `__version__ = "0.1.0"`,`docs/conf.py` 改为
-`release = cycleplot.__version__`(conf.py 已经把仓库根加进 `sys.path`),
+`release = rrplot.__version__`(conf.py 已经把仓库根加进 `sys.path`),
 `pyproject.toml` 用 `dynamic = ["version"]` + `[tool.setuptools.dynamic]`
 从 `__init__.py` 读取。
 
@@ -262,12 +262,12 @@ TOTAL                        999     35    96%
 **建议**:零尺寸时直接 `return` 跳过 `set_xlim`/`set_ylim`,
 或钳到 `max(width, 1)`;同时给该测试加 `filterwarnings` 断言锁住行为。
 
-#### 3. ✅ `pyproject.toml` 的 `packages = ["cycleplot"]` 是硬编码清单(已修复)
+#### 3. ✅ `pyproject.toml` 的 `packages = ["rrplot"]` 是硬编码清单(已修复)
 
 一旦按建议把 `parts.py` 拆成 `parts/` 包,或新增子模块,这行会**静默漏装**——
 `pip install` 成功但 `import` 失败,只在用户环境里暴露。
 
-**建议**:改用 `[tool.setuptools.packages.find] include = ["cycleplot*"]`。
+**建议**:改用 `[tool.setuptools.packages.find] include = ["rrplot*"]`。
 
 ### P2 —— 测试覆盖盲区
 
@@ -315,7 +315,7 @@ label_dy=0` 加载 + 渲染,并断言 bridge 不改变端口偏移。
 
 #### 8. 测试直接 import 私有函数
 
-`tests/test_cycleplot.py:13` 从 `cycleplot.core` 导入 `_fit_end` /
+`tests/test_rrplot.py:13` 从 `rrplot.core` 导入 `_fit_end` /
 `_orthogonalize` / `_is_sensor` / `_resolve_at`。这些函数名带下划线意味着
 "内部 API",测试却深度依赖它们——将来重构内部实现会连带改测试。
 
@@ -325,7 +325,7 @@ label_dy=0` 加载 + 渲染,并断言 bridge 不改变端口偏移。
 
 #### 9. hvac 工厂名在测试里硬编码列举
 
-`test_cycleplot.py:341-346` 显式列出 17 个工厂名(为了避开
+`test_rrplot.py:341-346` 显式列出 17 个工厂名(为了避开
 `vars(parts)` 把 matplotlib 类也捞进来)。新增符号时忘记加进去,
 烟雾测试就少测一个,且不会报错。
 
@@ -380,7 +380,7 @@ not name.startswith("_")`,并保留一个断言数量下限(如 `>= 17`)兜底�
 
 #### 15. 部分修复 —— ruff 配置已加,`pre-commit` 仍未有
 
-CI 跑 `ruff check cycleplot tests`,原本用的是 ruff 默认规则(E/F),
+CI 跑 `ruff check rrplot tests`,原本用的是 ruff 默认规则(E/F),
 仓库里没有 `[tool.ruff]` 配置段。`parts.py:761` 的 `from .core import
 make_partial  # noqa: E402,F401` 说明规则集是"撞上了才豁免"而非主动约定。
 
@@ -459,9 +459,9 @@ lint/format。可选,不影响 CI。
 
 ## 附录:关键事实速查
 
-- 测试:`python -m pytest`(也可直接 `python tests/test_cycleplot.py`)
-- 覆盖率:`python -m pytest --cov=cycleplot --cov-report=term-missing`
+- 测试:`python -m pytest`(也可直接 `python tests/test_rrplot.py`)
+- 覆盖率:`python -m pytest --cov=rrplot --cov-report=term-missing`
 - 文档:`python -m sphinx -b html docs docs/_build/html`
-- 静态检查:`ruff check cycleplot tests`
+- 静态检查:`ruff check rrplot tests`
 - 导出部件单图:`python export_parts_svg.py` → `SVG/`
-- 字体排查:`python -c "from cycleplot import use_font; use_font()"`
+- 字体排查:`python -c "from rrplot import use_font; use_font()"`

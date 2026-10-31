@@ -17,8 +17,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from cycleplot import Diagram, use_font
-from cycleplot.parts import (
+from rrplot import Diagram, use_font
+from rrplot.parts import (
     bowtie_valve_dome,
     bowtie_valve_solenoid,
     make_heat_exchanger,

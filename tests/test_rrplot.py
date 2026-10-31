@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""端口/标注的最小回归测试:python tests/test_cycleplot.py 即可跑。"""
+"""端口/标注的最小回归测试:python tests/test_rrplot.py 即可跑。"""
 import os
 import sys
 
@@ -10,8 +10,8 @@ import matplotlib.pyplot as plt  # noqa: E402  须在 use() 之后导入
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from cycleplot import Diagram, parts
-from cycleplot.core import (
+from rrplot import Diagram, parts
+from rrplot.core import (
     Port,
     _fit_end,
     _is_sensor,
@@ -19,7 +19,7 @@ from cycleplot.core import (
     _resolve_at,
     make_partial,
 )
-from cycleplot.svgparts import load_svg_part
+from rrplot.svgparts import load_svg_part
 
 try:
     import pytest
@@ -34,7 +34,7 @@ else:
 
 
 def _raises(exc, fn, *args, **kw):
-    """兼容 pytest 与 `python tests/test_cycleplot.py` 两种跑法的断言。"""
+    """兼容 pytest 与 `python tests/test_rrplot.py` 两种跑法的断言。"""
     try:
         fn(*args, **kw)
     except exc as e:
@@ -123,9 +123,26 @@ def test_load_svg_part_ports_and_rename():
     assert p2.port("in") == (-40.0, 0.0)
 
 
+def test_load_svg_part_rejects_unsafe_xml():
+    """外部 SVG 的 DTD/实体声明必须被拒绝。"""
+    import tempfile
+
+    fd, path = tempfile.mkstemp(suffix=".svg")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(
+                '<!DOCTYPE svg [<!ENTITY xxe "blocked">]>'
+                '<svg viewBox="0 0 10 10" data-connection-points="[]" />'
+            )
+        err = _raises(ValueError, load_svg_part, path)
+        assert "DOCTYPE" in str(err)
+    finally:
+        os.unlink(path)
+
+
 def test_hvac_factory_ports_match_svg_part():
     """hvac 代码图元与 load_svg_part 的端口定义保持一致。"""
-    from cycleplot import hvac
+    from rrplot import hvac
     sym_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                            "references", "hvacsvg", "symbols")
     for svg, factory in [("04_蓄热水箱.svg", hvac.thermal_tank),
@@ -200,7 +217,7 @@ def test_pipe_points_orthogonal_and_cached():
 
 def test_pipe_via_tokens_end_on_port():
     d = Diagram(width=800, height=600, default_step=100)
-    from cycleplot import parts as _parts
+    from rrplot import parts as _parts
     comp = d.add(_parts.compressor, None, loc=(330, 140))
     evap = d.add(_parts.evaporator, None, loc=(100, 105))
     assert d.pipe(evap["out"], comp["suction"],
@@ -297,6 +314,30 @@ def test_check_valve_render_both_directions():
     d = Diagram(width=360, height=140)
     d.add(parts.check_valve, "单向阀", loc=(90, 70))
     d.add(parts.check_valve_w, "反向", loc=(260, 70))
+    d.render()
+
+
+def test_expansion_valve_x_ports():
+    """圆X膨胀阀:端口落圆周,orient 决定水平/竖直与进出方向。"""
+    xv = parts.make_expansion_valve_x(orient="h")
+    assert xv.port("in") == (-10, 0)
+    assert xv.port("out") == (10, 0)
+    assert xv.direction("in") == (-1, 0)
+    assert xv.direction("out") == (1, 0)
+    vv = parts.make_expansion_valve_x(orient="v")
+    assert vv.port("in") == (0, -10)
+    assert vv.port("out") == (0, 10)
+    assert vv.direction("in") == (0, -1)
+    assert vv.direction("out") == (0, 1)
+    assert parts.expansion_valve_x.port("in") == (-10, 0)
+    e = _raises(ValueError, parts.make_expansion_valve_x, orient="x")
+    assert "orient" in str(e) and "'h'" in str(e)
+
+
+def test_expansion_valve_x_render_both_orients():
+    d = Diagram(width=420, height=160)
+    d.add(parts.make_expansion_valve_x(orient="h"), "水平", loc=(110, 80))
+    d.add(parts.make_expansion_valve_x(orient="v"), "竖直", loc=(300, 80))
     d.render()
 
 
@@ -460,6 +501,8 @@ def test_resolve_at_tokens_and_error():
     assert _resolve_at(0.3) == 0.3
     e = _raises(ValueError, _resolve_at, "middle")
     assert "start" in str(e) and "mid" in str(e)
+    assert _raises(ValueError, _resolve_at, -0.1)
+    assert _raises(ValueError, _resolve_at, 1.1)
 
 
 def test_degenerate_diagram_and_pipe():
@@ -472,6 +515,13 @@ def test_degenerate_diagram_and_pipe():
     assert d2.pipe((10, 10), (10, 10)).points() == [(10.0, 10.0), (10.0, 10.0)]
     assert d2.pipe((0, 0), (50, 50)).points() == [(0.0, 0.0), (0.0, 50.0),
                                                    (50.0, 50.0)]
+
+
+def test_diagram_rejects_invalid_dimensions():
+    """画布尺寸和默认步长必须是有限的合法数值。"""
+    for kw in ({"width": -1}, {"height": -1}, {"default_step": 0},
+               {"width": "wide"}):
+        assert _raises(ValueError, Diagram, **kw)
 
 
 def test_save_writes_readable_image(tmp_path=None):
@@ -506,8 +556,8 @@ def test_render_every_part_and_hvac_symbol(tmp_path=None):
     """
     import tempfile
 
-    from cycleplot import hvac
-    from cycleplot.parts import Part
+    from rrplot import hvac
+    from rrplot.parts import Part
     tmp = tmp_path if tmp_path is not None else tempfile.mkdtemp()
 
     # hvac 工厂函数自动发现:排除导入进来的 matplotlib 类/原语(模块名不同),
@@ -539,7 +589,7 @@ def test_render_every_svg_symbol(tmp_path=None):
     import glob
     import tempfile
 
-    from cycleplot.parts import Part
+    from rrplot.parts import Part
     tmp = tmp_path if tmp_path is not None else tempfile.mkdtemp()
     sym_dir = os.path.join(os.path.dirname(os.path.dirname(
         os.path.abspath(__file__))), "references", "hvacsvg", "symbols")
@@ -622,7 +672,7 @@ def test_render_all_labels_on_and_off(tmp_path=None):
     """每个部件在 label 有/无两种情况下都能渲染(覆盖 if label 分支)。"""
     import tempfile
 
-    from cycleplot.parts import Part
+    from rrplot.parts import Part
     tmp = tmp_path if tmp_path is not None else tempfile.mkdtemp()
     d = Diagram(width=1400, height=900)
     i = 0
@@ -682,6 +732,20 @@ def test_diagram_close_and_context_manager():
     assert d2.fig.number not in plt.get_fignums()
 
 
+def test_clear_render_rebuilds_after_node_mutation():
+    """修改节点位置后可清空旧图层并重新绘制。"""
+    d = Diagram(width=240, height=140)
+    node = d.add(parts.filter, None, loc=(60, 70))
+    d.render()
+    first = d.ax.patches[0].get_xy()
+    node.loc = (180, 70)
+    d.clear_render().render()
+    second = d.ax.patches[0].get_xy()
+    assert first != second
+    assert second[0] > first[0]
+    plt.close(d.fig)
+
+
 def test_sensor_and_text_helpers():
     """Diagram.sensor()/text() 都能落笔,不报错。"""
     d = Diagram(width=200, height=150)
@@ -695,7 +759,7 @@ def test_sensor_and_text_helpers():
 def test_state_instance_and_full_options():
     """State 实例可直接传;dict 形式支持 side/kind/size 全参数。"""
     d = Diagram(width=200, height=150)
-    from cycleplot.core import State
+    from rrplot.core import State
     st = State("1", 0.5)
     d.pipe((0, 0), (100, 0), states=st)
     d.pipe((0, 10), (100, 10),
@@ -727,11 +791,94 @@ def test_fit_end_tangent_aligned_normal_offset():
 
 def test_use_font_prints(capsys=None):
     """use_font() 打印当前生效字体,且返回字体名。"""
-    from cycleplot.style import FONT, use_font
+    from rrplot.style import FONT, use_font
     out = use_font()
     assert out == FONT
     if capsys is not None:                 # pytest 下校验打印内容
         assert "使用字体" in capsys.readouterr().out
+
+
+def test_style_context_restores_matplotlib_rcparams():
+    """样式上下文退出后恢复调用方的 Matplotlib 配置。"""
+    import matplotlib
+
+    from rrplot.style import context
+
+    before = matplotlib.rcParams["mathtext.fontset"]
+    with context(**{"mathtext.fontset": "dejavusans"}):
+        assert matplotlib.rcParams["mathtext.fontset"] == "dejavusans"
+    assert matplotlib.rcParams["mathtext.fontset"] == before
+
+
+def test_cycleplot_compatibility_alias():
+    """旧包名仍可导入,且与 rrplot 使用同一版本。"""
+    import importlib
+    import warnings
+
+    importlib.invalidate_caches()
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always", DeprecationWarning)
+        import cycleplot
+        importlib.reload(cycleplot)
+    import rrplot
+
+    assert cycleplot.__version__ == rrplot.__version__
+    assert cycleplot.Diagram is Diagram
+    assert any(issubclass(w.category, DeprecationWarning) for w in caught)
+
+
+def test_part_model_is_shared_without_loading_registry():
+    """SVG/HVAC 与部件注册表共享同一个 Part 数据模型。"""
+    from rrplot.part import Part
+
+    assert parts.Part is Part
+
+
+def test_repr_svg_and_render_idempotent():
+    """_repr_svg_ 输出 SVG;render() 重复调用不重复叠加图元。"""
+    d = Diagram(width=150, height=120)
+    d.add(parts.compressor, "压缩机", loc=(75, 60))
+    d.render()
+    n = len(d.ax.patches)
+    d.render()
+    assert len(d.ax.patches) == n
+    svg = d._repr_svg_()
+    assert "<svg" in svg and "</svg>" in svg
+    d._repr_svg_()                     # 富显示可反复触发,不叠加
+    assert len(d.ax.patches) == n
+    plt.close(d.fig)
+
+
+def test_debug_overlay():
+    """debug() 叠加端口点/法向箭头/拐点标记,只读不改走线坐标。"""
+    d = Diagram(width=280, height=160)
+    a = d.add(parts.evaporator, "蒸发器", loc=(70, 90))
+    b = d.add(parts.compressor, "压缩机", loc=(210, 90))
+    pipe = d.pipe(a["out"], b["suction"], via=[("e", 140)])
+    pts0 = list(pipe.points())
+    d.render()
+    n = len(d.ax.patches)
+    d.debug(names=True)
+    assert len(d.ax.patches) > n
+    assert pipe.points() == pts0
+    plt.close(d.fig)
+
+
+def test_save_multiple_formats(tmp_path=None):
+    """save() 一次传多个路径输出多格式;单路径仍返回路径字符串。"""
+    import tempfile
+    tmp = tmp_path if tmp_path is not None else tempfile.mkdtemp()
+    d = Diagram(width=200, height=140)
+    d.add(parts.filter, "过滤器", loc=(100, 70))
+    png, svg, pdf = d.save(os.path.join(tmp, "m.png"),
+                           os.path.join(tmp, "m.svg"),
+                           os.path.join(tmp, "m.pdf"))
+    assert os.path.getsize(png) > 1000
+    with open(svg, "rb") as f:
+        assert b"<svg" in f.read()
+    assert os.path.getsize(pdf) > 1000
+    assert d.save(os.path.join(tmp, "s.png")) == os.path.join(tmp, "s.png")
+    plt.close(d.fig)
 
 
 if __name__ == "__main__":

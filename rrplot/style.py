@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 """字体、颜色、线宽等全局样式常量。"""
+from contextlib import contextmanager
+
 import matplotlib
 from matplotlib import font_manager as fm
 
@@ -14,11 +16,37 @@ FONT = next((c for c in FONT_CANDIDATES if c in _installed), "DejaVu Serif")
 # 交给 matplotlib 做逐字回退:西文用 Times,汉字回退到宋体
 FONT_STACK = [c for c in FONT_CANDIDATES if c in _installed] or [FONT]
 
-matplotlib.rcParams["font.family"] = "serif"
-matplotlib.rcParams["font.serif"] = FONT_CANDIDATES
-# 数学文本(如 EEV$_1$ 的下标)用 STIX,与 Times 风格一致
-matplotlib.rcParams["mathtext.fontset"] = "stix"
-matplotlib.rcParams["axes.unicode_minus"] = False
+STYLE_PARAMS = {
+    "font.family": "serif",
+    "font.serif": FONT_CANDIDATES,
+    # 数学文本(如 EEV$_1$ 的下标)用 STIX,与 Times 风格一致
+    "mathtext.fontset": "stix",
+    "axes.unicode_minus": False,
+}
+
+
+def apply_style(**overrides):
+    """把 rrplot 样式应用到 Matplotlib 全局配置并返回配置副本。
+
+    该函数保留旧版的全局样式行为;嵌入其他绘图库时优先使用
+    :func:`context` 让配置在代码块结束后自动恢复。
+    """
+    params = dict(STYLE_PARAMS)
+    params.update(overrides)
+    matplotlib.rcParams.update(params)
+    return params
+
+
+@contextmanager
+def context(**overrides):
+    """在上下文中临时启用 rrplot 样式,退出后恢复调用方配置。"""
+    params = dict(STYLE_PARAMS)
+    params.update(overrides)
+    with matplotlib.rc_context(params):
+        yield
+
+
+apply_style()
 
 LINE = "#000000"
 FILL = "white"       # 部件填充(论文风格:纯白)

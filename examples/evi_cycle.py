@@ -6,7 +6,7 @@
 支路:冷凝器出液经 EEV1 节流入经济器闪蒸,中压气体自经济器右侧引出、
       自压缩机顶部补气口(vapor_inj)补入,实现中间补气、提升低温制热量与能效。
 
-用 cycleplot 库组装:部件只需声明 loc,管路用「端口 + 走点」描述,
+用 rrplot 库组装:部件只需声明 loc,管路用「端口 + 走点」描述,
 拐角正交化、状态点/温压测点标注由库自动编译。
 """
 import os
@@ -14,7 +14,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from cycleplot import Diagram, make_partial, parts, use_font
+from rrplot import Diagram, make_partial, parts, use_font
 
 use_font()
 

@@ -9,7 +9,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from cycleplot import Diagram, parts
+from rrplot import Diagram, parts
 
 d = Diagram(width=960, height=760, default_step=80)
 comp = d.add(parts.compressor, loc=(450, 140))

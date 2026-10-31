@@ -3,7 +3,7 @@
 
 每个符号是一个工厂,参数语义与 load_svg_part 一致::
 
-    from cycleplot import hvac
+    from rrplot import hvac
 
     tank = hvac.thermal_tank(scale=1.5, bridge=44,
                             moves={"right": (160, 72)}, label_dy=-97)
@@ -25,7 +25,7 @@ from matplotlib.patches import Circle, Ellipse, FancyBboxPatch, PathPatch, Recta
 from matplotlib.path import Path
 
 from ._primitives import line, txt
-from .parts import Part
+from .part import Part
 from .style import LINE, LW_PIPE
 
 VB_W, VB_H = 160.0, 100.0

@@ -4,7 +4,7 @@
 参考 draw_gmv.py 的纯 SVG 手绘风格:所有坐标手工排布,图元以函数
 形式追加 SVG 片段,最终 join 成一张矢量图。
 
-本文件是 references/ 下的原型脚本,不是 cycleplot 库的一部分:
+本文件是 references/ 下的原型脚本,不是 rrplot 库的一部分:
 它不依赖 matplotlib,只做 SVG 字符串拼装。用法(在本目录下)::
 
     from vrfpart import render_vrf_system, render_gmv

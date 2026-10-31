@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""示例:双系统制冷循环 + 共用冷却水路 —— 用 cycleplot 库组装。
+"""示例:双系统制冷循环 + 共用冷却水路 —— 用 rrplot 库组装。
 
 与旧脚本的区别:部件只需声明 loc,管路用「端口 + 走点」描述,
 拐角与传感器标注由库自动编译。
@@ -9,7 +9,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from cycleplot import Diagram, make_partial, parts, use_font
+from rrplot import Diagram, make_partial, parts, use_font
 
 use_font()
 

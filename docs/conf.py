@@ -5,9 +5,9 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from cycleplot import __version__  # noqa: E402
+from rrplot import __version__  # noqa: E402
 
-project = "cycleplot"
+project = "rrplot"
 copyright = "2026, xiaenbaba"
 author = "xiaenbaba"
 version = __version__
