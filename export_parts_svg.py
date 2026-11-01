@@ -33,12 +33,9 @@ def export(part, label, fname):
     print("  已导出:", fname)
 
 
-COMPRESSOR_CN = {"centrifugal": "离心式", "rotor": "通用旋转式",
-                 "axial": "轴流式", "recip": "往复式", "screw": "螺杆式",
-                 "scroll": "涡旋式", "chord": "涡旋式(简化)"}
-HEX_CN = {"circle": "圆壳之字", "rect": "矩形之字", "rect_diag": "矩形对角",
-          "rect_x": "矩形对角X", "rect_zigzag": "蛇形盘管",
-          "rect_zigzag7": "7点之字", "rect_shell": "管壳式"}
+COMPRESSOR_CN = {"圆形": "圆形(圆体双弦)", "方形": "方形(胶囊壳体)"}
+HEX_CN = {"rect_diag": "矩形对角", "rect_x": "矩形对角X",
+          "rect_zigzag7": "7点之字"}
 
 
 def main():
@@ -50,15 +47,15 @@ def main():
         if not isinstance(obj, Part) or name.startswith("_"):
             continue
         if name == "compressor":
-            continue                    # 由 compressor__centrifugal 代表
+            continue                    # 由压缩机两种 style 代表
         export(obj, obj.name, f"{name}.svg")
 
-    print("[2/3] 压缩机 7 种型式")
+    print("[2/3] 压缩机 2 种机身")
     for s in COMPRESSOR_STYLES:
         p = make_compressor(r=95, style=s, name=f"压缩机({s})")
-        export(p, COMPRESSOR_CN[s], f"compressor__{s}.svg")
+        export(p, s, f"compressor__{s}.svg")
 
-    print("[3/3] 换热器 7 种换热面")
+    print("[3/3] 换热器 3 种换热面")
     for sh in HEX_SHAPES:
         p = make_heat_exchanger(shape=sh, name=f"换热器({sh})")
         export(p, HEX_CN[sh], f"heat_exchanger__{sh}.svg")

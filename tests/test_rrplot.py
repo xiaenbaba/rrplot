@@ -42,27 +42,38 @@ def _raises(exc, fn, *args, **kw):
     raise AssertionError(f"未抛出 {exc.__name__}")
 
 
-def test_evaporator_ports_on_body():
-    assert parts.evaporator.port("in") == (0, 48)
-    assert parts.evaporator.port("out") == (0, -48)
-    assert parts.evaporator.direction("in") == (0, 1)
-    assert parts.evaporator.direction("out") == (0, -1)
+def test_heat_exchanger_ports_on_body():
+    hx = parts.make_heat_exchanger(48, 96)
+    assert hx.port("top") == (0, -48)
+    assert hx.port("bottom") == (0, 48)
+    assert hx.direction("top") == (0, -1)
+    assert hx.direction("bottom") == (0, 1)
 
 
-def test_scroll_style_factory_ports():
-    comp = parts.make_compressor(style="scroll")
-    assert comp.port("right") == (95, 0)
-    assert comp.port("top") == (0, -95)
+def test_compressor_style_factory_ports():
+    """圆形:通用四口;方形:胶囊同套四口(宽 r、高 2r,与圆形等高)。"""
+    round_ = parts.make_compressor(style="圆形")
+    assert round_.port("top") == (0, -95)
+    assert round_.port("bottom") == (0, 95)
+    assert round_.port("left") == (-95, 0)
+    cap = parts.make_compressor(style="方形")
+    assert cap.port("top") == (0, -95)
+    assert cap.port("bottom") == (0, 95)
+    assert cap.port("left") == (-47.5, 0)
+    assert cap.port("right") == (47.5, 0)
+    e = _raises(ValueError, parts.make_compressor, style="scroll")
+    assert "style" in str(e) and "圆形" in str(e)
 
 
 def test_make_partial_dirs_and_stale_dir_dropped():
-    sp = make_partial(parts.make_rect(260, 110),
+    sp = make_partial(parts.make_heat_exchanger(260, 110),
                       {"vapor_out": (-65, -55)}, dirs={"vapor_out": "n"})
     assert sp.direction("vapor_out") == (0, -1)
     # 挪了端口位置,旧方向声明应作废并回落到按偏移推断
-    sp2 = make_partial(parts.evaporator, {"in": (-24, 48), "out": (24, 48)})
-    assert sp2.direction("in") == (0, 1)
-    assert sp2.direction("out") == (0, 1)
+    sp2 = make_partial(parts.make_heat_exchanger(48, 96),
+                       {"left": (-24, 48), "right": (24, 48)})
+    assert sp2.direction("left") == (0, 1)
+    assert sp2.direction("right") == (0, 1)
 
 
 def test_is_sensor_mathtext():
@@ -219,8 +230,8 @@ def test_pipe_via_tokens_end_on_port():
     d = Diagram(width=800, height=600, default_step=100)
     from rrplot import parts as _parts
     comp = d.add(_parts.compressor, None, loc=(330, 140))
-    evap = d.add(_parts.evaporator, None, loc=(100, 105))
-    assert d.pipe(evap["out"], comp["suction"],
+    hx = d.add(_parts.make_heat_exchanger(96, 48), None, loc=(100, 105))
+    assert d.pipe(hx["top"], comp["suction"],
                   via=[("e", 200), ("n", 105)]).points()[-1] == \
         comp["suction"].point
 
@@ -259,13 +270,54 @@ def test_four_way_round_add_time_mark_override():
     assert len(d2.ax.texts) == 4          # 内置 D/S/C/E
 
 
-def test_low_pressure_tank_ports():
-    # 默认 w=66 h=150:rx=33, vapor 在筒体上端右侧
-    assert parts.low_pressure_tank.port("top") == (0, -75)
-    assert parts.low_pressure_tank.port("bottom") == (0, 75)
-    assert parts.low_pressure_tank.port("vapor") == (33, -65)
-    assert parts.low_pressure_tank.direction("top") == (0, -1)
-    assert parts.low_pressure_tank.direction("bottom") == (0, 1)
+def test_vessel_ports():
+    # 默认 w=66 h=150:rx=33, vapor 在筒体上端右侧(body_top + 4)
+    assert parts.vessel.port("top") == (0, -75)
+    assert parts.vessel.port("bottom") == (0, 75)
+    assert parts.vessel.port("left") == (-33, 0)
+    assert parts.vessel.port("vapor") == (33, -38)
+    assert parts.vessel.direction("top") == (0, -1)
+    assert parts.vessel.direction("bottom") == (0, 1)
+
+
+def test_intermediate_hex_ports():
+    """中间换热器:主路下侧、副路上侧,四口关于中心对称(逆流布置)。"""
+    hx = parts.make_intermediate_hex(w=190, h=80, drop=0.275)
+    assert hx.port("main_in") == (-95, 22)
+    assert hx.port("main_out") == (95, 22)
+    assert hx.port("sub_in") == (95, -22)
+    assert hx.port("sub_out") == (-95, -22)
+    assert hx.direction("main_in") == (-1, 0)
+    assert hx.direction("main_out") == (1, 0)
+    assert hx.direction("sub_in") == (1, 0)
+    assert hx.direction("sub_out") == (-1, 0)
+    d = Diagram(width=300, height=140)
+    d.add(parts.intermediate_hex, "中间换热器", loc=(150, 70))
+    d.render()
+
+
+def test_vertical_intermediate_hex_channels_and_ports():
+    """竖直图元的通道接在上下端口,两路逆流且端口法向朝外。"""
+    hx = parts.make_intermediate_hex(w=120, h=240, drop=0.25, orient="v")
+    assert hx.port("main_in") == (30, -120)
+    assert hx.port("main_out") == (30, 120)
+    assert hx.port("sub_in") == (-30, 120)
+    assert hx.port("sub_out") == (-30, -120)
+    assert hx.direction("main_in") == hx.direction("sub_out") == (0, -1)
+    assert hx.direction("main_out") == hx.direction("sub_in") == (0, 1)
+
+    with Diagram(width=300, height=320) as d:
+        node = d.add(hx, None, loc=(150, 160))
+        d.render()
+        shell = d.ax.patches[0]
+        assert shell.get_width() == 120
+        assert shell.get_height() == 240
+        for channel, keys in zip(d.ax.lines, (("main_in", "main_out"),
+                                              ("sub_in", "sub_out"))):
+            endpoints = list(zip(channel.get_xdata(), channel.get_ydata()))
+            assert endpoints == [node[key].point for key in keys]
+
+    _raises(ValueError, parts.make_intermediate_hex, orient="diagonal")
 
 
 def test_globe_valve_ports():
@@ -379,49 +431,10 @@ def test_bowtie_valve_actuator_override_render():
     domed.add(parts.bowtie_valve, "", loc=(60, 60), actuator="dome")
     domed.render()
     assert len(domed.ax.lines) == 2
-
-
-def test_scroll_chord_ports_and_render():
-    assert "chord" in parts.COMPRESSOR_STYLES
-    sc = parts.make_scroll_chord()
-    assert sc.port("suction") == (-85, 0)
-    assert sc.port("discharge") == (85, 0)
-    assert sc.port("inj") == (-0.08 * 85, 85)
-    assert sc.direction("suction") == (-1, 0)
-    assert sc.direction("discharge") == (1, 0)
-    assert sc.direction("inj") == (0, 1)
-    # chord 画法挂进 make_compressor,scroll_chord 为带端口语义的实例
-    d = Diagram(width=420, height=220)
-    d.add(parts.make_compressor(style="chord"), "chord", loc=(110, 110))
-    d.add(parts.scroll_chord, "涡旋压缩机", loc=(310, 110),
-          label_offset=(95, 60), label_ha="left")
-    d.render()
-
-
-def test_capsule_compressor_ports_and_render():
-    cc = parts.make_compressor_capsule()
-    assert cc.port("discharge") == (0, -54)      # 默认 w=48 h=84 stub=12
-    assert cc.port("suction") == (0, 54)
-    ix, iy = cc.port("inj")
-    assert ix == 0.85 * 24
-    # 底弧上起点(y = h/2 - rx + sqrt(rx² - ix²)) + 竖直向下 stub
-    assert iy == 42 - 24 + 24 * (1 - 0.85 ** 2) ** 0.5 + 12
-    assert cc.direction("discharge") == (0, -1)
-    assert cc.direction("suction") == (0, 1)
-    assert cc.direction("inj") == (0, 1)
-    d = Diagram(width=480, height=200)
-    d.add(parts.capsule_compressor, "压缩机", loc=(90, 95))
-    d.add(parts.make_compressor_capsule(w=60, h=110), "变频压缩机",
-          loc=(250, 95))
-    d.add(parts.capsule_compressor, "", loc=(410, 95))
-    d.render()
-
-
-def test_separator_ports():
-    assert parts.separator.port("left") == (-17, 0)
-    assert parts.separator.port("right") == (17, 0)
-    assert parts.separator.port("top") == (0, -32)
-    assert parts.separator.direction("top") == (0, -1)
+    teed = Diagram(width=120, height=120)
+    teed.add(parts.bowtie_valve_tee, "", loc=(60, 60))
+    teed.render()
+    assert len(teed.ax.lines) == 2
 
 
 def test_oil_separator_ports():
@@ -463,8 +476,9 @@ def test_separator_utube_flip_ports():
 
 
 def test_part_unknown_port_error_lists_available():
-    e = _raises(KeyError, parts.evaporator.port, "outt")
-    assert "没有端口" in str(e) and "out" in str(e)
+    hx = parts.make_heat_exchanger()
+    e = _raises(KeyError, hx.port, "topp")
+    assert "没有端口" in str(e) and "top" in str(e)
     n = Diagram(width=100, height=100).add(parts.globe_valve, None,
                                             loc=(50, 50))
     e = _raises(KeyError, lambda: n["top"])
@@ -576,7 +590,7 @@ def test_render_every_part_and_hvac_symbol(tmp_path=None):
         if isinstance(obj, Part) and not str(name).startswith("_"):
             d.add(obj, None, loc=(110 + (i % 7) * 195, 90 + (i // 7) * 150))
             i += 1
-    assert i >= 40, f"可渲染图元过少:{i}"
+    assert i >= 30, f"可渲染图元过少:{i}"
     d.render()
     png = d.save(os.path.join(tmp, "all_parts.png"))
     assert os.path.getsize(png) > 10_000
@@ -618,7 +632,7 @@ def test_render_all_compressor_styles(tmp_path=None):
         d.add(parts.make_compressor(70, style=style), f"s{i}",
               loc=(140 + i * 200, 130))
     png = d.save(os.path.join(tmp, "compressors.png"))
-    assert os.path.getsize(png) > 10_000
+    assert os.path.getsize(png) > 5_000
     import matplotlib.pyplot as plt
     plt.close(d.fig)
 
@@ -632,38 +646,7 @@ def test_render_all_heat_exchanger_shapes(tmp_path=None):
         d.add(parts.make_heat_exchanger(140, 90, shape=shape), f"h{i}",
               loc=(140 + i * 200, 130))
     png = d.save(os.path.join(tmp, "hex.png"))
-    assert os.path.getsize(png) > 10_000
-    import matplotlib.pyplot as plt
-    plt.close(d.fig)
-
-
-def test_render_all_economizer_styles(tmp_path=None):
-    """经济器全部 style 都能渲染。"""
-    import tempfile
-    tmp = tmp_path if tmp_path is not None else tempfile.mkdtemp()
-    d = Diagram(width=len(parts.ECONOMIZER_STYLES) * 160 + 40, height=220)
-    for i, style in enumerate(parts.ECONOMIZER_STYLES):
-        d.add(parts.make_economizer(60, 120, style=style), f"e{i}",
-              loc=(120 + i * 160, 110))
-    png = d.save(os.path.join(tmp, "econ.png"))
-    assert os.path.getsize(png) > 1_500
-    import matplotlib.pyplot as plt
-    plt.close(d.fig)
-
-
-def test_subcooler_ports_and_render(tmp_path=None):
-    """过冷器四口:主路 top/bottom 居中,支路 left/right 逆流错开。"""
-    import tempfile
-    sc = parts.make_subcooler(w=64, h=150)
-    assert sc.port("top") == (0, -75)
-    assert sc.port("bottom") == (0, 75)
-    assert sc.port("left") == (-32, -0.25 * 150)
-    assert sc.port("right") == (32, 0.25 * 150)
-    tmp = tmp_path if tmp_path is not None else tempfile.mkdtemp()
-    d = Diagram(width=300, height=300)
-    d.add(sc, "过冷器", loc=(150, 150))
-    png = d.save(os.path.join(tmp, "subcooler.png"))
-    assert os.path.getsize(png) > 1_500
+    assert os.path.getsize(png) > 5_000
     import matplotlib.pyplot as plt
     plt.close(d.fig)
 
@@ -852,9 +835,9 @@ def test_repr_svg_and_render_idempotent():
 def test_debug_overlay():
     """debug() 叠加端口点/法向箭头/拐点标记,只读不改走线坐标。"""
     d = Diagram(width=280, height=160)
-    a = d.add(parts.evaporator, "蒸发器", loc=(70, 90))
+    a = d.add(parts.make_heat_exchanger(96, 48), "蒸发器", loc=(70, 90))
     b = d.add(parts.compressor, "压缩机", loc=(210, 90))
-    pipe = d.pipe(a["out"], b["suction"], via=[("e", 140)])
+    pipe = d.pipe(a["top"], b["suction"], via=[("e", 140)])
     pts0 = list(pipe.points())
     d.render()
     n = len(d.ax.patches)

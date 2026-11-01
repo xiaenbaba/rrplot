@@ -6,7 +6,7 @@
   <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:date>2026-10-14T17:22:42.950222</dc:date>
+    <dc:date>2026-11-01T09:02:52.696891</dc:date>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
@@ -30,27 +30,31 @@ z
   </g>
   <g id="axes_1">
    <g id="patch_2">
-    <path d="M 219.5856 192.2256 
-L 219.6144 192.2256 
-Q 231.8544 192.2256 231.8544 204.4656 
-L 231.8544 234.7344 
-Q 231.8544 246.9744 219.6144 246.9744 
-L 219.5856 246.9744 
-Q 207.3456 246.9744 207.3456 234.7344 
-L 207.3456 204.4656 
-Q 207.3456 192.2256 219.5856 192.2256 
+    <path d="M 196.56 156.24 
+L 242.64 156.24 
+L 242.64 282.96 
+L 196.56 282.96 
 z
-" clip-path="url(#pa2489286ea)" style="fill: #ffffff; stroke: #000000; stroke-linejoin: miter"/>
+" clip-path="url(#p040a054c6f)" style="fill: #ffffff; stroke: #000000; stroke-linejoin: miter"/>
    </g>
    <g id="line2d_1">
-    <path d="M 210.24 205.2 
-L 219.6 219.6 
-L 228.96 205.2 
-" clip-path="url(#pa2489286ea)" style="fill: none; stroke: #000000; stroke-linecap: round"/>
+    <path d="M 219.6 144.72 
+L 219.6 156.24 
+" clip-path="url(#p040a054c6f)" style="fill: none; stroke: #000000; stroke-linecap: round"/>
+   </g>
+   <g id="line2d_2">
+    <path d="M 219.6 282.96 
+L 219.6 294.48 
+" clip-path="url(#p040a054c6f)" style="fill: none; stroke: #000000; stroke-linecap: round"/>
+   </g>
+   <g id="line2d_3">
+    <path d="M 185.04 187.92 
+L 196.56 187.92 
+" clip-path="url(#p040a054c6f)" style="fill: none; stroke: #000000; stroke-linecap: round"/>
    </g>
    <g id="text_1">
     <!-- 油分离器 -->
-    <g transform="translate(247.68 218.039531) scale(0.17 -0.17)">
+    <g transform="translate(255.6 218.039531) scale(0.17 -0.17)">
      <defs>
       <path id="SimSun-6cb9" d="M 4175 1800 
 L 4175 175 
@@ -383,7 +387,7 @@ z
   </g>
  </g>
  <defs>
-  <clipPath id="pa2489286ea">
+  <clipPath id="p040a054c6f">
    <rect x="3.6" y="3.6" width="432" height="432"/>
   </clipPath>
  </defs>

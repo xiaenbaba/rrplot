@@ -14,8 +14,6 @@ v = d.add(parts.globe_valve, "截止阀", loc=(320, 210))
 d.text(*v["in"].point, "in", size=12)
 d.text(*v["out"].point, "out", size=12)
 
-d.add(parts.valve, "蝶形阀(对比)", loc=(320, 350))
-
 out = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                    "globe_valve_demo.png")
 d.save(out)

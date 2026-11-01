@@ -2,7 +2,7 @@
 ========
 
 从零画出一张制冷循环图。读完能覆盖 90% 的日常用法;引擎为什么这么设计
-见 :doc:`design`,参数逐项说明见 :doc:`api`。
+见 :doc:`design`,参数逐项说明见 :doc:`/api/index`。
 
 .. contents:: 本页内容
    :local:
@@ -40,20 +40,23 @@ Linux 装 ``fonts-noto-cjk``。详见 README 的"字体"一节。
 .. code-block:: python
 
    from rrplot import Diagram, parts
+   from rrplot.parts import make_heat_exchanger
 
    d = Diagram(width=780, height=500)          # 画布 780×500 像素
 
    comp = d.add(parts.compressor, "压缩机", loc=(640, 245))
-   cond = d.add(parts.condenser,   "冷凝器", loc=(360, 40))
+   cond = d.add(make_heat_exchanger(180, 80, shape="rect_zigzag7"),
+                "冷凝器", loc=(360, 40))
    cap  = d.add(parts.capillary,   "毛细管", loc=(90, 250))
-   evap = d.add(parts.evaporator,  "蒸发器", loc=(360, 425))
+   evap = d.add(make_heat_exchanger(180, 80, shape="rect_zigzag7"),
+                "蒸发器", loc=(360, 425))
 
    d.pipe(comp["discharge"], cond["right"], via=[(640, 40)], states=[("2", 0.35)])
    d.pipe(cond["left"], cap["in"],            via=[(90, 40)],  states=[("3", 0.3)])
    d.pipe(cap["out"],    evap["left"],        via=[(90, 425)], states=[("4", 0.3)])
    d.pipe(evap["right"], comp["suction"],     via=[(640, 425)], states=[("1", 0.35)])
 
-   d.save("simple_cycle.png")                 # 也支持 .pdf / .svg
+   d.save("my_cycle.png")                     # 也支持 .pdf / .svg
 
 三个要点:
 
@@ -161,46 +164,22 @@ Linux 装 ``fonts-noto-cjk``。详见 README 的"字体"一节。
      - 说明
    * - ``compressor``(工厂 ``make_compressor``)
      - ``left`` ``right`` ``top`` ``bottom``
-     - 圆形压缩机,7 种型式标记(``COMPRESSOR_STYLES``)
-   * - ``capsule_compressor``(工厂 ``make_compressor_capsule``)
-     - ``discharge`` ``suction`` ``inj``
-     - 立式胶囊压缩机(VRF/喷气增焓):上排气、下回气、右下补气口,标签竖排机身内
-   * - ``evaporator``
-     - ``in`` ``out``
-     - 竖长方形 + 双椭圆盘管
-   * - ``condenser``
+     - 两种机身同一套四口: ``圆形`` (圆体双弦)/ ``方形`` (胶囊壳体,
+       宽 r、高 2r,与圆形等高)
+   * - ``make_heat_exchanger(w, h, shape=...)``
      - ``left`` ``right`` ``top`` ``bottom``
-     - 竖长方形 + 四根竖管
-   * - ``separator`` / ``receiver``
-     - ``left`` ``right`` ``top``
-     - 气液分离器 / 储液器,圆角竖筒
-   * - ``expansion_valve``
-     - ``in`` ``out``
-     - 三角 + 上方矩形(电子膨胀阀)
+     - 换热器/蒸发器/冷凝器通用:3 种换热面(``HEX_SHAPES``),标签自定
    * - ``capillary``
      - ``in`` ``out``
      - 弹簧形细管,竖放
-   * - ``filter_drier``
-     - ``in`` ``out``
-     - 长方 + 内圆(干燥过滤器)
-   * - ``plate_hex``
-     - ``in`` ``out``
-     - 板式换热器
-   * - ``four_way_valve``
-     - ``left`` ``right`` ``top`` ``bottom``
-     - 矩形四通阀
+   * - ``intermediate_hex``
+     - ``main_in`` ``main_out`` ``sub_in`` ``sub_out``
+     - 中间换热器(过冷器/经济器同体):矩形 + 上下两条通道线,
+       默认主路下侧、副路上侧,逆流。工厂传 ``orient="v"`` 可改为
+       竖直通道:主路右侧上进下出、副路左侧下进上出; ``w/h`` 始终为外壳宽/高
    * - ``four_way_round``
      - ``exhaust`` ``condenser`` ``evaporator`` ``suction``
      - 圆体 + 内菱形,自带 D/S/C/E 口别标注
-   * - ``economizer``
-     - ``top`` ``bottom`` ``left`` ``right``
-     - 经济器(板式)
-   * - ``valve``
-     - ``left`` ``right`` ``top`` ``bottom``
-     - 蝶形阀(对顶三角 + 圆冠)
-   * - ``bowtie_valve`` 系
-     - ``in`` ``out``
-     - 对顶三角阀;``bowtie_valve_dome`` / ``bowtie_valve_solenoid`` 带执行机构
    * - ``globe_valve``
      - ``in`` ``out``
      - 截止阀:沙漏 + 阀杆(止于中点) + 手轮
@@ -210,41 +189,42 @@ Linux 装 ``fonts-noto-cjk``。详见 README 的"字体"一节。
    * - ``expansion_valve_eng``
      - ``in`` ``out``
      - 电子膨胀阀工程画法:圆体 + 圆内 X(无执行机构)
+   * - ``expansion_valve_x``
+     - ``in`` ``out``
+     - 膨胀阀圆 + 内接 X,端口在圆周,``orient="h"/"v"`` 水平/竖直通用
+   * - ``bowtie_valve`` 系
+     - ``in`` ``out``
+     - 对顶三角阀;``bowtie_valve_dome`` 穹顶 / ``bowtie_valve_solenoid``
+       电磁 / ``tee`` T 形截止阀
    * - ``check_valve`` / ``check_valve_w``
      - ``in`` ``out``
      - 单向阀:实心三角 + 尖端挡条,``_w`` 为反向实例
    * - ``filter``
      - ``in`` ``out``
-     - 过滤器:矩形 + 菱形网格(区别于 ``filter_drier`` 干燥过滤器)
+     - 过滤器:矩形 + 菱形网格
    * - ``vessel``
      - ``top`` ``bottom`` ``left`` ``right`` ``vapor``
-     - 闪发罐,胶囊形上下封头
-   * - ``low_pressure_tank``
-     - ``top`` ``bottom`` ``left`` ``right`` ``vapor``
-     - 低压罐:平顶 + 圆底 + 液位计
-   * - ``pump`` / ``water_tank`` / ``flow_meter`` / ``square_wave``
-     - 见源码
-     - 泵 / 水箱 / 流量计 / 过冷器换热面
+     - 闪发罐:胶囊形上下封头 + 液位线
 
 **尺寸不合适就用工厂生成** (端口偏移会跟着尺寸走):
 
 .. code-block:: python
 
    from rrplot.parts import (make_compressor, make_heat_exchanger,
-                                make_vessel, make_low_pressure_tank,
+                                make_vessel,
                                 make_globe_valve, make_solenoid_valve,
-                                make_expansion_valve_eng, make_bowtie_valve,
-                                make_check_valve, make_filter,
-                                make_economizer, make_rect)
+                                make_expansion_valve_eng,
+                                make_expansion_valve_x, make_check_valve,
+                                make_filter)
 
-   comp = make_compressor(r=80, style="centrifugal")        # 半径 80
+   comp = make_compressor(r=80, style="圆形")               # 半径 80
    cond = make_heat_exchanger(240, 62, shape="rect_zigzag7")  # 宽 240 高 62
    tank = make_vessel(w=66, h=150, liquid=0.42)
 
-``make_compressor`` 的 ``style``:``centrifugal`` / ``rotor`` / ``axial`` /
-``recip`` / ``screw`` / ``scroll`` / ``chord``;
-``make_heat_exchanger`` 的 ``shape``:``circle`` / ``rect`` / ``rect_diag`` /
-``rect_x`` / ``rect_zigzag`` / ``rect_zigzag7`` / ``rect_shell``。
+``make_compressor`` 的 ``style``: ``圆形`` (圆体双弦)/
+``方形`` (胶囊壳体);
+``make_heat_exchanger`` 的 ``shape``:``rect_diag`` / ``rect_x`` /
+``rect_zigzag7``。
 
 **只想改端口、不想重画图形**,用 ``make_partial``:
 
@@ -252,17 +232,18 @@ Linux 装 ``fonts-noto-cjk``。详见 README 的"字体"一节。
 
    from rrplot import make_partial, parts
 
-   comp_part = make_partial(parts.make_compressor(80, style="centrifugal"),
+   comp_part = make_partial(parts.make_compressor(80, style="圆形"),
                             {"discharge": (0, -80), "suction": (0, 80)})
 
-``examples/simple_cycle.py`` 就是这么把压缩机接成"上进下出"的。
+``examples/vrf_multisplit.py`` 里多处用 ``make_partial`` 派生端口(如
+四通阀换向、电子膨胀阀流向东→西的 in/out 对调)。
 
 **只想改画法、不想改端口**,在 ``add()`` 的 ``**style`` 里按绘制函数的
 参数名传:
 
 .. code-block:: python
 
-   d.add(parts.bowtie_valve, "阀", loc=(60, 70), actuator="solenoid")
+   d.add(parts.four_way_round, "四通阀", loc=(60, 70), mark=False)
 
 
 7. HVAC 符号族
@@ -391,7 +372,7 @@ Linux 装 ``fonts-noto-cjk``。详见 README 的"字体"一节。
 10. 现成示例
 ----------------------------------------
 
-``examples/`` 下 17 个脚本,每个都配一张同名 PNG,建议对照着改:
+``examples/`` 下 13 个脚本,每个都配一张同名 PNG,建议对照着改:
 
 .. list-table::
    :header-rows: 1
@@ -399,32 +380,28 @@ Linux 装 ``fonts-noto-cjk``。详见 README 的"字体"一节。
 
    * - 脚本
      - 内容
-   * - ``simple_cycle.py``
-     - 单级压缩基本循环(最简,建议从这个开始读)
-   * - ``superheat_cycle.py``
-     - 带过热度标注
-   * - ``economizer_cycle.py``
-     - 经济器补气
+   * - ``vrf_multisplit.py``
+     - 多联机(VRF)系统图(室外机 + 室内机 1…n,综合布线范例,建议从这个开始读)
+   * - ``ftvi_cycle.py``
+     - FTVI 闪发罐喷气增焓系统图(电子膨胀阀节流)
+   * - ``evi_ftvi_layout.py``
+     - 按 FTVI 版式重排的 EVI 过冷器喷气增焓(过冷器替代闪蒸罐)
    * - ``evi_cycle.py``
-     - EVI 涡旋压缩热泵(喷气增焓,制热模式)
-   * - ``flash_tank_cycle.py``
-     - 闪发罐中间补气
-   * - ``split_cycle.py``
-     - 涡旋压缩机 + 过冷器
-   * - ``subcooler_cycle.py``
-     - 过冷器循环(主路 + 旁通过冷)
+     - 多联机 / VRF 常见的 EVI 经济器喷气增焓(主路双级节流)
+   * - ``evi_subcooler_cycle.py``
+     - 普通热泵常见的 EVI 过冷器式喷气增焓(带电磁阀)
+   * - ``evi_economizer_cycle.py``
+     - 普通热泵 EVI 经济器竖直排布(主路上下贯通,喷气支路左右贯通)
    * - ``compressor_symbols.py``
      - 7 种压缩机画法速观
    * - ``heat_exchanger_shapes.py``
-     - 5 种换热器画法速观
+     - 7 种换热器画法速观
    * - ``hvac_system.py`` / ``hvac_system_notank.py``
      - 空气能供暖系统(带 / 无水箱)
    * - ``hvacsvg_demo.py``
      - ``load_svg_part`` 直接加载 SVG 符号
    * - ``four_way_round_demo.py``
      - 四通阀圆体回路
-   * - ``low_pressure_tank_demo.py``
-     - 低压罐图元(顶平底圆 + 液位计)
    * - ``globe_valve_demo.py``
      - 截止阀图元(沙漏 + 手轮)
    * - ``solenoid_valve_demo.py``
@@ -435,15 +412,13 @@ Linux 装 ``fonts-noto-cjk``。详见 README 的"字体"一节。
      - 单向阀图元(实心三角,方向可选)
    * - ``filter_demo.py``
      - 过滤器图元(矩形 + 菱形网格)
-   * - ``vrf_system.py``
-     - 多联机(VRF)系统流程(室外机 + 双室内机,综合布线范例)
 
 
 下一步
 ----------------------------------------
 
 - 想加新部件:见 :doc:`design` 的"扩展:三条路"
-- 想知道 ``via`` / ``states`` / ``bridge`` 的完整参数:见 :doc:`api`
+- 想知道 ``via`` / ``states`` / ``bridge`` 的完整参数:见 :doc:`/api/index`
 - 想加测试:``tests/test_rrplot.py`` 里有端口定义、走线算法、
   错误提示、全件渲染四类现成范式,照着写即可
 - 改了代码先跑 ``python -m pytest`` 和 ``ruff check rrplot tests``

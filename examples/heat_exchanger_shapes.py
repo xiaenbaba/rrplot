@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""示例:换热器 7 种标准 PFD 形态对照(对照 references/pfd_symbol_palette.py)。
+"""示例:换热器 3 种换热面形态对照(对照 references/pfd_symbol_palette.py)。
 
 由 references/pfd_symbols.heat_exchanger 移植为 make_heat_exchanger。
 """
@@ -12,19 +12,15 @@ from rrplot import Diagram, parts, use_font
 
 use_font()
 
-COLS = (130 + 280 * i for i in range(7))
+COLS = (130 + 280 * i for i in range(3))
 
 ITEMS = [
-    ("circle", "圆 + 之字盘管"),
-    ("rect", "矩形 + 之字盘管"),
-    ("rect_zigzag", "矩形 + 蛇形盘管"),
-    ("rect_zigzag7", "矩形 + 7点之字"),
     ("rect_diag", "矩形 + 对角线"),
     ("rect_x", "矩形 + 对角线交叉"),
-    ("rect_shell", "管壳式"),
+    ("rect_zigzag7", "矩形 + 7点之字"),
 ]
 
-d = Diagram(width=1940, height=320)
+d = Diagram(width=980, height=320)
 
 for cx, (shape, tag) in zip(COLS, ITEMS):
     d.add(parts.make_heat_exchanger(120, 120, shape=shape, name=tag),

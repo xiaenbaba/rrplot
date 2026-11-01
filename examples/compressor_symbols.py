@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""示例:压缩机 6 种型式符号对照(标准 PFD 画法)。
+"""示例:压缩机两种机身对照 —— 圆形(圆体 + 双弦)与方形(胶囊壳体)。
 
 对照 references/compressor_symbols.py,符号已移植进 rrplot.parts。
 """
@@ -13,22 +13,15 @@ from rrplot import Diagram, parts, use_font
 use_font()
 
 R = 80
-COLS = (150, 450, 750)
-ROWS = (150, 420)
-
 ITEMS = [
-    (COLS[0], ROWS[0], "centrifugal", "离心式"),
-    (COLS[1], ROWS[0], "rotor", "通用旋转式"),
-    (COLS[2], ROWS[0], "axial", "轴流式"),
-    (COLS[0], ROWS[1], "recip", "往复式"),
-    (COLS[1], ROWS[1], "screw", "螺杆式"),
-    (COLS[2], ROWS[1], "scroll", "涡旋式"),
+    (150, 180, "圆形", None),
+    (450, 180, "方形", "压缩机"),
 ]
 
-d = Diagram(width=900, height=620)
+d = Diagram(width=600, height=360)
 
-for cx, cy, style, tag in ITEMS:
-    d.add(parts.make_compressor(R, style=style), tag, loc=(cx, cy))
+for cx, cy, style, label in ITEMS:
+    d.add(parts.make_compressor(R, style=style), label, loc=(cx, cy))
 
 out = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                    "compressor_symbols.png")

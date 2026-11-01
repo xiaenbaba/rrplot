@@ -8,7 +8,10 @@
 T/P 传感器圆圈,一键输出 PNG / PDF / SVG。坐标 1:1 对应画布像素(x 向右,
 y 向下),所见即所得。
 
-![单级制冷循环](examples/simple_cycle.png)
+**版本：** 1.3.0
+**依赖：** Python 3.9+, matplotlib, numpy
+
+![多联机(VRF)系统图](examples/vrf_multisplit.png)
 
 更多示例见 [`examples/`](#示例)。
 
@@ -26,7 +29,7 @@ pip install -e .
 从旧版 `cycleplot` 升级时,旧包名仍提供兼容导入;新代码建议统一使用
 `rrplot`。
 
-跑回归测试(56 个用例,CI 覆盖 ubuntu/windows × Python 3.9/3.12):
+跑回归测试(67 个用例,CI 覆盖 ubuntu/windows × Python 3.9/3.12):
 
 ```powershell
 pip install -e ".[test]"
@@ -83,32 +86,41 @@ head_at, color)` 连线。
 
 ## 部件库(`rrplot.parts`)
 
-按名字取直接实例:`compressor`、`capsule_compressor`(立式胶囊增焓压缩机,
-上排/下吸/右下补气)、`evaporator`、`condenser`、`separator`(气液分离器)、
+按名字取直接实例:`compressor`、
 `separator_utube`(U 形管气液分离器)、`oil_separator`(油分离器)、
-`receiver`(储液器)、`expansion_valve`、`capillary`(毛
-细管)、`filter_drier`、`plate_hex`、`economizer`、`subcooler`(过冷器,矩形
-+ 中央竖线四口,主路 top/bottom、支路 left/right 逆流错开)、`four_way_valve`、
-`four_way_round`(圆体菱形四通阀,端口 exhaust/condenser/evaporator/
-suction,自带 D/S/C/E 口别标注)、`vessel`(闪发罐,
-胶囊形)、`low_pressure_tank`(低压罐,顶平底圆 + 液位计/视镜,端口
+`capillary`(毛细管)、`intermediate_hex`(中间换热器,过冷器/经济器
+同体:矩形 + 上下两条通道线,主路 `main_in`/`main_out` 下侧、副路
+`sub_in`/`sub_out` 上侧,逆流)、`four_way_round`(圆体菱形四通阀,端口
+exhaust/condenser/evaporator/suction,自带 D/S/C/E 口别标注)、
+`vessel`(闪发罐,胶囊形上下封头 + 液位线,端口
 top/bottom/left/right/vapor)、`globe_valve`(截止阀,左右对顶沙漏 + 阀杆
 (止于中点) + 手轮横杆,端口 in/out)、`solenoid_valve`(电磁阀,圆体 + 圆内 X +
 顶部电磁引线与横杠,端口 in/out)、`expansion_valve_eng`(电子膨胀阀工程
-画法,电磁阀体去掉引线与横杠,端口 in/out)、`check_valve`(单向阀,实心
+画法,电磁阀体去掉引线与横杠,端口 in/out)、`expansion_valve_x`(膨胀阀
+圆 + 内接 X,端口在圆周,orient="h"/"v" 水平/竖直通用)、`bowtie_valve` 系
+(对顶三角阀:裸阀/穹顶膨胀阀/Σ 电磁阀/T 形截止阀,`actuator` 切换,端口 in/out)、
+`check_valve`(单向阀,实心
 三角指向流通方向 + 尖端挡条,`check_valve_w` 为反向实例,端口 in/out)、
-`filter`(过滤器,矩形 + 菱形网格,端口 in/out)等。
+`filter`(过滤器,矩形 + 菱形网格,端口 in/out)等。蒸发器/冷凝器等
+换热器不分专用图元,用 `make_heat_exchanger(w, h, shape=...)` 生成,
+端口 left/right/top/bottom,label 自定("蒸发器"/"冷凝器")。
+
+中间换热器也支持竖直通道:
+`make_intermediate_hex(w=160, h=220, orient="v")`。
+主路右侧上进下出,副路左侧下进上出;`w`、`h` 始终为外壳宽、高。
+默认 `orient="h"` 保持原来的水平通道布置。竖直示例见 `examples/evi_cycle.py`。
 
 尺寸不合适时用工厂生成:
 
 ```python
-from rrplot.parts import make_compressor, make_vessel, make_heat_exchanger
-from rrplot.parts import (make_four_way_round, make_globe_valve,
-                             make_low_pressure_tank, make_solenoid_valve)
+from rrplot.parts import make_compressor, make_heat_exchanger
+from rrplot.parts import (make_expansion_valve_x, make_four_way_round,
+                             make_globe_valve, make_vessel,
+                             make_solenoid_valve)
 ```
 
-压缩机 `style` 支持 centrifugal/rotor/axial/recip/screw/scroll/chord,换热器
-`shape` 支持 circle/rect/rect_diag/rect_x/rect_zigzag/rect_zigzag7/rect_shell,
+压缩机 `style` 支持 圆形/方形(圆体双弦 / 胶囊壳体),换热器
+`shape` 支持 rect_diag/rect_x/rect_zigzag7,
 详见各自 docstring。特殊端口定义可用 `make_partial(part, ports=..., dirs=...)`
 从现有部件派生。
 
@@ -129,7 +141,7 @@ from rrplot.parts import (make_four_way_round, make_globe_valve,
 ![空气能供暖系统](examples/hvac_system.png)
 ![四通阀圆体回路](examples/four_way_round_demo.png)
 ![SVG 符号直接加载](examples/hvacsvg_demo.png)
-![多联机(VRF)系统](examples/vrf_system.png)
+![多联机(VRF)系统图](examples/vrf_multisplit.png)
 
 </details>
 
@@ -139,31 +151,27 @@ from rrplot.parts import (make_four_way_round, make_globe_valve,
 
 | 文件 | 内容 |
 | --- | --- |
-| simple_cycle.py | 单级压缩基本循环 |
-| superheat_cycle.py | 带过热度标注 |
-| economizer_cycle.py | 经济器补气 |
-| evi_cycle.py | EVI 涡旋压缩热泵(喷气增焓,制热模式) |
-| flash_tank_cycle.py | 闪发罐中间补气 |
-| split_cycle.py | 涡旋压缩机 + 过冷器 |
-| subcooler_cycle.py | 过冷器循环(主路 + 旁通过冷) |
-| heat_pump_cycle.py | 热泵制热循环(四通阀换向 + 油分离器回油) |
+| vrf_multisplit.py | 多联机(VRF)系统图(室外机 + 室内机 1…n,参考图复刻) |
+| ftvi_cycle.py | FTVI 闪发罐喷气增焓系统图(电子膨胀阀节流) |
+| evi_ftvi_layout.py | 按 FTVI 版式重排的 EVI 过冷器喷气增焓(过冷器替代闪蒸罐) |
+| evi_cycle.py | 多联机 / VRF 常见的 EVI 经济器喷气增焓(主路双级节流) |
+| evi_subcooler_cycle.py | 普通热泵常见的 EVI 过冷器式喷气增焓(带电磁阀) |
+| evi_economizer_cycle.py | 普通热泵 EVI 经济器竖直排布(主路上下贯通,喷气支路左右贯通) |
 | compressor_symbols.py / heat_exchanger_shapes.py | 符号速观 |
 | hvac_system.py / hvac_system_notank.py | 空气能供暖系统(带/无水箱) |
 | hvacsvg_demo.py | `load_svg_part` 直接加载 SVG 符号 |
 | four_way_round_demo.py | 四通阀圆体回路演示 |
-| low_pressure_tank_demo.py | 低压罐图元演示(顶平底圆 + 液位计) |
 | separator_utube_demo.py | U 形管气液分离器图元演示(镜像/翻转可选) |
 | globe_valve_demo.py | 截止阀图元演示(左右对顶沙漏 + 手轮) |
 | solenoid_valve_demo.py | 电磁阀图元演示(圆体 + 圆内 X + 电磁杠) |
 | expansion_valve_eng_demo.py | 电子膨胀阀图元演示(工程画法,无执行机构) |
 | check_valve_demo.py | 单向阀图元演示(实心三角,方向可选) |
 | filter_demo.py | 过滤器图元演示(矩形 + 菱形网格) |
-| vrf_system.py | 多联机(VRF)系统流程(室外机 + 双室内机) |
 
 改完脚本直接重跑即覆盖同名 PNG:
 
 ```powershell
-python examples/simple_cycle.py
+python examples/vrf_multisplit.py
 python examples/hvac_system.py
 ```
 

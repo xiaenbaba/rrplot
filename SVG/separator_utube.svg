@@ -6,7 +6,7 @@
   <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:date>2026-10-14T17:22:44.662298</dc:date>
+    <dc:date>2026-11-01T09:02:52.613862</dc:date>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
@@ -35,7 +35,7 @@ L 262.8 177.12
 L 262.8 262.08 
 L 176.4 262.08 
 z
-" clip-path="url(#p8d68c6fbe4)" style="fill: #ffffff; stroke: #000000; stroke-linejoin: miter"/>
+" clip-path="url(#pa89ddc68e8)" style="fill: #ffffff; stroke: #000000; stroke-linejoin: miter"/>
    </g>
    <g id="patch_3">
     <path d="M 219.6 257.03568 
@@ -48,7 +48,7 @@ C 217.89948 259.924097 217.6992 259.440578 217.6992 258.93648
 C 217.6992 258.432382 217.89948 257.948863 218.255931 257.592411 
 C 218.612383 257.23596 219.095902 257.03568 219.6 257.03568 
 z
-" clip-path="url(#p8d68c6fbe4)" style="stroke: #000000; stroke-width: 0.6; stroke-linejoin: miter"/>
+" clip-path="url(#pa89ddc68e8)" style="stroke: #000000; stroke-width: 0.6; stroke-linejoin: miter"/>
    </g>
    <g id="line2d_1">
     <path d="M 182.016 186.97536 
@@ -84,12 +84,12 @@ L 256.362699 235.181055
 L 256.978111 232.080501 
 L 257.184 228.9456 
 L 257.184 165.6 
-" clip-path="url(#p8d68c6fbe4)" style="fill: none; stroke: #000000; stroke-linecap: round"/>
+" clip-path="url(#pa89ddc68e8)" style="fill: none; stroke: #000000; stroke-linecap: round"/>
    </g>
    <g id="line2d_2">
     <path d="M 188.064 165.6 
 L 188.064 194.112 
-" clip-path="url(#p8d68c6fbe4)" style="fill: none; stroke: #000000; stroke-linecap: round"/>
+" clip-path="url(#pa89ddc68e8)" style="fill: none; stroke: #000000; stroke-linecap: round"/>
    </g>
    <g id="text_1">
     <!-- 气液分离器(U形管) -->
@@ -734,7 +734,7 @@ z
   </g>
  </g>
  <defs>
-  <clipPath id="p8d68c6fbe4">
+  <clipPath id="pa89ddc68e8">
    <rect x="3.6" y="3.6" width="432" height="432"/>
   </clipPath>
  </defs>

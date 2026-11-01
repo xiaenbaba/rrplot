@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="439.2pt" height="439.2pt" viewBox="0 0 439.2 439.2" xmlns="http://www.w3.org/2000/svg" version="1.1">
+ <metadata>
+  <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+   <cc:Work>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+    <dc:date>2026-11-01T09:02:52.958336</dc:date>
+    <dc:format>image/svg+xml</dc:format>
+    <dc:creator>
+     <cc:Agent>
+      <dc:title>Matplotlib v3.10.3, https://matplotlib.org/</dc:title>
+     </cc:Agent>
+    </dc:creator>
+   </cc:Work>
+  </rdf:RDF>
+ </metadata>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="figure_1">
+  <g id="patch_1">
+   <path d="M 0 439.2 
+L 439.2 439.2 
+L 439.2 0 
+L 0 0 
+z
+" style="fill: #ffffff"/>
+  </g>
+  <g id="axes_1">
+   <g id="patch_2">
+    <path d="M 219.5856 189.3456 
+L 219.6144 189.3456 
+Q 236.8944 189.3456 236.8944 206.6256 
+L 236.8944 232.5744 
+Q 236.8944 249.8544 219.6144 249.8544 
+L 219.5856 249.8544 
+Q 202.3056 249.8544 202.3056 232.5744 
+L 202.3056 206.6256 
+Q 202.3056 189.3456 219.5856 189.3456 
+z
+" clip-path="url(#p8974995793)" style="fill: #ffffff; stroke: #000000; stroke-width: 1.5; stroke-linejoin: miter"/>
+   </g>
+   <g id="line2d_1">
+    <path d="M 219.6 189.36 
+L 219.6 180.72 
+" clip-path="url(#p8974995793)" style="fill: none; stroke: #000000; stroke-width: 1.5; stroke-linecap: round"/>
+   </g>
+   <g id="line2d_2">
+    <path d="M 219.6 249.84 
+L 219.6 258.48 
+" clip-path="url(#p8974995793)" style="fill: none; stroke: #000000; stroke-width: 1.5; stroke-linecap: round"/>
+   </g>
+   <g id="line2d_3">
+    <path d="M 234.288 241.662805 
+L 234.288 250.302805 
+" clip-path="url(#p8974995793)" style="fill: none; stroke: #000000; stroke-width: 1.5; stroke-linecap: round"/>
+   </g>
+   <g id="text_1">
+    <!-- 方 -->
+    <g transform="translate(209.6 214.974687) scale(0.2 -0.2)">
+     <defs>
+      <path id="SimSun-65b9" d="M 275 3925 
+L 5250 3925 
+L 5625 4300 
+L 6150 3775 
+L 3075 3775 
+Q 3050 3300 2950 2675 
+L 4575 2675 
+L 4825 2925 
+L 5225 2550 
+L 4975 2400 
+Q 4725 475 4625 125 
+Q 4525 -225 4312 -362 
+Q 4100 -500 3725 -600 
+Q 3625 -200 2900 100 
+L 2925 200 
+Q 3600 0 3812 -12 
+Q 4025 -25 4137 75 
+Q 4250 175 4350 712 
+Q 4450 1250 4600 2525 
+L 2925 2525 
+Q 2500 350 475 -575 
+L 425 -475 
+Q 2675 800 2675 3775 
+L 1100 3775 
+Q 775 3775 500 3700 
+L 275 3925 
+z
+M 2675 5150 
+Q 3325 4900 3437 4725 
+Q 3550 4550 3550 4450 
+Q 3550 4350 3450 4212 
+Q 3350 4075 3325 4075 
+Q 3225 4075 3125 4350 
+Q 2975 4725 2625 5075 
+L 2675 5150 
+z
+" transform="scale(0.015625)"/>
+     </defs>
+     <use xlink:href="#SimSun-65b9"/>
+    </g>
+    <!-- 形 -->
+    <g transform="translate(209.6 233.834688) scale(0.2 -0.2)">
+     <defs>
+      <path id="SimSun-5f62" d="M 5175 5025 
+L 5650 4675 
+Q 5425 4600 4950 4100 
+Q 4475 3575 3825 3125 
+L 3775 3200 
+Q 4125 3500 4525 4012 
+Q 4925 4525 5175 5025 
+z
+M 5425 3350 
+L 5850 2950 
+Q 5625 2875 5000 2325 
+Q 4375 1750 3575 1350 
+L 3525 1425 
+Q 4250 1950 4737 2487 
+Q 5225 3025 5425 3350 
+z
+M 5650 1700 
+L 6100 1250 
+Q 5850 1225 5350 775 
+Q 4825 300 4212 -62 
+Q 3600 -425 3150 -575 
+L 3100 -500 
+Q 3350 -375 3912 12 
+Q 4475 400 4975 912 
+Q 5475 1425 5650 1700 
+z
+M 1800 4500 
+L 1800 2800 
+L 2725 2800 
+L 2725 4500 
+L 1800 4500 
+z
+M 2700 -325 
+Q 2725 475 2725 2650 
+L 1800 2650 
+Q 1750 525 375 -525 
+L 325 -450 
+Q 1375 675 1450 2650 
+L 850 2650 
+L 550 2600 
+L 350 2800 
+L 1450 2800 
+L 1450 4500 
+L 1025 4500 
+L 725 4450 
+L 525 4650 
+L 3225 4650 
+L 3550 4975 
+L 4025 4500 
+L 3050 4500 
+L 3050 2800 
+L 3300 2800 
+L 3625 3125 
+L 4100 2650 
+L 3050 2650 
+Q 3050 375 3075 -100 
+L 2700 -325 
+z
+" transform="scale(0.015625)"/>
+     </defs>
+     <use xlink:href="#SimSun-5f62"/>
+    </g>
+   </g>
+  </g>
+ </g>
+ <defs>
+  <clipPath id="p8974995793">
+   <rect x="3.6" y="3.6" width="432" height="432"/>
+  </clipPath>
+ </defs>
+</svg>

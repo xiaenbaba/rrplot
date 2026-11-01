@@ -4,7 +4,7 @@
 这一页解释 rrplot **为什么这样设计**。读完你应该能回答三个问题:
 坐标系是怎么定的、端口方向从哪来、管线为什么总是直角且贴着端口出入。
 
-API 逐项说明见 :doc:`api`,动手画图见 :doc:`tutorial`。
+API 逐项说明见 :doc:`/api/index`,动手画图见 :doc:`tutorial`。
 
 .. contents:: 本页内容
    :local:
@@ -223,7 +223,7 @@ PFD 惯例。:func:`rrplot.core._orthogonalize` 遍历相邻点,发现方向
 
 :meth:`rrplot.core.Diagram.render` 先画所有部件、再画所有管线,返回
 ``fig``。部件的 ``**style`` 参数透传给绘制函数,所以
-``d.add(parts.compressor, "压缩机", loc=..., style="scroll")`` 里
+``d.add(parts.compressor, "压缩机", loc=..., style="方形")`` 里
 ``style`` 是绘制函数的参数名,不是 :class:`rrplot.core.Pipe` 的线型。
 
 :meth:`rrplot.core.Diagram.save` 默认 ``tight=True``,会用

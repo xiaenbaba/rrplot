@@ -10,19 +10,23 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from rrplot import Diagram, parts
+from rrplot.parts import make_heat_exchanger
 
 d = Diagram(width=960, height=760, default_step=80)
 comp = d.add(parts.compressor, loc=(450, 140))
 valve = d.add(parts.four_way_round, loc=(450, 380))
-cond = d.add(parts.condenser, loc=(660, 380))
+cond = d.add(make_heat_exchanger(120, 160, shape="rect_zigzag7"),
+             loc=(660, 380))
 cap = d.add(parts.capillary, label="毛细管", loc=(790, 540))
-evap = d.add(parts.evaporator, loc=(450, 640))
+evap = d.add(make_heat_exchanger(120, 160, shape="rect_zigzag7"),
+             loc=(450, 640))
 
 d.pipe(comp["discharge"], valve["exhaust"])
 d.pipe(valve["condenser"], cond["left"])
 d.pipe(cond["bottom"], cap["in"], via=[("s", 500), ("e", 790)])
-d.pipe(cap["out"], evap["in"], via=[("s", 688), ("w", 450)])
-d.pipe(evap["out"], valve["evaporator"])
+d.pipe(cap["out"], evap["top"], via=[("n", 520), ("w", 450)])
+d.pipe(evap["left"], valve["evaporator"], via=[("w", 330), ("n", 420),
+                                               ("e", 450)])
 d.pipe(valve["suction"], comp["suction"], via=[("w", 330), ("n", 45)])
 
 out = os.path.join(os.path.dirname(os.path.abspath(__file__)),

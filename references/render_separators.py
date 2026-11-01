@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""渲染气液分离器 / 油分离器对比图"""
+"""渲染气液分离器(U 形管) / 油分离器对比图"""
 import os
 import sys
 
@@ -11,7 +11,7 @@ use_font()
 
 d = Diagram(width=600, height=360)
 
-d.add(parts.separator, "气液分离器", loc=(150, 180))
+d.add(parts.separator_utube, "气液分离器(U形管)", loc=(150, 180))
 d.add(parts.oil_separator, "油分离器", loc=(400, 180))
 
 out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "separators.png")

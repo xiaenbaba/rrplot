@@ -1,82 +1,163 @@
 # -*- coding: utf-8 -*-
-"""EVI 涡旋压缩热泵 —— 经济器补气循环原理图(制热模式)。
+"""多联机 / VRF 常见的 EVI 经济器喷气增焓系统图。
 
-主线:涡旋压缩机(带喷气增焓口) -> 冷凝器 -> 主路 EEV1 -> 经济器
-      -> EEV2 -> 蒸发器 -> 回压缩机吸气;
-支路:冷凝器出液经 EEV1 节流入经济器闪蒸,中压气体自经济器右侧引出、
-      自压缩机顶部补气口(vapor_inj)补入,实现中间补气、提升低温制热量与能效。
+这张图把 EVI 循环拆成五个容易追踪的流路:
 
-用 rrplot 库组装:部件只需声明 loc,管路用「端口 + 走点」描述,
-拐角正交化、状态点/温压测点标注由库自动编译。
+* 红色:压缩机排气和冷凝器出口的高压侧;
+* 橙色:冷凝后的高压液体;
+* 蓝色:经过 EEV-1 后进入经济器的中间压力主路;
+* 紫色:经济器副路出口回到压缩机补气口;
+* 青色:蒸发器出口回压缩机吸气口的低压回气。
+
+这类回路常用于多联机室外机,主路为 冷凝器 → EEV-1 → 经济器主路
+→ EEV-2 → 蒸发器,
+喷气支路从经济器主路出口、EEV-2 之前分流，
+经 EEV-3 → 经济器副路 → 压缩机补气口。
+经济器竖直布置:主路右侧自上向下,副路左侧自下向上,两路逆流。
+三个电子膨胀阀的编号与控制功能分别标在阀旁，状态点编号沿管线标注。
 """
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from rrplot import Diagram, make_partial, parts, use_font
+from matplotlib.lines import Line2D
+from matplotlib.patches import Circle
+
+from rrplot import Diagram, make_partial, use_font
+from rrplot.parts import (
+    make_compressor,
+    make_expansion_valve_x,
+    make_heat_exchanger,
+    make_intermediate_hex,
+)
+from rrplot.style import FONT_STACK
 
 use_font()
 
-d = Diagram(width=860, height=540)
+# 留出右侧阀门说明和底部图例空间,避免文字压住管路。
+d = Diagram(width=1050, height=820)
 
-# 涡旋压缩机:工厂默认端口是 left/right/top/bottom,补气口从底部(0,95)
-# 改到顶部(0,-95)并起用循环图惯用口名,使补气管自上方接入、与吸气管错开。
-comp_part = make_partial(
-    parts.make_compressor(style="scroll", name="涡旋压缩机"),
-    {"suction": (-95, 0), "discharge": (95, 0), "vapor_inj": (0, -95)})
-comp = d.add(comp_part, "涡旋压缩机", loc=(720, 250),
-             label_offset=(92, 52), label_ha="left")
-cond = d.add(parts.make_heat_exchanger(240, 64, shape="rect_zigzag7"),
-             "冷凝器(室内侧)", loc=(430, 60))
-eev1 = d.add(parts.valve, loc=(150, 110))
-econ = d.add(parts.make_economizer(w=32, h=130, style="plate", n_plates=10),
-             "经济器", loc=(150, 240))
-eev2 = d.add(parts.valve, loc=(150, 360))
-evap = d.add(parts.make_heat_exchanger(190, 60, shape="rect_zigzag7"),
-             "蒸发器(室外侧)", loc=(430, 440))
+# 统一的流程颜色,箭头与接点共同标明主路和喷气支路。
+DISCHARGE = "#c43d3d"       # 排气/冷凝器高压气
+LIQUID = "#c2761b"          # 冷凝器出口高压液体
+INTERMEDIATE = "#2f67b1"    # 经济器主路中间压力
+INJECTION = "#7b4aa8"       # 补气支路
+SUCTION = "#138a8a"         # 蒸发器出口低压回气
 
-# EEV 文字标注(阀部件本身不带标签)
-d.text(196, 110, "EEV$_1$", size=18, ha="left")
-d.text(196, 360, "EEV$_2$", size=18, ha="left")
 
-# ---------- 管路 ----------
-# 1. 压缩机排气 -> 冷凝器
-d.pipe(comp["discharge"], cond["right"], via=[(815, 60)],
-       states=[("2", 0.55)], head_at=(0.6,))
-# 2. 冷凝器出液 -> 左行 -> 经济器左侧(主路进液)
-d.pipe(cond["left"], econ["left"], via=[(60, 60), (60, 240)],
-       states=[("3", 0.25)], head_at=(0.4,))
-# 3. 支路取液 -> EEV1 -> 经济器顶部
-d.pipe((150, 60), eev1["top"], head=False)
-d.pipe(eev1["bottom"], econ["top"], states=[("3'", 0.5)])
-# 4. 经济器底部 -> EEV2 -> 蒸发器
-d.pipe(econ["bottom"], eev2["top"], head=False, states=[("4", 0.5)])
-d.pipe(eev2["bottom"], evap["left"], via=[(150, 440)],
-       states=[("5", 0.5)], head_at=(0.55,))
-# 5. 蒸发器 -> 压缩机吸气(自下方竖直接入左侧吸气口)
-d.pipe(evap["right"], comp["suction"], via=[(625, 440)],
-       states=[("1", 0.2)], head_at=(0.5,))
-# 6. 经济器补气出口 -> 压缩机顶部喷气口(自上方绕入)
-d.pipe(econ["right"], comp["vapor_inj"], via=[(170, 150), (720, 150)],
-       states=[("6", 0.5)], head_at=(0.6,))
+# ===================== 部件 =====================
+comp = d.add(make_compressor(r=42, style="圆形"), None, loc=(180, 390))
+cond = d.add(make_heat_exchanger(200, 56, shape="rect_zigzag7"),
+             None, loc=(440, 130))
+evap = d.add(make_heat_exchanger(200, 56, shape="rect_zigzag7", name="蒸发器"),
+             None, loc=(440, 690))
+# 原图元为 190 × 80,竖放时交换宽高,保持外壳与通道间距的比例。
+economizer = d.add(make_intermediate_hex(w=80, h=190, orient="v"), None,
+                    loc=(736, 390))
+main_x = economizer["main_in"].point[0]
+sub_x = economizer["sub_in"].point[0]
 
-# 温压测点(绝对坐标,白底圆圈)
-d.sensor(792, 148, r"$T_2$")
-d.sensor(592, 330, r"$T_1$")
-d.sensor(45, 110, r"$T_3$")
-d.sensor(150, 478, r"$T_5$")
-d.sensor(300, 200, r"$T_6$")
+# 主路预节流、主路蒸发节流、喷气支路节流。
+eev1 = d.add(make_expansion_valve_x(orient="v"), None, loc=(main_x, 215))
+eev2 = d.add(make_expansion_valve_x(orient="v"), None, loc=(main_x, 615))
+# 喷气支路向左折后向上节流:阀门与副路底部入口对齐。
+eev3 = d.add(make_partial(
+    make_expansion_valve_x(orient="v"),
+    ports={"in": (0, 10), "out": (0, -10)},
+    dirs={"in": "s", "out": "n"}), None, loc=(sub_x, 520))
 
-# 标题
-d.text(20, 20, "EVI 喷气增焓热泵 · 经济器补气循环", size=20, ha="left")
 
-# ---------- 出图(render 一次,分别存位图与矢量) ----------
-here = os.path.dirname(os.path.abspath(__file__))
-out_png = os.path.join(here, "evi_cycle.png")
-out_svg = os.path.join(here, "evi_cycle.svg")
-d.render()
-d.fig.savefig(out_png, dpi=100, bbox_inches="tight", pad_inches=0.05)
-d.fig.savefig(out_svg, bbox_inches="tight", pad_inches=0.05)
-print("已生成:", out_png)
-print("已生成:", out_svg)
+# ===================== 标题与设备标注 =====================
+d.text(500, 28, "EVI 经济器喷气增焓制冷循环", size=21, weight="bold")
+d.text(500, 57, "双级节流 · 中间换热器过冷 · 压缩机中间压力补气",
+        size=11, color="#555555")
+
+d.text(440, 88, "冷凝器", size=15, weight="bold")
+d.text(440, 744, "蒸发器", size=15, weight="bold")
+d.text(112, 390, "压缩机", size=15, weight="bold", ha="right")
+d.text(810, 390, "中间换热器\n（经济器）", size=15, weight="bold", ha="left")
+
+# 阀门标签用白底,即使与折线路径靠近也保持可读。
+d.text(820, 215, "EEV-1\n主路预节流", size=11, ha="left", boxed=True)
+d.text(sub_x - 40, 520, "EEV-3\n喷气支路节流", size=11, ha="right", boxed=True)
+d.text(820, 615, "EEV-2\n蒸发器节流", size=11, ha="left", boxed=True)
+
+# 经济器两条竖直通道分别连接顶部和底部端口。
+d.text(sub_x, 390, "副\n路\n↑", size=12, color=INJECTION, boxed=True)
+d.text(main_x, 390, "主\n路\n↓", size=12, color=INTERMEDIATE, boxed=True)
+
+
+# ===================== 管路 =====================
+# 1) 压缩机排气 → 冷凝器左口(状态 2)。
+d.pipe(comp["top"], cond["left"], via=[(180, 130)],
+       color=DISCHARGE, head_at=(0.52,),
+       states=[{"text": "2", "at": 0.48, "side": -1, "size": 13}])
+
+# 2) 冷凝器出口 → EEV-1。这里不分出喷气支路。
+d.pipe(cond["right"], eev1["in"], via=[(main_x, 130)],
+       color=LIQUID, head_at=(0.6,),
+       states=[{"text": "3", "at": 0.65, "side": -1, "size": 13}])
+
+# 3) EEV-1 → 经济器主路顶部入口,主路在右侧向下流动。
+d.pipe(eev1["out"], economizer["main_in"],
+       color=INTERMEDIATE, head_at=(0.58,),
+       states=[{"text": "4", "at": 0.50, "side": -1, "size": 13}])
+
+# 4) 主路从经济器底部流出后分流:向下去 EEV-2,向左经 EEV-3 去副路。
+split = (main_x, 560)
+d.pipe(economizer["main_out"], split, color=INTERMEDIATE,
+       head_at=(0.5,))
+d.ax.add_patch(Circle(split, 5, facecolor=INTERMEDIATE, edgecolor="white",
+                      lw=1.2, zorder=7))
+d.text(820, 560, "主路出口分流", size=10, ha="left",
+        color=INTERMEDIATE)
+d.pipe(split, eev3["in"], via=[(sub_x, 560)],
+       color=INTERMEDIATE, head_at=(0.5,))
+d.pipe(eev3["out"], economizer["sub_in"],
+       color=INJECTION, head_at=(0.58,),
+       states=[{"text": "6", "at": 0.60, "side": -1, "size": 13}])
+
+# 5) 主路出口分流点 → EEV-2 → 蒸发器右口(状态 5)。
+# 之字盘管连接左右两口,按本图流向从右口进入、左口流出。
+d.pipe(split, eev2["in"], color=INTERMEDIATE, head_at=(0.50,))
+d.pipe(eev2["out"], evap["right"], via=[(main_x, 690)],
+       color=SUCTION, head_at=(0.58,),
+       states=[{"text": "5", "at": 0.63, "side": 1, "size": 13}])
+
+# 6) 经济器副路顶部出口 → 压缩机补气口(状态 7)。
+d.pipe(economizer["sub_out"], comp["right"],
+       via=[(sub_x, 245), (370, 245), (370, 390)], color=INJECTION,
+       head_at=(0.35, 0.85),
+       states=[{"text": "7", "at": 0.78, "side": -1, "size": 13}])
+
+# 7) 蒸发器左口 → 压缩机底部吸气口(状态 1)。
+d.pipe(evap["left"], comp["bottom"],
+       via=[(180, 690)], color=SUCTION,
+       head_at=(0.40, 0.82),
+       states=[{"text": "1", "at": 0.30, "side": 1, "size": 13}])
+
+
+# ===================== 图例与说明 =====================
+legend_handles = [
+    Line2D([0], [0], color=DISCHARGE, lw=2.2, label="排气 / 高压气"),
+    Line2D([0], [0], color=LIQUID, lw=2.2, label="冷凝液 / 高压液"),
+    Line2D([0], [0], color=INTERMEDIATE, lw=2.2, label="经济器主路"),
+    Line2D([0], [0], color=INJECTION, lw=2.2, label="喷气补气支路"),
+    Line2D([0], [0], color=SUCTION, lw=2.2, label="蒸发回气 / 吸气"),
+]
+d.ax.legend(handles=legend_handles, loc="upper left",
+            bbox_to_anchor=(0.79, 0.97), ncol=1,
+            prop={"family": FONT_STACK, "size": 9},
+            frameon=True, framealpha=0.95, handlelength=2.5,
+            columnspacing=1.5)
+d.text(505, 794,
+        "状态点: 1 吸气 · 2 排气 · 3 冷凝液 · 4 经济器主路入口 · "
+        "5 蒸发器入口 · 6 喷气支路入口 · 7 补气",
+        size=9, color="#555555")
+
+out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "evi_cycle.png")
+d.save(out, out.replace(".png", ".svg"), dpi=140)
+print("已生成:", out)
+
+

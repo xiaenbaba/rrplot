@@ -31,6 +31,7 @@ from rrplot.parts import (
     make_four_way_round,
     make_globe_valve,
     make_heat_exchanger,
+    make_intermediate_hex,
     make_oil_separator,
     make_partial,
     make_separator_utube,
@@ -66,7 +67,7 @@ fw = d.add(make_partial(
     dirs={"exhaust": "s", "evaporator": "n", "condenser": "w",
           "suction": "e"}), None, loc=(525, 190))
 oil = d.add(make_oil_separator(w=30, h=60, stub=8), None, loc=(525, 307))
-comp = d.add(make_compressor(r=60, style="centrifugal", name="压缩机"),
+comp = d.add(make_compressor(r=60, style="圆形", name="压缩机"),
              None, loc=(410, 405))
 acc = d.add(make_separator_utube(w=90, h=90, stub=12, flip=True), None,
             loc=(738, 546))
@@ -90,10 +91,9 @@ xv_eev = d.add(make_partial(make_expansion_valve_x(orient="h"),
                             ports={"in": (10, 0), "out": (-10, 0)},
                             dirs={"in": "e", "out": "w"}), None,
                loc=(640, 668))
-# 中间换热器:素面矩形串在液管总管上,主/副两路接口分列左右两边
-d.ax.add_patch(Rectangle((390, 650), 190, 80, facecolor="white",
-                         edgecolor=INK, lw=1.2))
-d.text(485, 690, "中间换热器", size=13, boxed=True)
+# 中间换热器:矩形 + 上下两条通道线,主路下侧、副路上侧(端口式图元)
+hx = d.add(make_intermediate_hex(w=190, h=80), "中间换热器",
+           loc=(485, 690))
 
 # 竖排器件名
 d.text(200, 420, "室外换热器", size=14, rot=90, boxed=True)
@@ -127,21 +127,17 @@ dot(525, 489)
 # 四通阀 C 口西行 → 室外换热器顶部;底部经膨胀阀入液管总管,
 # 主路沿中间换热器下侧水平穿过(主/副路接口关于中心对称)
 d.pipe(fw["condenser"], coil_out["top"], via=[(200, 190)], head=False)
-d.pipe(coil_out["bottom"], xv_out["in"], head=False)
-d.pipe(xv_out["out"], (580, 712), head=False)
+d.pipe(coil_out["bottom"], hx["main_in"], head=False)
 # 液管:中间换热器主路出口 → 液管检修阀 → 出机接室内机液管总管
-d.pipe((580, 712), liq_stop["in"], head=False)
+d.pipe(hx["main_out"], liq_stop["in"], head=False)
 d.pipe(liq_stop["out"], (1224, 712), head=False)
 dot(700, 712)
 # 喷气支路(经济器副路):主路出换热器后三通引出,向上左折经电子膨胀阀
 # 节流,水平穿过中间换热器副路(进口右侧、出口左侧,与主路同侧对齐),
 # 出换热器后西折上行进压缩机增焓入口
 d.pipe((700, 712), xv_eev["in"], head=False)
-d.pipe(xv_eev["out"], comp["left"],
-       via=[(340, 668), (340, 405)], head=False)
-# 副路闪发气自左侧出口(与主路进口同侧)引出 → 西折上行
-# → 压缩机增焓入口(左侧)
-d.pipe((390, 668), comp["left"],
+d.pipe(xv_eev["out"], hx["sub_in"], head=False)
+d.pipe(hx["sub_out"], comp["left"],
        via=[(340, 668), (340, 405)], head=False)
 # 吸气:四通阀 S 口东行下行 → 气液分离器;U 形管出气西行 → 压缩机回气口(底部)
 acc_in = acc["in"].point
