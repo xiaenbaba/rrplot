@@ -8,6 +8,7 @@ const uid = prefix => prefix + '-' + crypto.randomUUID().slice(0, 8);
 const DRAFT = 'rrplot-web-v1-draft';
 let doc = null, catalog = [], geometries = new Map(), fontFamily = 'Times New Roman, SimSun, serif';
 let selection = null, multiSelection = [], mode = 'select', placement = null, ports = [], pendingPort = null;
+let previewTarget = null;
 let undo = [], redo = [], drag = null, dirty = false, spaceDown = false;
 let revision = 0, request = 0, previewUrl = null, messageTimer = null;
 let view = { x: -40, y: -30, w: 840, h: 640 };
@@ -93,6 +94,13 @@ function edgePoints(edge) {
   return route(endpoint(edge.source, nodes, doc.junctions), endpoint(edge.target, nodes, doc.junctions), edge.vertices);
 }
 
+function connectionTarget(event, point) {
+  const hit = event.target.closest('[data-kind="port"], [data-kind="junction"]');
+  if (hit?.dataset.kind === 'port') return endpoint(JSON.parse(hit.dataset.ref), currentNodes(), doc.junctions);
+  if (hit?.dataset.kind === 'junction') return endpoint({ junctionId: hit.dataset.id }, currentNodes(), doc.junctions);
+  return { point, direction: [0, 0] };
+}
+
 function saveDraft() {
   try { localStorage.setItem(DRAFT, JSON.stringify({ time: Date.now(), document: doc })); }
   catch { message('浏览器草稿空间不可用，请使用“保存 JSON”保存图纸。'); }
@@ -138,7 +146,7 @@ async function replaceDocument(next, preserveDraft = false) {
   ++revision;
   doc = result.document; geometries = new Map(result.nodes.map(n => [n.id, n.geometry]));
   fontFamily = result.fontFamily; undo = []; redo = []; clearSelection(); ports = [];
-  pendingPort = null; mode = 'select'; placement = null; dirty = false;
+  pendingPort = null; previewTarget = null; mode = 'select'; placement = null; dirty = false;
   if (!preserveDraft) clearDraft();
   render(); fit(); status('图纸已打开 · 点击对象编辑'); message('');
 }
@@ -203,6 +211,13 @@ function renderCanvas() {
         [base[0] + direction[1] * 2.7, base[1] - direction[0] * 2.7]].map(p => p.join(',')).join(' '), fill: edge.color, 'pointer-events': 'none' }, g);
     }
   }
+  if (mode === 'connect' && pendingPort && previewTarget) {
+    try {
+      const start = endpoint(pendingPort, nodes, doc.junctions);
+      const points = route(start, previewTarget, []);
+      shape('polyline', { points: points.map(p => p.join(',')).join(' '), class: 'connection-preview' });
+    } catch { /* The source may have been removed while connecting. */ }
+  }
   for (const n of nodes) {
     const g = shape('g', { class: 'node' + (selected('node', n.id) ? ' selected' : ''),
       'data-kind': 'node', 'data-id': n.id, transform: `translate(${n.x} ${n.y}) rotate(${n.rotation})` });
@@ -215,15 +230,18 @@ function renderCanvas() {
       const key = p.point.join(','); if (seen.has(key)) continue; seen.add(key);
       const ref = { nodeId: n.id, portId: id };
       const chosen = ports.some(p => eqRef(p, ref)) || eqRef(pendingPort, ref);
+      shape('circle', { cx: p.point[0], cy: p.point[1], r: 10,
+        class: 'port-hit', 'data-kind': 'port', 'data-ref': JSON.stringify(ref) }, g);
       const circle = shape('circle', { cx: p.point[0], cy: p.point[1], r: 4.5,
         class: 'port' + (chosen ? ' chosen' : ''), 'data-kind': 'port', 'data-ref': JSON.stringify(ref) }, g);
       shape('title', {}, circle).textContent = id;
     }
   }
   for (const j of doc.junctions) {
-    const c = shape('circle', { cx: j.x, cy: j.y, r: 4, fill: '#111',
-      class: 'junction' + (selected('junction', j.id) ? ' selected' : ''),
+    const g = shape('g', { class: 'junction' + (selected('junction', j.id) ? ' selected' : ''),
       'data-kind': 'junction', 'data-id': j.id });
+    shape('circle', { cx: j.x, cy: j.y, r: 10, class: 'junction-hit' }, g);
+    const c = shape('circle', { cx: j.x, cy: j.y, r: 4, class: 'junction-dot', 'pointer-events': 'none' }, g);
     shape('title', {}, c).textContent = '三通';
   }
   for (const label of doc.labels) {
@@ -442,10 +460,14 @@ function addNode(type, position) {
 
 function onPort(ref) {
   if (mode === 'connect') {
-    if (!pendingPort) { pendingPort = ref; status('已选择起点，请点击终点端口或三通'); }
+    if (!pendingPort) {
+      pendingPort = ref;
+      previewTarget = endpoint(ref, currentNodes(), doc.junctions);
+      status('已选择起点，请点击终点端口或三通');
+    }
     else if (!eqRef(pendingPort, ref)) edit(() => {
       const id = uid('edge'); doc.edges.push({ id, source: pendingPort, target: ref, vertices: [], head: true, headAt: [.55], color: '#111111', width: 1.8, linestyle: 'solid' });
-      setSelection('edge', id); pendingPort = null;
+      setSelection('edge', id); pendingPort = null; previewTarget = null;
     });
     render(); return;
   }
@@ -496,7 +518,7 @@ function removeJunction(junction) {
   }
   doc.junctions = doc.junctions.filter(item => item.id !== junction.id);
   ports = ports.filter(ref => ref.junctionId !== junction.id);
-  pendingPort = null;
+  pendingPort = null; previewTarget = null;
   clearSelection();
 }
 
@@ -509,7 +531,7 @@ function removeSelected() {
       const prop = key === 'node' ? 'nodeId' : 'junctionId';
       doc.edges = doc.edges.filter(e => e.source[prop] !== item.id && e.target[prop] !== item.id);
       doc.labels = doc.labels.filter(l => l.nodeId !== item.id);
-      ports = ports.filter(p => p[prop] !== item.id); pendingPort = null;
+      ports = ports.filter(p => p[prop] !== item.id); pendingPort = null; previewTarget = null;
     }
     const collection = { node: 'nodes', label: 'labels', edge: 'edges', junction: 'junctions' }[key];
     doc[collection] = doc[collection].filter(o => o.id !== item.id); clearSelection();
@@ -529,7 +551,7 @@ function copySelected() {
 function history(direction) {
   const from = direction === 'undo' ? undo : redo, to = direction === 'undo' ? redo : undo;
   if (!from.length) return;
-  to.push(clone(doc)); doc = from.pop(); clearSelection(); ports = []; pendingPort = null;
+  to.push(clone(doc)); doc = from.pop(); clearSelection(); ports = []; pendingPort = null; previewTarget = null;
   revision++; dirty = true; saveDraft(); render(); void refresh();
 }
 
@@ -568,7 +590,7 @@ const actions = {
   undo: () => history('undo'), redo: () => history('redo'), copy: copySelected, delete: removeSelected,
   fit, 'zoom-in': () => zoom(.85), 'zoom-out': () => zoom(1 / .85),
   'align-x': () => alignPorts('x'), 'align-y': () => alignPorts('y'),
-  'clear-ports': () => { ports = []; pendingPort = null; render(); },
+  'clear-ports': () => { ports = []; pendingPort = null; previewTarget = null; render(); },
   restore: async () => {
     const saved = JSON.parse(localStorage.getItem(DRAFT));
     if (saved?.document && await confirmReplace()) { await replaceDocument(saved.document); dirty = true; saveDraft(); render(); }
@@ -585,10 +607,10 @@ document.addEventListener('click', async event => {
 });
 
 function setTool(tool) {
-  mode = tool; placement = null; pendingPort = null;
+  mode = tool; placement = null; pendingPort = null; previewTarget = null;
   if (tool === 'move-all') { clearSelection(); ports = []; }
   render();
-  status('工具：' + { select: '选择', 'move-all': '整体移动：按住左键拖动全部内容', connect: '连线：点击起点和终点端口', junction: '在空白处放三通，或选中管路后在属性中插入', text: '在画布点击放置文字' }[tool]);
+  status('工具：' + { select: '选择', 'move-all': '整体移动：按住左键拖动全部内容', connect: '连线：点击起点和终点端口，鼠标靠近时自动吸附', junction: '在空白处放三通，或选中管路后在属性中插入', text: '在画布点击放置文字' }[tool]);
 }
 
 svg.addEventListener('pointerdown', event => {
@@ -644,7 +666,15 @@ function startPan(event) {
   svg.setPointerCapture(event.pointerId); svg.classList.add('panning'); event.preventDefault();
 }
 svg.addEventListener('pointermove', event => {
-  if (!drag) return;
+  if (!drag) {
+    if (mode === 'connect' && pendingPort) {
+      const next = connectionTarget(event, world(event));
+      const changed = !previewTarget || next.point.some((value, index) => value !== previewTarget.point[index])
+        || next.direction.some((value, index) => value !== previewTarget.direction[index]);
+      if (changed) { previewTarget = next; renderCanvas(); }
+    }
+    return;
+  }
   if (drag.kind === 'pan') {
     view.x = drag.origin.x - (event.clientX - drag.client[0]) * view.w / svg.clientWidth;
     view.y = drag.origin.y - (event.clientY - drag.client[1]) * view.h / svg.clientHeight;
@@ -690,6 +720,9 @@ svg.addEventListener('pointermove', event => {
   else [item.x, item.y] = drag.origin.map((v, i) => snapped(v + delta[i]));
   renderCanvas();
 });
+svg.addEventListener('pointerleave', () => {
+  if (!drag && mode === 'connect' && pendingPort && previewTarget) { previewTarget = null; renderCanvas(); }
+});
 function endDrag(event) {
   if (!drag) return;
   const current = drag; drag = null; svg.classList.remove('panning');
@@ -732,7 +765,7 @@ window.addEventListener('keydown', async event => {
   if (event.target.matches('input,textarea,select') || document.querySelector('dialog[open]')) return;
   const modifier = event.ctrlKey || event.metaKey;
   if (event.code === 'Space') { spaceDown = true; event.preventDefault(); }
-  if (event.key === 'Escape') { mode = 'select'; placement = null; pendingPort = null; ports = []; cancelDrag(); }
+  if (event.key === 'Escape') { mode = 'select'; placement = null; pendingPort = null; previewTarget = null; ports = []; cancelDrag(); }
   if (drag) return;
   if (modifier && event.key.toLowerCase() === 'a') { event.preventDefault(); setTool('move-all'); }
   if (event.key === 'Delete' || event.key === 'Backspace') { event.preventDefault(); removeSelected(); }
@@ -753,7 +786,7 @@ async function init() {
       const b = html('button', undefined, 'part-button'); b.dataset.part = entry.type; b.draggable = true;
       b.append(html('span', entry.label.slice(0, 1), 'part-icon'));
       const name = html('span', entry.label); name.append(html('small', entry.type)); b.append(name);
-      b.addEventListener('click', () => { placement = entry.type; mode = 'select'; pendingPort = null; document.body.classList.remove('library-open'); render(); status('在画布点击放置：' + entry.label); });
+      b.addEventListener('click', () => { placement = entry.type; mode = 'select'; pendingPort = null; previewTarget = null; document.body.classList.remove('library-open'); render(); status('在画布点击放置：' + entry.label); });
       b.addEventListener('dragstart', event => event.dataTransfer.setData('text/rrplot-part', entry.type));
       $('palette').append(b);
     }

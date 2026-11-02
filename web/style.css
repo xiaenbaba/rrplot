@@ -56,9 +56,12 @@ input[type=checkbox] { min-height: unset; accent-color: var(--accent); }
 .node.selected .node-hit { stroke: var(--accent); stroke-dasharray: 4 3; fill: #17796708; }
 .node, .diagram-label, .junction { cursor: move; }
 .port { fill: #fff; stroke: var(--accent); stroke-width: 1.5; cursor: crosshair; opacity: 0; }
+.port-hit { fill: transparent; stroke: none; cursor: crosshair; pointer-events: all; }
+.port-hit:hover + .port { opacity: 1; fill: #c5e5da; stroke-width: 2; }
 .node:hover .port, .node.selected .port, .connecting .port, .port.chosen { opacity: 1; }
 .port.chosen { fill: #c5e5da; stroke-width: 2; }
 .edge { cursor: pointer; }
+.connection-preview { fill: none; stroke: var(--accent); stroke-width: 1.8; stroke-dasharray: 6 4; stroke-linecap: round; opacity: .8; pointer-events: none; }
 .edge-hit { fill: none; stroke: transparent; stroke-width: 13; }
 .edge.selected .edge-visible { stroke: #208b7a; }
 .edge:hover .edge-hit { stroke: #26897611; }
@@ -67,7 +70,10 @@ input[type=checkbox] { min-height: unset; accent-color: var(--accent); }
 .moving-all .node-hit { stroke: #95c5b9; stroke-dasharray: 4 3; }
 .moving-all .port { opacity: 0; pointer-events: none; }
 .label-highlight { fill: #e1f3eb; opacity: .65; }
-.junction.selected { stroke: var(--accent); stroke-width: 3; }
+.junction-hit { fill: transparent; cursor: crosshair; pointer-events: all; }
+.junction-dot { fill: #111; stroke: none; }
+.junction:hover .junction-dot { stroke: var(--accent); stroke-width: 3; }
+.junction.selected .junction-dot { stroke: var(--accent); stroke-width: 3; }
 .canvas-hint { position: absolute; left: 18px; bottom: 18px; color: #8a969f; font-size: 10px; pointer-events: none; }
 .zoom-control { position: absolute; right: 16px; bottom: 13px; display: flex; align-items: center; gap: 2px; background: white; border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 2px 8px #24344408; padding: 2px; }
 .zoom-control button { border: none; min-width: 28px; }
