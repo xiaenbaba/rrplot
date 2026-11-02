@@ -33,6 +33,15 @@ def test_template_roundtrip_and_orthogonal_edges(name):
     assert scene["document"] == d
 
 
+def test_intermediate_evi_injection_enters_compressor_left_port():
+    document = load_template("evi_intermediate")
+    injection = next(edge for edge in document["edges"] if edge["id"] == "injection")
+    assert injection["target"] == {"nodeId": "comp", "portId": "left"}
+    resolved = resolve_scene(document)
+    injection = next(edge for edge in resolved["edges"] if edge["id"] == "injection")
+    assert injection["points"][-1] == [578, 280]
+
+
 def test_node_move_updates_pipe_and_attached_label_without_mutating_document():
     d = load_template("evi_ftvi")
     old = resolve_scene(d)

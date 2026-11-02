@@ -20,7 +20,7 @@
     {"id": "branch-in", "source": {"junctionId": "split"}, "target": {"nodeId": "eev1", "portId": "in"}, "vertices": [[40, 80]], "headAt": [0.5], "head": true, "width": 1.8, "color": "#111111", "linestyle": "solid"},
     {"id": "branch-expanded", "source": {"nodeId": "eev1", "portId": "out"}, "target": {"nodeId": "hex", "portId": "sub_in"}, "vertices": [[40, 375]], "headAt": [0.55], "head": true, "width": 1.8, "color": "#111111", "linestyle": "solid"},
     {"id": "to-evap", "source": {"nodeId": "eev2", "portId": "out"}, "target": {"nodeId": "evap", "portId": "left"}, "vertices": [[120, 480]], "headAt": [0.55], "head": true, "width": 1.8, "color": "#111111", "linestyle": "solid"},
-    {"id": "injection", "source": {"nodeId": "hex", "portId": "sub_out"}, "target": {"nodeId": "comp", "portId": "vapor_inj"}, "vertices": [[88, 185], [680, 185], [680, 280]], "headAt": [0.55], "head": true, "width": 1.8, "color": "#111111", "linestyle": "solid"}
+    {"id": "injection", "source": {"nodeId": "hex", "portId": "sub_out"}, "target": {"nodeId": "comp", "portId": "left"}, "vertices": [[88, 185], [558, 185], [558, 280]], "headAt": [0.55], "head": true, "width": 1.8, "color": "#111111", "linestyle": "solid"}
   ],
   "labels": [
     {"id": "label-cond", "text": "冷凝器", "x": 0, "y": -44, "size": 15, "ha": "center", "boxed": false, "color": "#111111", "nodeId": "cond"},
