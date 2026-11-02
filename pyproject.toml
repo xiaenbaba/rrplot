@@ -36,6 +36,9 @@ include = ["rrplot*", "cycleplot*"]
 [tool.setuptools.dynamic]
 version = { attr = "rrplot.__version__" }
 
+[tool.setuptools.package-data]
+rrplot = ["templates/*.json"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"

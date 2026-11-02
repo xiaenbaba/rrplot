@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>rrplot · 制冷系统图编辑器</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">r<span>r</span></span><div>rrplot<small>制冷系统图编辑器</small></div></div>
+    <div class="document-title"><input id="title" aria-label="图纸名称" value="载入中…"><span id="save-state">本机编辑</span></div>
+    <div class="header-actions">
+      <button data-action="new">新建</button><button data-action="open">打开</button>
+      <button data-action="save">保存 JSON</button><span class="divider"></span>
+      <button data-action="undo" id="undo" title="撤销 Ctrl+Z">↶</button><button data-action="redo" id="redo" title="重做 Ctrl+Y">↷</button>
+      <button data-action="preview">预览</button>
+      <select id="export-format" aria-label="导出格式"><option value="svg">SVG 矢量</option><option value="png">PNG 图片</option><option value="pdf">PDF 文档</option></select>
+      <button data-action="export" class="primary">导出 ↓</button>
+    </div>
+  </header>
+  <main class="editor">
+    <aside class="library">
+      <div class="panel-heading"><span>图元库</span><span class="eyebrow">PARTS</span></div>
+      <p class="muted panel-note">选择图元，再点击画布放置</p>
+      <div id="palette" class="palette"></div>
+      <div class="panel-heading section-heading"><span>系统模板</span></div>
+      <div id="templates" class="template-list"></div>
+      <div class="library-footer"><span class="local-dot"></span> 本机运行 · 文件由你保存<br><span class="muted">图元与最终出图来自 rrplot</span></div>
+    </aside>
+    <section class="workspace" aria-label="绘图工作区">
+      <div class="canvas-toolbar">
+        <button data-action="toggle-library" class="mobile-only">图元</button>
+        <div class="tool-group" role="group" aria-label="编辑工具">
+          <button data-tool="select" class="active" title="选择与拖动">↖ <span>选择</span></button>
+          <button data-tool="move-all" aria-label="整体移动" title="整体移动全部内容 Ctrl+A">✥ <span>整体移动</span></button>
+          <button data-tool="connect" title="依次点击起点和终点端口">⌁ <span>连线</span></button>
+          <button data-tool="junction" title="在画布放置三通，或在选中管路上插入">● <span>三通</span></button>
+          <button data-tool="text" title="在画布放置文字">T <span>文字</span></button>
+        </div>
+        <div class="tool-group"><button data-action="copy" title="复制选中对象 Ctrl+D">复制</button><button data-action="delete" title="删除选中对象 Delete">删除</button></div>
+        <div class="spacer"></div>
+        <label class="check"><input id="snap" type="checkbox" checked>吸附</label>
+        <label class="check"><input id="grid" type="checkbox" checked>网格</label>
+        <button data-action="fit" title="适应页面">适应页面</button>
+        <button data-action="toggle-properties" class="mobile-only">属性</button>
+      </div>
+      <div id="draft-banner" hidden>发现上次未导出的本地草稿。<button data-action="restore">恢复草稿</button><button data-action="dismiss-draft">忽略</button></div>
+      <div id="message" role="status" aria-live="polite" hidden></div>
+      <svg id="diagram" xmlns="http://www.w3.org/2000/svg" aria-label="系统图画布" tabindex="0"></svg>
+      <div class="canvas-hint">滚轮缩放 · 拖动空白平移 · 双击管线添加折点 · Esc 取消</div>
+      <div class="zoom-control"><button data-action="zoom-out" aria-label="缩小">−</button><span id="zoom">100%</span><button data-action="zoom-in" aria-label="放大">＋</button></div>
+    </section>
+    <aside class="properties">
+      <div class="panel-heading"><span>属性</span><span id="selection-kind" class="eyebrow">PAGE</span></div>
+      <div id="inspector"></div>
+      <section class="alignment">
+        <div class="section-label">端口对齐</div>
+        <p id="align-description" class="muted">选择模式下依次点击两个端口，移动第二个对象。</p>
+        <div class="button-row"><button data-action="align-y">水平对齐</button><button data-action="align-x">垂直对齐</button></div>
+        <button data-action="clear-ports" class="text-button">清除端口选择</button>
+      </section>
+      <div class="property-help">端口连线保持连接关系。改变图元尺寸后，端口和外形同步更新。正式效果请使用顶部预览。</div>
+    </aside>
+  </main>
+  <footer class="statusbar"><span id="status">正在连接本机绘图服务…</span><span id="counts"></span><span>原生 SVG · 无图编辑器依赖</span></footer>
+  <input id="file-input" type="file" accept=".json,application/json" hidden>
+  <dialog id="preview-dialog"><div class="preview-heading"><strong>正式出图预览</strong><span>与导出使用同一图纸</span><button data-action="close-preview">关闭 ×</button></div><div class="preview-body"><img id="preview-image" alt="rrplot 正式导出预览"></div></dialog>
+  <dialog id="replace-dialog" aria-labelledby="replace-heading"><form method="dialog"><h2 id="replace-heading">替换当前图纸？</h2><p>当前修改尚未保存为 JSON。替换后，本机草稿也会更新；如需保留，请先继续编辑并保存 JSON。</p><div class="button-row"><button value="cancel" autofocus>继续编辑</button><button value="replace" class="primary">替换图纸</button></div></form></dialog>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

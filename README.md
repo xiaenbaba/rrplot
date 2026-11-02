@@ -29,7 +29,7 @@ pip install -e .
 从旧版 `cycleplot` 升级时,旧包名仍提供兼容导入;新代码建议统一使用
 `rrplot`。
 
-跑回归测试(67 个用例,CI 覆盖 ubuntu/windows × Python 3.9/3.12):
+跑回归测试(CI 覆盖 ubuntu/windows × Python 3.9/3.12/3.13):
 
 ```powershell
 pip install -e ".[test]"
@@ -42,8 +42,23 @@ python -m pytest
 静态检查(CI 里跑同一条):
 
 ```powershell
-ruff check rrplot tests examples
+ruff check rrplot tests examples server
 ```
+
+## 浏览器编辑器
+
+在仓库根目录启动本机服务：
+
+```powershell
+.\.venv\Scripts\python.exe server\run.py
+```
+
+打开 <http://127.0.0.1:8765>，可编辑 EVI/FTVI 模板，放置图元、连接端口、
+调整折点和标签，保存 JSON，并导出 PNG/SVG/PDF。前端使用原生 SVG，
+服务使用 Python 标准库，无需安装 Node.js、npm 或图编辑器框架。
+
+详细操作见 [Web 使用说明](web/README.md)，设计与验收记录见
+[Web 项目方案](WEB_PROJECT_PLAN.md)。首版面向本机单用户，尚不支持自动避障和全图元库。
 
 ## 快速上手
 

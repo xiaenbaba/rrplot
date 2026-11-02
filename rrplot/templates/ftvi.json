@@ -1,0 +1,323 @@
+{
+  "schemaVersion": 1,
+  "title": "FTVI 闪蒸罐喷气增焓",
+  "page": {
+    "width": 760,
+    "height": 580
+  },
+  "nodes": [
+    {
+      "id": "cond",
+      "type": "heat_exchanger",
+      "title": "冷凝器",
+      "x": 330,
+      "y": 70,
+      "params": {
+        "w": 200,
+        "h": 56,
+        "shape": "rect_x",
+        "orient": "h"
+      },
+      "rotation": 0
+    },
+    {
+      "id": "evap",
+      "type": "heat_exchanger",
+      "title": "蒸发器",
+      "x": 330,
+      "y": 490,
+      "params": {
+        "w": 200,
+        "h": 56,
+        "shape": "rect_x",
+        "orient": "h"
+      },
+      "rotation": 0
+    },
+    {
+      "id": "comp",
+      "type": "compressor",
+      "title": "压缩机",
+      "x": 600,
+      "y": 272,
+      "params": {
+        "r": 42,
+        "style": "圆形"
+      },
+      "rotation": 0
+    },
+    {
+      "id": "eev2",
+      "type": "expansion_valve",
+      "title": "EEV2",
+      "x": 110,
+      "y": 410,
+      "params": {
+        "r": 10,
+        "orient": "v"
+      },
+      "rotation": 0
+    },
+    {
+      "id": "tank",
+      "type": "vessel",
+      "title": "闪蒸罐",
+      "x": 110,
+      "y": 300,
+      "params": {
+        "w": 66,
+        "h": 130,
+        "liquid": 0.42
+      },
+      "rotation": 0
+    },
+    {
+      "id": "eev1",
+      "type": "expansion_valve",
+      "title": "EEV1",
+      "x": 110,
+      "y": 165,
+      "params": {
+        "r": 10,
+        "orient": "v"
+      },
+      "rotation": 0
+    }
+  ],
+  "junctions": [],
+  "edges": [
+    {
+      "id": "discharge",
+      "source": {
+        "nodeId": "comp",
+        "portId": "top"
+      },
+      "target": {
+        "nodeId": "cond",
+        "portId": "right"
+      },
+      "vertices": [
+        [
+          600,
+          70
+        ]
+      ],
+      "headAt": [
+        0.3,
+        0.7
+      ],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid"
+    },
+    {
+      "id": "to-evap",
+      "source": {
+        "nodeId": "eev2",
+        "portId": "out"
+      },
+      "target": {
+        "nodeId": "evap",
+        "portId": "left"
+      },
+      "vertices": [
+        [
+          110,
+          490
+        ]
+      ],
+      "headAt": [
+        0.55
+      ],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid"
+    },
+    {
+      "id": "suction",
+      "source": {
+        "nodeId": "evap",
+        "portId": "right"
+      },
+      "target": {
+        "nodeId": "comp",
+        "portId": "bottom"
+      },
+      "vertices": [
+        [
+          600,
+          490
+        ]
+      ],
+      "headAt": [
+        0.3,
+        0.7
+      ],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid"
+    },
+    {
+      "id": "cond-eev1",
+      "source": {
+        "nodeId": "cond",
+        "portId": "left"
+      },
+      "target": {
+        "nodeId": "eev1",
+        "portId": "in"
+      },
+      "vertices": [
+        [
+          110,
+          70
+        ]
+      ],
+      "headAt": [
+        0.55
+      ],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid"
+    },
+    {
+      "id": "flash-in",
+      "source": {
+        "nodeId": "eev1",
+        "portId": "out"
+      },
+      "target": {
+        "nodeId": "tank",
+        "portId": "top"
+      },
+      "vertices": [],
+      "headAt": [
+        0.55
+      ],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid"
+    },
+    {
+      "id": "flash-liquid",
+      "source": {
+        "nodeId": "tank",
+        "portId": "bottom"
+      },
+      "target": {
+        "nodeId": "eev2",
+        "portId": "in"
+      },
+      "vertices": [],
+      "headAt": [
+        0.55
+      ],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid"
+    },
+    {
+      "id": "flash-vapor",
+      "source": {
+        "nodeId": "tank",
+        "portId": "vapor"
+      },
+      "target": {
+        "nodeId": "comp",
+        "portId": "left"
+      },
+      "vertices": [],
+      "headAt": [
+        0.55
+      ],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid"
+    }
+  ],
+  "labels": [
+    {
+      "id": "label-cond",
+      "text": "冷凝器",
+      "x": 0,
+      "y": -42,
+      "size": 15,
+      "ha": "center",
+      "boxed": false,
+      "color": "#111111",
+      "nodeId": "cond"
+    },
+    {
+      "id": "label-evap",
+      "text": "蒸发器",
+      "x": 0,
+      "y": -40,
+      "size": 15,
+      "ha": "center",
+      "boxed": false,
+      "color": "#111111",
+      "nodeId": "evap"
+    },
+    {
+      "id": "label-comp",
+      "text": "压缩机",
+      "x": -60,
+      "y": 26,
+      "size": 15,
+      "ha": "right",
+      "boxed": false,
+      "color": "#111111",
+      "nodeId": "comp"
+    },
+    {
+      "id": "label-eev2",
+      "text": "EEV2",
+      "x": 22,
+      "y": 2,
+      "size": 13,
+      "ha": "left",
+      "boxed": false,
+      "color": "#111111",
+      "nodeId": "eev2"
+    },
+    {
+      "id": "label-tank",
+      "text": "闪蒸罐",
+      "x": 46,
+      "y": -4,
+      "size": 15,
+      "ha": "left",
+      "boxed": false,
+      "color": "#111111",
+      "nodeId": "tank"
+    },
+    {
+      "id": "label-eev1",
+      "text": "EEV1",
+      "x": 16,
+      "y": 0,
+      "size": 13,
+      "ha": "left",
+      "boxed": false,
+      "color": "#111111",
+      "nodeId": "eev1"
+    },
+    {
+      "id": "label-vapor",
+      "text": "补气支路",
+      "x": 330,
+      "y": 298,
+      "size": 11,
+      "ha": "center",
+      "boxed": false,
+      "color": "#111111"
+    }
+  ]
+}

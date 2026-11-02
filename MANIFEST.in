@@ -1,0 +1,4 @@
+include WEB_PROJECT_PLAN.md
+include start-web.cmd
+recursive-include server *.py
+recursive-include web *.html *.css *.js *.md
