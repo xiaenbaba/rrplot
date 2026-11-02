@@ -293,6 +293,13 @@ function renderInspector() {
     $('selection-kind').textContent = 'MULTI';
     root.append(html('h2', `已选择 ${multiSelection.length} 项`, 'object-heading'));
     root.append(html('p', '按住 Shift 点击可继续添加或取消选择。拖动任意已选对象，可一起移动设备、三通和文字。', 'muted'));
+    const layout = html('div', undefined, 'layout-grid');
+    for (const [action, caption] of [
+      ['align-left', '左对齐'], ['align-center-x', '水平居中'], ['align-right', '右对齐'],
+      ['align-top', '上对齐'], ['align-center-y', '垂直居中'], ['align-bottom', '下对齐'],
+      ['distribute-x', '水平等距'], ['distribute-y', '垂直等距'],
+    ]) inspectorButton(layout, caption, () => batchLayout(action));
+    root.append(html('div', '批量布局', 'section-label'), layout);
     inspectorButton(root, '清除多选', () => { clearSelection(); render(); });
     return;
   }
@@ -348,6 +355,59 @@ function renderInspector() {
 function coordinateFields(parent, item, prefix = '') {
   const pair = html('div', undefined, 'field-pair'); parent.append(pair);
   for (const axis of ['x', 'y']) field(pair, `${prefix}${axis.toUpperCase()}`, item[axis], v => { item[axis] = v; }, { min: -100000, max: 100000 });
+}
+
+function layoutRefs() {
+  return multiSelection.filter(ref => ['node', 'junction', 'label'].includes(ref.kind))
+    .map(ref => ({ ref, item: doc[{ node: 'nodes', junction: 'junctions', label: 'labels' }[ref.kind]]
+      .find(item => item.id === ref.id) })).filter(entry => entry.item);
+}
+function layoutBox(entry) {
+  const { ref, item } = entry;
+  if (ref.kind === 'node') {
+    const geometry = geometries.get(item.id), rotated = item.rotation % 180 !== 0;
+    const width = rotated ? geometry.height : geometry.width, height = rotated ? geometry.width : geometry.height;
+    return { x: item.x, y: item.y, left: item.x - width / 2, right: item.x + width / 2,
+      top: item.y - height / 2, bottom: item.y + height / 2, width, height };
+  }
+  const [x, y] = ref.kind === 'label' ? labelPosition(item) : [item.x, item.y];
+  return { x, y, left: x, right: x, top: y, bottom: y, width: 0, height: 0 };
+}
+function moveLayoutRef(entry, x, y) {
+  const { ref, item } = entry;
+  if (ref.kind === 'node' || ref.kind === 'junction') { item.x = +x.toFixed(4); item.y = +y.toFixed(4); return; }
+  if (item.nodeId) {
+    const node = doc.nodes.find(candidate => candidate.id === item.nodeId);
+    const local = rotate([x - node.x, y - node.y], -node.rotation);
+    item.x = +local[0].toFixed(4); item.y = +local[1].toFixed(4);
+  } else { item.x = +x.toFixed(4); item.y = +y.toFixed(4); }
+}
+function batchLayout(action) {
+  const entries = layoutRefs();
+  if (entries.length < 2) return message('请至少多选两个设备、三通或文字。');
+  const boxes = entries.map(layoutBox), before = clone(doc);
+  const minLeft = Math.min(...boxes.map(box => box.left)), maxRight = Math.max(...boxes.map(box => box.right));
+  const minTop = Math.min(...boxes.map(box => box.top)), maxBottom = Math.max(...boxes.map(box => box.bottom));
+  if (action === 'distribute-x' || action === 'distribute-y') {
+    if (entries.length < 3) return message('均匀分布至少需要三个对象。');
+    const axis = action === 'distribute-x' ? 'x' : 'y';
+    const order = entries.map((entry, index) => ({ entry, box: boxes[index] })).sort((a, b) => a.box[axis] - b.box[axis]);
+    const first = order[0].box[axis], step = (order.at(-1).box[axis] - first) / (order.length - 1);
+    order.forEach(({ entry, box }, index) => moveLayoutRef(entry, axis === 'x' ? first + step * index : box.x,
+      axis === 'y' ? first + step * index : box.y));
+  } else {
+    const target = { 'align-left': minLeft, 'align-center-x': (minLeft + maxRight) / 2, 'align-right': maxRight,
+      'align-top': minTop, 'align-center-y': (minTop + maxBottom) / 2, 'align-bottom': maxBottom }[action];
+    entries.forEach((entry, index) => {
+      const box = boxes[index];
+      const x = action === 'align-left' ? target + box.width / 2 : action === 'align-right' ? target - box.width / 2
+        : action === 'align-center-x' ? target : box.x;
+      const y = action === 'align-top' ? target + box.height / 2 : action === 'align-bottom' ? target - box.height / 2
+        : action === 'align-center-y' ? target : box.y;
+      moveLayoutRef(entry, x, y);
+    });
+  }
+  finishEdit(before);
 }
 
 function render() {
