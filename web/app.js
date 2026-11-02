@@ -528,7 +528,9 @@ svg.addEventListener('pointerdown', event => {
   }
   const selectedKind = kind === 'vertex' ? 'edge' : kind;
   const additive = event.shiftKey && ['node', 'label', 'junction'].includes(selectedKind);
-  setSelection(selectedKind, id, additive);
+  const keepMulti = !additive && multiSelection.length > 1
+    && multiSelection.some(ref => ref.kind === selectedKind && ref.id === id);
+  if (!keepMulti) setSelection(selectedKind, id, additive);
   if (additive) { render(); return; }
   const item = findSelected();
   if (kind === 'edge') {
