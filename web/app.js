@@ -338,7 +338,10 @@ function renderInspector() {
     if (item.nodeId) inspectorButton(root, '解除设备附着', () => edit(() => {
       const p = labelPosition(item); delete item.nodeId; [item.x, item.y] = p;
     }));
-  } else if (kind === 'junction') coordinateFields(root, item);
+  } else if (kind === 'junction') {
+    coordinateFields(root, item);
+    inspectorButton(root, '删除三通并恢复管路', () => removeSelected());
+  }
   else if (kind === 'edge') {
     root.append(html('p', refName(item.source) + ' → ' + refName(item.target), 'muted'));
     field(root, '线宽（pt）', item.width, v => { item.width = v; }, { min: .2, max: 8 });
@@ -473,10 +476,31 @@ function splitEdge(edge) {
   });
 }
 
+function removeJunction(junction) {
+  const incident = doc.edges.filter(edge =>
+    [edge.source, edge.target].some(ref => ref.junctionId === junction.id));
+  const incoming = incident.find(edge => edge.target.junctionId === junction.id);
+  const outgoing = incident.find(edge => edge.source.junctionId === junction.id);
+  if (incident.length === 2 && incoming && outgoing) {
+    const merged = { ...clone(incoming), target: clone(outgoing.target),
+      vertices: [...incoming.vertices, ...outgoing.vertices] };
+    doc.edges = doc.edges.filter(edge => edge !== incoming && edge !== outgoing);
+    doc.edges.push(merged);
+  } else {
+    doc.edges = doc.edges.filter(edge =>
+      ![edge.source, edge.target].some(ref => ref.junctionId === junction.id));
+  }
+  doc.junctions = doc.junctions.filter(item => item.id !== junction.id);
+  ports = ports.filter(ref => ref.junctionId !== junction.id);
+  pendingPort = null;
+  clearSelection();
+}
+
 function removeSelected() {
   const item = findSelected(); if (!item) return;
   edit(() => {
     const key = selection.kind;
+    if (key === 'junction') { removeJunction(item); return; }
     if (key === 'node' || key === 'junction') {
       const prop = key === 'node' ? 'nodeId' : 'junctionId';
       doc.edges = doc.edges.filter(e => e.source[prop] !== item.id && e.target[prop] !== item.id);
