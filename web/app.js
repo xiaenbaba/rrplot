@@ -7,7 +7,7 @@ const clone = value => structuredClone(value);
 const uid = prefix => prefix + '-' + crypto.randomUUID().slice(0, 8);
 const DRAFT = 'rrplot-web-v1-draft';
 let doc = null, catalog = [], geometries = new Map(), fontFamily = 'Times New Roman, SimSun, serif';
-let selection = null, mode = 'select', placement = null, ports = [], pendingPort = null;
+let selection = null, multiSelection = [], mode = 'select', placement = null, ports = [], pendingPort = null;
 let undo = [], redo = [], drag = null, dirty = false, spaceDown = false;
 let revision = 0, request = 0, previewUrl = null, messageTimer = null;
 let view = { x: -40, y: -30, w: 840, h: 640 };
@@ -53,7 +53,23 @@ function findSelected() {
   return doc[{ node: 'nodes', edge: 'edges', label: 'labels', junction: 'junctions' }[selection.kind]]
     ?.find(item => item.id === selection.id);
 }
-function selected(kind, id) { return selection?.kind === kind && selection.id === id; }
+function selected(kind, id) {
+  return multiSelection.some(item => item.kind === kind && item.id === id);
+}
+function setSelection(kind, id, additive = false) {
+  const key = item => item.kind + ':' + item.id;
+  const item = { kind, id };
+  if (additive && ['node', 'label', 'junction'].includes(kind)) {
+    const index = multiSelection.findIndex(existing => key(existing) === key(item));
+    if (index >= 0) multiSelection.splice(index, 1);
+    else multiSelection.push(item);
+    selection = multiSelection.at(-1) || null;
+  } else {
+    multiSelection = [item];
+    selection = item;
+  }
+}
+function clearSelection() { selection = null; multiSelection = []; }
 function refName(ref) {
   if (ref.junctionId) return '三通 · ' + ref.junctionId.slice(-5);
   const n = doc.nodes.find(n => n.id === ref.nodeId);
@@ -121,7 +137,7 @@ async function replaceDocument(next, preserveDraft = false) {
   if (token !== request || version !== revision) return;
   ++revision;
   doc = result.document; geometries = new Map(result.nodes.map(n => [n.id, n.geometry]));
-  fontFamily = result.fontFamily; undo = []; redo = []; selection = null; ports = [];
+  fontFamily = result.fontFamily; undo = []; redo = []; clearSelection(); ports = [];
   pendingPort = null; mode = 'select'; placement = null; dirty = false;
   if (!preserveDraft) clearDraft();
   render(); fit(); status('图纸已打开 · 点击对象编辑'); message('');
@@ -273,6 +289,13 @@ function renderInspector() {
     root.append(html('p', '每次拖动可用 Ctrl+Z 撤销；拖动中按 Esc 取消本次移动，松开后按 Esc 退出。', 'muted'));
     return;
   }
+  if (multiSelection.length > 1) {
+    $('selection-kind').textContent = 'MULTI';
+    root.append(html('h2', `已选择 ${multiSelection.length} 项`, 'object-heading'));
+    root.append(html('p', '按住 Shift 点击可继续添加或取消选择。拖动任意已选对象，可一起移动设备、三通和文字。', 'muted'));
+    inspectorButton(root, '清除多选', () => { clearSelection(); render(); });
+    return;
+  }
   const item = findSelected();
   $('selection-kind').textContent = selection?.kind?.toUpperCase() || 'PAGE';
   if (!item) {
@@ -296,7 +319,7 @@ function renderInspector() {
     const entry = catalog.find(c => c.type === item.type);
     for (const [key, f] of Object.entries(entry.fields)) field(root, f.label, item.params[key], v => { item.params[key] = v; }, f);
     inspectorButton(root, '添加设备标签', () => edit(() => {
-      const id = uid('label'); doc.labels.push({ id, nodeId: item.id, x: 0, y: 70, text: item.title, size: 15, ha: 'center', boxed: true, color: '#111111' }); selection = { kind: 'label', id };
+      const id = uid('label'); doc.labels.push({ id, nodeId: item.id, x: 0, y: 70, text: item.title, size: 15, ha: 'center', boxed: true, color: '#111111' }); setSelection('label', id);
     }));
   } else if (kind === 'label') {
     field(root, '标签内容', item.text, v => { item.text = v; }, { multiline: true });
@@ -350,7 +373,7 @@ function addNode(type, position) {
     doc.nodes.push({ id, type, title: entry.label, x: snapped(position[0]), y: snapped(position[1]), params, rotation: 0 });
     doc.labels.push({ id: uid('label'), nodeId: id, x: 0, y: (params.h || 2 * params.r) / 2 + 24,
       text: entry.label, size: 15, ha: 'center', color: '#111111', boxed: false });
-    selection = { kind: 'node', id }; placement = null; mode = 'select';
+    setSelection('node', id); placement = null; mode = 'select';
   });
 }
 
@@ -359,7 +382,7 @@ function onPort(ref) {
     if (!pendingPort) { pendingPort = ref; status('已选择起点，请点击终点端口或三通'); }
     else if (!eqRef(pendingPort, ref)) edit(() => {
       const id = uid('edge'); doc.edges.push({ id, source: pendingPort, target: ref, vertices: [], head: true, headAt: [.55], color: '#111111', width: 1.8, linestyle: 'solid' });
-      selection = { kind: 'edge', id }; pendingPort = null;
+      setSelection('edge', id); pendingPort = null;
     });
     render(); return;
   }
@@ -386,7 +409,7 @@ function splitEdge(edge) {
     doc.junctions.push({ id, x: p[0], y: p[1] });
     const other = { ...clone(edge), id: uid('edge'), source: { junctionId: id }, vertices: points.slice(i + 1, -1) };
     edge.target = { junctionId: id }; edge.vertices = points.slice(1, i + 1);
-    doc.edges.push(other); selection = { kind: 'junction', id };
+    doc.edges.push(other); setSelection('junction', id);
   });
 }
 
@@ -401,7 +424,7 @@ function removeSelected() {
       ports = ports.filter(p => p[prop] !== item.id); pendingPort = null;
     }
     const collection = { node: 'nodes', label: 'labels', edge: 'edges', junction: 'junctions' }[key];
-    doc[collection] = doc[collection].filter(o => o.id !== item.id); selection = null;
+    doc[collection] = doc[collection].filter(o => o.id !== item.id); clearSelection();
   });
 }
 function copySelected() {
@@ -412,13 +435,13 @@ function copySelected() {
       doc.nodes.push(n);
       doc.labels.filter(l => l.nodeId === item.id).forEach(l => doc.labels.push({ ...clone(l), id: uid('label'), nodeId: n.id }));
     } else doc[selection.kind === 'label' ? 'labels' : 'junctions'].push(n);
-    selection = { kind: selection.kind, id: n.id };
+    setSelection(selection.kind, n.id);
   });
 }
 function history(direction) {
   const from = direction === 'undo' ? undo : redo, to = direction === 'undo' ? redo : undo;
   if (!from.length) return;
-  to.push(clone(doc)); doc = from.pop(); selection = null; ports = []; pendingPort = null;
+  to.push(clone(doc)); doc = from.pop(); clearSelection(); ports = []; pendingPort = null;
   revision++; dirty = true; saveDraft(); render(); void refresh();
 }
 
@@ -475,7 +498,7 @@ document.addEventListener('click', async event => {
 
 function setTool(tool) {
   mode = tool; placement = null; pendingPort = null;
-  if (tool === 'move-all') { selection = null; ports = []; }
+  if (tool === 'move-all') { clearSelection(); ports = []; }
   render();
   status('工具：' + { select: '选择', 'move-all': '整体移动：按住左键拖动全部内容', connect: '连线：点击起点和终点端口', junction: '在空白处放三通，或选中管路后在属性中插入', text: '在画布点击放置文字' }[tool]);
 }
@@ -493,17 +516,20 @@ svg.addEventListener('pointerdown', event => {
   if (hit?.dataset.kind === 'junction' && mode === 'connect') { onPort({ junctionId: hit.dataset.id }); return; }
   if (placement) { addNode(placement, p); return; }
   if (mode === 'junction' && !hit) {
-    edit(() => { const id = uid('junction'); doc.junctions.push({ id, x: snapped(p[0]), y: snapped(p[1]) }); selection = { kind: 'junction', id }; mode = 'select'; }); return;
+    edit(() => { const id = uid('junction'); doc.junctions.push({ id, x: snapped(p[0]), y: snapped(p[1]) }); setSelection('junction', id); mode = 'select'; }); return;
   }
   if (mode === 'text' && !hit) {
-    edit(() => { const id = uid('label'); doc.labels.push({ id, text: '文字', x: snapped(p[0]), y: snapped(p[1]), size: 15, ha: 'center', color: '#111111', boxed: false }); selection = { kind: 'label', id }; mode = 'select'; }); return;
+    edit(() => { const id = uid('label'); doc.labels.push({ id, text: '文字', x: snapped(p[0]), y: snapped(p[1]), size: 15, ha: 'center', color: '#111111', boxed: false }); setSelection('label', id); mode = 'select'; }); return;
   }
-  if (!hit) { selection = null; renderInspector(); return startPan(event); }
+  if (!hit) { clearSelection(); renderInspector(); return startPan(event); }
   const kind = hit.dataset.kind, id = hit.dataset.id;
   if (kind === 'vertex' && event.altKey) {
     edit(() => doc.edges.find(e => e.id === id).vertices.splice(Number(hit.dataset.index), 1)); return;
   }
-  selection = { kind: kind === 'vertex' ? 'edge' : kind, id };
+  const selectedKind = kind === 'vertex' ? 'edge' : kind;
+  const additive = event.shiftKey && ['node', 'label', 'junction'].includes(selectedKind);
+  setSelection(selectedKind, id, additive);
+  if (additive) { render(); return; }
   const item = findSelected();
   if (kind === 'edge') {
     // Keep the clicked path alive so the browser can deliver a double click.
@@ -513,8 +539,12 @@ svg.addEventListener('pointerdown', event => {
   }
   if (['node', 'label', 'junction', 'vertex'].includes(kind)) {
     ++request;
-    drag = { kind, id, start: p, before: clone(doc), origin: kind === 'vertex' ? [...item.vertices[Number(hit.dataset.index)]] : [item.x, item.y],
-      index: Number(hit.dataset.index), pointerId: event.pointerId, moved: false };
+    if (multiSelection.length > 1 && multiSelection.some(ref => ref.kind === selectedKind && ref.id === id)) {
+      drag = { kind: 'multi', start: p, before: clone(doc), pointerId: event.pointerId, moved: false };
+    } else {
+      drag = { kind, id, start: p, before: clone(doc), origin: kind === 'vertex' ? [...item.vertices[Number(hit.dataset.index)]] : [item.x, item.y],
+        index: Number(hit.dataset.index), pointerId: event.pointerId, moved: false };
+    }
     svg.setPointerCapture(event.pointerId); event.preventDefault();
   }
   render();
@@ -535,6 +565,31 @@ svg.addEventListener('pointermove', event => {
   drag.moved = true;
   if (drag.kind === 'all') {
     doc = translateDocument(drag.before, ...delta.map(snapped));
+    renderCanvas(); return;
+  }
+  if (drag.kind === 'multi') {
+    doc = clone(drag.before);
+    const movedNodes = new Set(multiSelection.filter(ref => ref.kind === 'node').map(ref => ref.id));
+    const dx = snapped(delta[0]), dy = snapped(delta[1]);
+    for (const ref of multiSelection) {
+      if (ref.kind === 'node') {
+        const item = doc.nodes.find(node => node.id === ref.id);
+        item.x += dx; item.y += dy;
+      } else if (ref.kind === 'junction') {
+        const item = doc.junctions.find(junction => junction.id === ref.id);
+        item.x += dx; item.y += dy;
+      } else if (ref.kind === 'label') {
+        const item = doc.labels.find(label => label.id === ref.id);
+        if (item.nodeId && movedNodes.has(item.nodeId)) continue;
+        if (item.nodeId) {
+          const node = doc.nodes.find(candidate => candidate.id === item.nodeId);
+          const local = rotate(delta, -node.rotation);
+          item.x += snapped(local[0]); item.y += snapped(local[1]);
+        } else {
+          item.x += dx; item.y += dy;
+        }
+      }
+    }
     renderCanvas(); return;
   }
   const item = findSelected();
@@ -565,7 +620,7 @@ svg.addEventListener('dblclick', event => {
   const hit = event.target.closest('[data-kind="edge"]'); if (!hit) return;
   const edge = doc.edges.find(e => e.id === hit.dataset.id), points = edgePoints(edge), p = world(event);
   const index = nearestSegment(points, p);
-  edit(() => { const vertices = points.slice(1, -1); vertices.splice(index, 0, p.map(snapped)); edge.vertices = vertices; selection = { kind: 'edge', id: edge.id }; });
+  edit(() => { const vertices = points.slice(1, -1); vertices.splice(index, 0, p.map(snapped)); edge.vertices = vertices; setSelection('edge', edge.id); });
 });
 svg.addEventListener('wheel', event => { event.preventDefault(); if (doc) zoom(event.deltaY > 0 ? 1.1 : 1 / 1.1, world(event)); }, { passive: false });
 svg.addEventListener('dragover', event => event.preventDefault());
