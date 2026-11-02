@@ -21,7 +21,7 @@ from rrplot.scene import (
 from rrplot.scene_renderer import build_scene, export_scene, resolve_for_editor
 
 
-@pytest.mark.parametrize("name", ["evi_ftvi", "ftvi"])
+@pytest.mark.parametrize("name", ["evi_ftvi", "ftvi", "heat_pump", "evi_intermediate"])
 def test_template_roundtrip_and_orthogonal_edges(name):
     d = load_template(name)
     assert validate_scene(json.loads(json.dumps(d))) == d
@@ -187,7 +187,7 @@ def test_frontend_and_backend_routes_agree():
     assert json.loads(result.stdout) == [route(*case) for case in cases]
 
 
-@pytest.mark.parametrize("name", ["evi_ftvi", "ftvi"])
+@pytest.mark.parametrize("name", ["evi_ftvi", "ftvi", "heat_pump", "evi_intermediate"])
 @pytest.mark.parametrize("offset", [(30, -20), (23.5, -17.25), (0, 0)])
 def test_frontend_translate_preserves_entire_resolved_layout(name, offset):
     executable = shutil.which("node")
