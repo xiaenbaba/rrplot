@@ -51,16 +51,23 @@ def test_heat_exchanger_ports_on_body():
 
 
 def test_compressor_style_factory_ports():
-    """圆形:通用四口;方形:胶囊同套四口(宽 r、高 2r,与圆形等高)。"""
+    """圆形/方形共用几何口;制冷口是 top/bottom/right 的别名。"""
     round_ = parts.make_compressor(style="圆形")
     assert round_.port("top") == (0, -95)
     assert round_.port("bottom") == (0, 95)
     assert round_.port("left") == (-95, 0)
+    assert round_.port("suction") == round_.port("top")
+    assert round_.port("discharge") == round_.port("bottom")
+    assert round_.port("vapor_inj") == round_.port("right")
     cap = parts.make_compressor(style="方形")
     assert cap.port("top") == (0, -95)
     assert cap.port("bottom") == (0, 95)
     assert cap.port("left") == (-47.5, 0)
     assert cap.port("right") == (47.5, 0)
+    assert cap.port("vapor_inj") == cap.port("right")
+    assert parts.compressor.port("suction") == (0, -95)
+    assert parts.compressor.port("discharge") == (0, 95)
+    assert parts.compressor.port("top") == parts.compressor.port("suction")
     e = _raises(ValueError, parts.make_compressor, style="scroll")
     assert "style" in str(e) and "圆形" in str(e)
 
@@ -258,6 +265,32 @@ def test_four_way_round_ports():
     assert not d.ax.texts
 
 
+def test_add_does_not_override_factory_geometry():
+    """add() 只能改外观(mark/actuator),不能改工厂锁定的半径/宽度。"""
+    fw = parts.make_four_way_round(r=40)
+    d = Diagram(width=300, height=200)
+    d.add(fw, "", loc=(150, 100), r=60, mark=False)
+    d.render()
+    assert fw.port("exhaust") == (0, -40)
+    assert d.ax.patches[0].get_radius() == 40
+    plt.close(d.fig)
+
+    bare = Diagram(width=160, height=120)
+    bare.add(parts.bowtie_valve, "", loc=(80, 60), w=200, actuator="none")
+    bare.render()
+    assert parts.bowtie_valve.port("in") == (38, 0)
+    xs = bare.ax.patches[0].get_xy()[:, 0]
+    assert max(xs) - min(xs) == 76 / 2
+    plt.close(bare.fig)
+
+    d3 = Diagram(width=200, height=200)
+    d3.add(parts.compressor, "", loc=(100, 100), r=40, style="方形")
+    d3.render()
+    assert parts.compressor.port("suction") == (0, -95)
+    assert d3.ax.patches[0].get_radius() == 95
+    plt.close(d3.fig)
+
+
 def test_four_way_round_add_time_mark_override():
     """add() 时同名词覆盖工厂默认(mark=False 关闭口别字母)。"""
     d = Diagram(width=300, height=200)
@@ -413,6 +446,8 @@ def test_bowtie_valve_family():
     assert parts.bowtie_valve.direction("out") == (-1, 0)
     assert parts.bowtie_valve_dome.name == "膨胀阀(穹顶)"
     assert parts.bowtie_valve_solenoid.name == "电磁阀(对顶三角)"
+    e = _raises(ValueError, parts.make_bowtie_valve, actuator="gate")
+    assert "actuator" in str(e) and "none" in str(e)
 
 
 def test_bowtie_valve_actuator_override_render():
@@ -438,7 +473,7 @@ def test_bowtie_valve_actuator_override_render():
 
 
 def test_oil_separator_ports():
-    """油分离器(瘦长矩形壳):顶进气 / 上部侧口出气 / 底回油。"""
+    """油分离器(瘦长矩形壳):侧口进气 / 顶口出气 / 底回油。"""
     oil = parts.oil_separator
     assert oil.port("top") == (0, -104)      # 默认 w=64 h=176 stub=16
     assert oil.port("left") == (-48, -44)    # 侧管在壳顶下 h/4

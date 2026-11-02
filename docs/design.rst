@@ -222,9 +222,10 @@ PFD 惯例。:func:`rrplot.core._orthogonalize` 遍历相邻点,发现方向
 ----------------------------------------
 
 :meth:`rrplot.core.Diagram.render` 先画所有部件、再画所有管线,返回
-``fig``。部件的 ``**style`` 参数透传给绘制函数,所以
-``d.add(parts.compressor, "压缩机", loc=..., style="方形")`` 里
-``style`` 是绘制函数的参数名,不是 :class:`rrplot.core.Pipe` 的线型。
+``fig``。部件的 ``**style`` 只覆盖**不改变端口**的外观项(如四通阀
+``mark``、对顶三角阀 ``actuator``)。半径、宽高、机身 ``style`` 在工厂
+闭包里锁定,``d.add(parts.compressor, style="方形")`` 不会改成胶囊机身;
+应写 ``d.add(make_compressor(style="方形"), ...)``。
 
 :meth:`rrplot.core.Diagram.save` 默认 ``tight=True``,会用
 ``bbox_inches="tight"`` 裁掉四周空白 —— 也就是**输出尺寸会略小于**

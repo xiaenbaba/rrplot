@@ -298,6 +298,7 @@ def make_heat_exchanger(w=80, h=80, shape="rect_zigzag7", orient="h",
 
     :param orient: 之字盘管走向,"h" 左口→右口水平(默认),
         "v" 顶口→底口竖直(对角线与 X 旋转对称,不受影响)。
+
     端口落在四边中点。
     """
     if shape not in HEX_SHAPES:
@@ -346,41 +347,42 @@ def make_heat_exchanger(w=80, h=80, shape="rect_zigzag7", orient="h",
 # =========================
 # 部件实例(端口表)
 # =========================
-compressor = _part("压缩机", {"suction": (0, -95), "discharge": (0, 95),
-                              "vapor_inj": (95, 0)},
-                   _compressor_circle)
 capillary = _part("毛细管", {"in": (0, -40), "out": (0, 40)}, _capillary,
                   dirs={"in": "n", "out": "s"})
 
 
-# =========================
-# 按尺寸生成端口的部件工厂
-# =========================
 def make_compressor(r=95, style="圆形", name="压缩机"):
     """压缩机部件,style 见 COMPRESSOR_STYLES。
 
-    两种机身同一套通用四口(left/right/top/bottom;top 排气、bottom
-    回气,其余按图接线自定):圆形 = 圆体 + 双弦;方形 = 胶囊壳体,
-    宽 r、高 2r,与圆形等高。历史型式(离心/转子/轴流/往复/螺杆/涡旋)
-    已移除,原型见 references/compressor_symbols.py。
+    两种机身同一套端口:几何口 left/right/top/bottom,制冷口
+    suction=top、discharge=bottom、vapor_inj=right。机身画法:圆形 =
+    圆体 + 双弦;方形 = 胶囊壳体,宽 r、高 2r,与圆形等高。历史型式
+    (离心/转子/轴流/往复/螺杆/涡旋)已移除,原型见
+    references/compressor_symbols.py。
+
+    r / style 在工厂里锁定,``add(..., r=..., style=...)`` 不会改外形或端口;
+    改尺寸请重新调用本工厂。
     """
     if style not in COMPRESSOR_STYLES:
         raise ValueError(f"未知压缩机 style={style!r},可用:"
                          f"{', '.join(COMPRESSOR_STYLES)}")
-    if style == "圆形":
-        def draw(ax, x, y, label=None, **kw):
-            _compressor_circle(ax, x, y, r=r, label=label)
+    rx = r if style == "圆形" else r / 2
 
-        ports = {"left": (-r, 0), "right": (r, 0),
-                 "top": (0, -r), "bottom": (0, r)}
-    else:
-        def draw(ax, x, y, label=None, **kw):
+    def draw(ax, x, y, label=None, **kw):
+        if style == "圆形":
+            _compressor_circle(ax, x, y, r=r, label=label)
+        else:
             _compressor_capsule(ax, x, y, r=r, label=label)
 
-        ports = {"left": (-r / 2, 0), "right": (r / 2, 0),
-                 "top": (0, -r), "bottom": (0, r)}
-    dirs = {"top": "n", "bottom": "s"}
+    ports = {"left": (-rx, 0), "right": (rx, 0),
+             "top": (0, -r), "bottom": (0, r),
+             "suction": (0, -r), "discharge": (0, r),
+             "vapor_inj": (rx, 0)}
+    dirs = {"top": "n", "bottom": "s", "suction": "n", "discharge": "s"}
     return Part(name, draw, ports, dirs)
+
+
+compressor = make_compressor()
 
 
 def make_vessel(w=66, h=150, liquid=0.42, name="闪发罐"):
@@ -409,11 +411,11 @@ def make_four_way_round(r=40, mark=True, name="四通阀(圆菱形)"):
 
     端口落在菱形四角:exhaust 顶(D)/ condenser 右(C)/
     evaporator 底(E)/ suction 左(S);mark=True 在四端点外侧
-    标注 D/S/C/E 口别字母。mark 等 add() 时同名词可覆盖。
+    标注 D/S/C/E 口别字母。r 在工厂锁定;mark 可在 add() 时用同名词覆盖。
     """
-    def draw(ax, x, y, label=None, **kw):
-        _four_way_round_valve(ax, x, y, label=label,
-                              **{"r": r, "mark": mark, **kw})
+    def draw(ax, x, y, label=None, mark=mark, **kw):
+        # r 锁定在工厂;mark 等外观项可在 add() 时用同名词覆盖
+        _four_way_round_valve(ax, x, y, label=label, r=r, mark=mark)
 
     return Part(name, draw,
                 {"exhaust": (0, -r), "condenser": (r, 0),
@@ -426,7 +428,7 @@ four_way_round = make_four_way_round()
 
 
 def make_globe_valve(w=64, h=48, stem=26, handle=44, name="截止阀"):
-    """截止阀部件:左右对顶三角沙漏 + 贯穿阀杆 + 手轮横杆。端口 in/out。
+    """截止阀部件:左右对顶三角沙漏 + 阀杆(止于中点,不贯穿阀体) + 手轮横杆。
 
     端口落在左右接管外端,沿水平方向(in=w, out=e)。
     """
@@ -543,7 +545,10 @@ def make_filter(w=72, h=36, n=7, stub=12, name="过滤器"):
                 {"in": "w", "out": "e"})
 
 
-filter = make_filter()
+line_filter = make_filter()
+filter = line_filter  # 兼容名,会覆盖内置 filter;新代码优先用 line_filter
+
+BOWTIE_ACTUATORS = ("none", "dome", "solenoid", "tee")
 
 
 def _bowtie_valve(ax, x, y, label=None, w=76, h=44, actuator="none",
@@ -555,6 +560,9 @@ def _bowtie_valve(ax, x, y, label=None, w=76, h=44, actuator="none",
               "solenoid" 电磁线圈(横杆 + Σ 折线)
               "tee"      T 形阀杆 + 手轮横杆(截止阀画法,不贯穿阀体)
     """
+    if actuator not in BOWTIE_ACTUATORS:
+        raise ValueError(f"未知 actuator={actuator!r},可用:"
+                         f"{', '.join(BOWTIE_ACTUATORS)}")
     for s in (-1, 1):
         ax.add_patch(Polygon(
             [(x + s * w / 2, y - h / 2), (x + s * w / 2, y + h / 2),
@@ -586,15 +594,20 @@ def make_bowtie_valve(w=76, h=44, actuator="none", stem=14, dome_r=21,
                       sol_len=62, handle=30, name="对顶三角阀"):
     """对顶三角阀部件(论文/参考图风格),actuator 见 _bowtie_valve。
 
-    端口按库内两端口件惯例 in=东口 / out=西口(图内流向东->西);
-    actuator/stem 等也可在 add() 时以同名词覆盖,如
+    端口与 globe/solenoid/filter 等两口阀相反:in=东口 / out=西口
+    (图内流向东→西)。w/h 在工厂锁定;actuator/stem 等外观项可在
+    add() 时以同名词覆盖,如
     d.add(parts.bowtie_valve, "电磁阀", loc=..., actuator="solenoid")。
     """
-    def draw(ax, x, y, label=None, **kw):
-        _bowtie_valve(ax, x, y, label=label,
-                      **{"w": w, "h": h, "actuator": actuator,
-                         "stem": stem, "dome_r": dome_r,
-                         "sol_len": sol_len, "handle": handle, **kw})
+    if actuator not in BOWTIE_ACTUATORS:
+        raise ValueError(f"未知 actuator={actuator!r},可用:"
+                         f"{', '.join(BOWTIE_ACTUATORS)}")
+
+    def draw(ax, x, y, label=None, actuator=actuator, stem=stem,
+             dome_r=dome_r, sol_len=sol_len, handle=handle, **kw):
+        _bowtie_valve(ax, x, y, label=label, w=w, h=h, actuator=actuator,
+                      stem=stem, dome_r=dome_r, sol_len=sol_len,
+                      handle=handle)
 
     return Part(name, draw, {"in": (w / 2, 0), "out": (-w / 2, 0)},
                 {"in": "e", "out": "w"})

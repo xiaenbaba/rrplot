@@ -26,6 +26,7 @@ for i, (part, name) in enumerate(valves):
     d.add(part, None, loc=(x, y))
     d.text(x, y + 90, name, size=14, ha="center")
 
-out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "valves_refrigeration.png")
+out = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                   "valves_refrigeration.png")
 d.save(out)
 print("已生成:", out)

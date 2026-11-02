@@ -163,9 +163,10 @@ Linux 装 ``fonts-noto-cjk``。详见 README 的"字体"一节。
      - 端口
      - 说明
    * - ``compressor``(工厂 ``make_compressor``)
-     - ``left`` ``right`` ``top`` ``bottom``
-     - 两种机身同一套四口: ``圆形`` (圆体双弦)/ ``方形`` (胶囊壳体,
-       宽 r、高 2r,与圆形等高)
+     - ``left`` ``right`` ``top`` ``bottom``;
+       ``suction = top`` / ``discharge = bottom`` / ``vapor_inj = right``
+     - 两种机身同一套口: ``圆形`` (圆体双弦)/ ``方形`` (胶囊壳体,
+       宽 r、高 2r,与圆形等高)。改半径/机身请走工厂,不要在 ``add()`` 里改
    * - ``make_heat_exchanger(w, h, shape=...)``
      - ``left`` ``right`` ``top`` ``bottom``
      - 换热器/蒸发器/冷凝器通用:3 种换热面(``HEX_SHAPES``),标签自定
@@ -199,9 +200,9 @@ Linux 装 ``fonts-noto-cjk``。详见 README 的"字体"一节。
    * - ``check_valve`` / ``check_valve_w``
      - ``in`` ``out``
      - 单向阀:实心三角 + 尖端挡条,``_w`` 为反向实例
-   * - ``filter``
+   * - ``line_filter`` (兼容名 ``filter``)
      - ``in`` ``out``
-     - 过滤器:矩形 + 菱形网格
+     - 过滤器:矩形 + 菱形网格。``filter`` 会覆盖 Python 内置名
    * - ``vessel``
      - ``top`` ``bottom`` ``left`` ``right`` ``vapor``
      - 闪发罐:胶囊形上下封头 + 液位线

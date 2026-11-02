@@ -49,12 +49,14 @@ ruff check rrplot tests examples
 
 ```python
 from rrplot import Diagram, parts
+from rrplot.parts import make_heat_exchanger
 
 d = Diagram(width=1491, height=1055)
 comp = d.add(parts.compressor, "压缩机", loc=(330, 140))
-evap = d.add(parts.evaporator, "蒸发器", loc=(100, 105))
+cond = d.add(make_heat_exchanger(180, 90, shape="rect_zigzag7"),
+             "冷凝器", loc=(945, 140))
 
-d.pipe(evap["out"], comp["suction"], via=[("e", 200), ("n", 105)],
+d.pipe(cond["bottom"], comp["suction"], via=[("e", 200), ("n", 105)],
        states=[("1", 0.5)])
 d.save("out.png")     # 也支持 .pdf / .svg 矢量输出
 ```
@@ -101,7 +103,8 @@ top/bottom/left/right/vapor)、`globe_valve`(截止阀,左右对顶沙漏 + 阀�
 (对顶三角阀:裸阀/穹顶膨胀阀/Σ 电磁阀/T 形截止阀,`actuator` 切换,端口 in/out)、
 `check_valve`(单向阀,实心
 三角指向流通方向 + 尖端挡条,`check_valve_w` 为反向实例,端口 in/out)、
-`filter`(过滤器,矩形 + 菱形网格,端口 in/out)等。蒸发器/冷凝器等
+`line_filter`/`filter`(过滤器,矩形 + 菱形网格,端口 in/out;`filter`
+会覆盖 Python 内置名,新代码优先 `line_filter`)等。蒸发器/冷凝器等
 换热器不分专用图元,用 `make_heat_exchanger(w, h, shape=...)` 生成,
 端口 left/right/top/bottom,label 自定("蒸发器"/"冷凝器")。
 
@@ -213,7 +216,7 @@ docs/          Sphinx 文档:tutorial(上手)/ design(原理)/ api(自动提取)
 本地构建(0 警告):
 
 ```powershell
-pip install sphinx
+pip install -e ".[docs]"
 python -m sphinx -b html docs docs/_build/html
 ```
 

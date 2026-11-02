@@ -4,8 +4,8 @@
 每张 SVG 按部件实际外形紧裁(bbox_inches="tight"),可直接单张拷进论文/PPT。
 覆盖三类:
   1) parts 模块内所有 Part 实例(压缩机默认型除外,它由下变体组代表);
-  2) make_compressor 的 7 种型式变体;
-  3) make_heat_exchanger 的 7 种换热面变体。
+  2) make_compressor 的全部机身变体;
+  3) make_heat_exchanger 的全部换热面变体。
 
 用法:
     python export_parts_svg.py
