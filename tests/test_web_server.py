@@ -56,13 +56,15 @@ def test_static_and_catalog_interfaces(service):
     assert request(service, "/app.js")[1]["Content-Type"].startswith("text/javascript")
     assert json.loads(request(service, "/api/health")[2])["ok"] is True
     assert len(json.loads(request(service, "/api/catalog")[2])) == 5
-    assert len(json.loads(request(service, "/api/templates")[2])) == 4
+    assert len(json.loads(request(service, "/api/templates")[2])) == 5
     for path in ("/../pyproject.toml", "/missing", "/api/missing"):
         assert request(service, path)[0] == 404
     assert request(service, "/api/templates/missing")[0] == 400
 
 
-@pytest.mark.parametrize("name", ["evi_ftvi", "ftvi", "heat_pump", "evi_intermediate"])
+@pytest.mark.parametrize("name", [
+    "evi_ftvi", "ftvi", "heat_pump", "heat_pump_receiver", "evi_intermediate"
+])
 def test_template_edit_reopen_preview_and_exports(service, name):
     document = json.loads(request(service, "/api/templates/" + name)[2])
     node = next(item for item in document["nodes"] if item["id"] in {"eev1", "eev"})

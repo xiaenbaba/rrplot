@@ -14,6 +14,7 @@ TEMPLATES = {
     "evi_ftvi": "EVI 过冷器喷气增焓",
     "ftvi": "FTVI 闪蒸罐喷气增焓",
     "heat_pump": "普通热泵循环",
+    "heat_pump_receiver": "带储液器的普通热泵",
     "evi_intermediate": "EVI 中间换热器喷气增焓",
 }
 

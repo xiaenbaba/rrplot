@@ -32,7 +32,7 @@ X6、React Flow、LogicFlow、draw.io 只参考源码、文档和交互方法，
 
 ## 3. 首版范围
 
-- 普通热泵、EVI（FTVI 版式）、FTVI 和 EVI 中间换热器四个模板、新建空白图纸。
+- 普通热泵、带储液器的普通热泵、EVI（FTVI 版式）、FTVI 和 EVI 中间换热器五个模板、新建空白图纸。
 - 压缩机、换热器、中间换热器、闪蒸罐、膨胀阀、三通。
 - 放置、拖动、尺寸/画法/方向/90 度旋转属性。
 - 端口连线和跟随、手动折点、网格吸附、端口水平/垂直对齐。
@@ -128,7 +128,7 @@ Matplotlib 使用 Agg，通过共享锁串行处理绘图并及时关闭 figure�
 
 - [x] 只参考开源实现方法，不引入图编辑器依赖。
 - [x] 更新并保存方案。
-- [x] 图纸模型、注册表、四个制冷系统模板。
+- [x] 图纸模型、注册表、五个制冷系统模板。
 - [x] 标准库服务、正式预览与导出。
 - [x] 原生 SVG 编辑交互。
 - [x] 自动检查、打包与使用说明。
@@ -141,14 +141,14 @@ Matplotlib 使用 Agg，通过共享锁串行处理绘图并及时关闭 figure�
 
 | 检查 | 结果 |
 | --- | --- |
-| pytest（含既有库回归、模型、HTTP 接口、整体移动、三通拆分锚定） | 148 项通过 |
+| pytest（含既有库回归、模型、HTTP 接口、整体移动、三通拆分锚定、新模板） | 153 项通过 |
 | rrplot 覆盖率 | 96.93%，高于 CI 的 90% 门槛 |
 | Python / JavaScript 路由一致性 | 100 组随机案例一致；Node 仅用于可选开发校验 |
 | Ruff | rrplot、tests、examples、server 全部通过 |
 | JavaScript 语法 | app.js、geometry.js 通过 `node --check` |
 | Sphinx | `-W --keep-going` 严格构建通过 |
 | sdist / wheel | `python -m build --no-isolation` 成功 |
-| wheel 资源 | 四个 JSON 模板齐全；直接从 wheel 读取模板并生成 SVG 成功 |
+| wheel 资源 | 五个 JSON 模板齐全；直接从 wheel 读取模板并生成 SVG 成功 |
 | sdist 资源 | 包含 server、Web 静态文件、操作说明和本方案 |
 | 服务启动 | 从仓库外的工作目录用绝对路径启动成功，监听 127.0.0.1:8765 |
 
