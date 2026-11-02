@@ -196,6 +196,26 @@ def test_frontend_and_backend_routes_agree():
     assert json.loads(result.stdout) == [route(*case) for case in cases]
 
 
+def test_frontend_split_route_anchors_both_edges_at_junction():
+    """插入三通时，前后两段都必须显式保留同一个连接点。"""
+    executable = shutil.which("node")
+    if not executable:
+        pytest.skip("Node not installed; optional JavaScript geometry check")
+    raw = Path(__file__).resolve().parents[1].joinpath("web/geometry.js").read_bytes()
+    module = "data:text/javascript;base64," + base64.b64encode(raw).decode()
+    script = ("import fs from 'node:fs'; const {splitRoute}=await import("
+              + json.dumps(module)
+              + "); const points=JSON.parse(fs.readFileSync(0,'utf8'));"
+              "console.log(JSON.stringify(splitRoute(points)));" )
+    points = [[0, 0], [100, 0], [100, 100], [200, 100]]
+    result = subprocess.run([executable, "--input-type=module", "-e", script],
+                            input=json.dumps(points), text=True,
+                            capture_output=True, check=True)
+    split = json.loads(result.stdout)
+    assert split["prefix"][-1] == split["point"]
+    assert split["suffix"][0] == split["point"]
+
+
 @pytest.mark.parametrize("name", ["evi_ftvi", "ftvi", "heat_pump", "evi_intermediate"])
 @pytest.mark.parametrize("offset", [(30, -20), (23.5, -17.25), (0, 0)])
 def test_frontend_translate_preserves_entire_resolved_layout(name, offset):

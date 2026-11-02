@@ -1,4 +1,4 @@
-import { rotate, endpoint, route, along, nearestSegment, translateDocument } from './geometry.js';
+import { rotate, endpoint, route, along, nearestSegment, splitRoute, translateDocument } from './geometry.js';
 
 const $ = id => document.getElementById(id);
 const svg = $('diagram');
@@ -466,12 +466,16 @@ function alignPorts(axis) {
 }
 
 function splitEdge(edge) {
-  const points = edgePoints(edge), p = along(points, .5).point;
-  const i = nearestSegment(points, p), id = uid('junction');
+  const points = edgePoints(edge), split = splitRoute(points), { point: p, prefix, suffix } = split;
+  const id = uid('junction');
   edit(() => {
     doc.junctions.push({ id, x: p[0], y: p[1] });
-    const other = { ...clone(edge), id: uid('edge'), source: { junctionId: id }, vertices: points.slice(i + 1, -1) };
-    edge.target = { junctionId: id }; edge.vertices = points.slice(1, i + 1);
+    // Keep the split point in both routes explicitly.  The junction endpoint
+    // has no direction, so relying on route() to reconstruct the last/first
+    // segment can otherwise leave a visible gap or make the branch start away
+    // from the junction when the original edge contains corners.
+    const other = { ...clone(edge), id: uid('edge'), source: { junctionId: id }, vertices: suffix };
+    edge.target = { junctionId: id }; edge.vertices = prefix;
     doc.edges.push(other); setSelection('junction', id);
   });
 }

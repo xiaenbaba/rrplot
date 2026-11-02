@@ -86,3 +86,18 @@ export function nearestSegment(points, point) {
   });
   return best.index;
 }
+
+// Split a routed polyline while retaining the exact split point in both
+// halves.  This is used when inserting a junction into an existing edge;
+// explicit endpoints keep the two rendered edges anchored to the junction
+// even when the original route contains corners or port lead-ins.
+export function splitRoute(points, fraction = .5) {
+  const { point } = along(points, fraction);
+  const index = nearestSegment(points, point);
+  return {
+    point,
+    index,
+    prefix: [...points.slice(1, index + 1), point],
+    suffix: [point, ...points.slice(index + 1, -1)],
+  };
+}
