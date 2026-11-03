@@ -32,6 +32,9 @@ def edit_document(document, selection, operation="copy", **options):
               "input.collision || 'copy-'+kind+'-'+(++index),input.offset) : "
               "input.operation==='move' ? "
               "edits.translateSelection(input.document,input.selection,input.offset) : "
+              "input.operation==='nudge' ? "
+              "edits.nudgeSelection(input.document,input.selection,"
+              "input.direction,input.accelerated) : "
               "input.operation==='reconnect' ? "
               "edits.reconnectEdge(input.document,input.edgeId,input.side,input.ref) : "
               "edits.deleteSelection(input.document,input.selection);"
@@ -336,3 +339,97 @@ def test_reconnect_same_endpoint_is_noop_and_opposite_endpoint_is_rejected():
     assert json.dumps(unchanged) == json.dumps(document)
     assert "error" in edit_document(document, [], "reconnect", edgeId=edge["id"],
                                     side="source", ref=edge["target"])
+
+
+@pytest.mark.parametrize("direction,offset", [
+    ("ArrowLeft", [-1, 0]), ("ArrowRight", [1, 0]),
+    ("ArrowUp", [0, -1]), ("ArrowDown", [0, 1]),
+])
+@pytest.mark.parametrize("accelerated", [False, True])
+def test_nudge_moves_device_and_its_selected_label_once(direction, offset, accelerated):
+    document = load_template("evi_ftvi")
+    selection = [dict(kind="node", id="comp"), dict(kind="label", id="label-comp")]
+    moved = edit_document(document, selection, "nudge", direction=direction,
+                          accelerated=accelerated)["result"]
+    before, after = resolve_scene(document), resolve_scene(moved)
+    delta = [v * (10 if accelerated else 1) for v in offset]
+    for old, new in zip(before["labels"], after["labels"]):
+        expected = [v + d for v, d in zip(old["position"], delta)]
+        assert new["position"] == (expected if old["id"] == "label-comp"
+                                   else old["position"])
+    old = next(n for n in document["nodes"] if n["id"] == "comp")
+    new = next(n for n in moved["nodes"] if n["id"] == "comp")
+    assert [new["x"], new["y"]] == [old["x"] + delta[0], old["y"] + delta[1]]
+    assert moved["edges"] == document["edges"]
+
+
+@pytest.mark.parametrize("name", list(TEMPLATES))
+@pytest.mark.parametrize("accelerated", [False, True])
+def test_nudged_group_keeps_internal_routes_and_state_labels(name, accelerated):
+    document = load_template(name)
+    document["nodes"][0]["x"] += .25
+    document["edges"][0]["vertices"] = [[120.5, 90.25], [150.5, 90.25]]
+    document["labels"].append(dict(id="follow", edgeId=document["edges"][0]["id"],
+                                    at=.37, text="T1", x=7, y=-13))
+    document = validate_scene(document)
+    selection = [dict(kind=kind, id=item["id"])
+                 for kind, collection in (("node", "nodes"),
+                                          ("junction", "junctions"),
+                                          ("label", "labels"))
+                 for item in document[collection]]
+    moved = edit_document(document, selection, "nudge", direction="ArrowUp",
+                          accelerated=accelerated)["result"]
+    before = resolve_scene(document)
+    after = resolve_scene(json.loads(json.dumps(moved)))
+    dy = -10 if accelerated else -1
+    for old, new in zip(before["labels"], after["labels"]):
+        assert new["position"] == pytest.approx([old["position"][0],
+                                                  old["position"][1] + dy])
+    for old, new in zip(before["edges"], after["edges"]):
+        assert new["points"] == [[x, y + dy] for x, y in old["points"]]
+        assert new["source"] == old["source"] and new["target"] == old["target"]
+    assert moved["page"] == document["page"]
+
+
+@pytest.mark.parametrize("rotation", [0, 90, 180, 270])
+def test_nudge_rotated_attached_label_follows_page_direction(rotation):
+    document = load_template("evi_ftvi")
+    next(n for n in document["nodes"] if n["id"] == "comp")["rotation"] = rotation
+    moved = edit_document(document, [dict(kind="label", id="label-comp")],
+                          "nudge", direction="ArrowRight")["result"]
+    before = next(label for label in resolve_scene(document)["labels"]
+                  if label["id"] == "label-comp")
+    after = next(label for label in resolve_scene(moved)["labels"]
+                 if label["id"] == "label-comp")
+    assert after["position"] == [before["position"][0] + 1, before["position"][1]]
+    assert moved["nodes"] == document["nodes"]
+    assert moved["edges"] == document["edges"]
+
+
+def test_nudge_state_label_only_changes_offset_and_ignores_selected_pipe():
+    document = load_template("evi_ftvi")
+    document["labels"].append(dict(id="state", edgeId="injection", at=.4,
+                                    text="s", x=3, y=-13))
+    document = validate_scene(document)
+    refs = [dict(kind="label", id="state"), dict(kind="edge", id="injection")]
+    moved = edit_document(document, refs, "nudge", direction="ArrowDown",
+                          accelerated=True)["result"]
+    assert moved["labels"][-1] == dict(document["labels"][-1], y=-3)
+    assert moved["nodes"] == document["nodes"]
+    assert moved["edges"] == document["edges"]
+
+
+@pytest.mark.parametrize("x,direction", [(99999.5, "ArrowRight"),
+                                        (-99999.5, "ArrowLeft")])
+def test_nudge_out_of_range_is_atomic_for_group(x, direction):
+    document = load_template("evi_ftvi")
+    next(n for n in document["nodes"] if n["id"] == "comp")["x"] = x
+    refs = [dict(kind="node", id="comp"), dict(kind="node", id="subcooler")]
+    assert "error" in edit_document(document, refs, "nudge", direction=direction)
+
+
+def test_nudge_cannot_move_a_whole_pipe_away_from_its_ports():
+    document = load_template("evi_ftvi")
+    refs = [dict(kind="edge", id="injection"), dict(kind="node", id="missing")]
+    result = edit_document(document, refs, "nudge", direction="ArrowLeft")["result"]
+    assert result == document

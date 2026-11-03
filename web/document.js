@@ -86,6 +86,22 @@ export function translateSelection(document, selection, offset) {
   return result;
 }
 
+export function nudgeSelection(document, selection, direction, accelerated = false) {
+  const directions = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+  const delta = directions[direction];
+  if (!delta) throw new Error('请选择有效的微调方向。');
+  const refs = selection.filter(ref => ['node', 'junction', 'label'].includes(ref.kind));
+  const result = translateSelection(document, refs, delta.map(v => v * (accelerated ? 10 : 1)));
+  for (const name of ['nodes', 'junctions', 'labels', 'edges']) {
+    for (const item of result[name]) {
+      const values = name === 'edges' ? item.vertices.flat() : [item.x, item.y];
+      if (values.some(v => !Number.isFinite(v) || Math.abs(v) > 100000))
+        throw new Error('微调后坐标超出允许范围，请先调整位置。');
+    }
+  }
+  return result;
+}
+
 export function deleteSelection(document, selection, routes = new Map()) {
   const selected = new Set(selectedRefs(document, selection).map(key));
   const result = structuredClone(document);

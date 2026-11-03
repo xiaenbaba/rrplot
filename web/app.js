@@ -1,5 +1,5 @@
 import { rotate, endpoint, route, along, nearestSegment, splitRoute, translateDocument, editableSegments, moveSegment, transformedBox, selectInBox, projectOnRoute } from './geometry.js';
-import { copySelection, deleteSelection, translateSelection, reverseEdge, splitEdgeLabels, reconnectEdge } from './document.js';
+import { copySelection, deleteSelection, translateSelection, reverseEdge, splitEdgeLabels, reconnectEdge, nudgeSelection } from './document.js';
 import { inspectDiagram } from './checks.js';
 
 const $ = id => document.getElementById(id);
@@ -14,6 +14,7 @@ let previewTarget = null;
 let reconnect = null;
 let edgeLabelsSupported = false;
 let undo = [], redo = [], drag = null, dirty = false, spaceDown = false;
+let nudge = null;
 let revision = 0, request = 0, previewUrl = null, messageTimer = null;
 let view = { x: -40, y: -30, w: 840, h: 640 };
 
@@ -165,10 +166,12 @@ async function refresh() {
   }
 }
 
-function finishEdit(before) {
+function finishEdit(before, { merge = false, deferRefresh = false } = {}) {
   if (JSON.stringify(before) === JSON.stringify(doc)) return render();
-  undo.push(before); if (undo.length > 80) undo.shift(); redo = [];
-  dirty = true; revision++; saveDraft(); render(); void refresh();
+  if (!merge || !undo.length) { undo.push(before); if (undo.length > 80) undo.shift(); }
+  redo = [];
+  dirty = true; revision++; saveDraft(); render();
+  if (!deferRefresh) void refresh();
 }
 function edit(fn) {
   if (!doc) return;
@@ -373,6 +376,7 @@ function inspectorButton(parent, caption, action) {
   const b = html('button', caption); b.addEventListener('click', action); parent.append(b); return b;
 }
 function renderInspector() {
+  renderHint();
   const root = $('inspector'); root.replaceChildren();
   if (mode === 'reconnect' && reconnect) {
     $('selection-kind').textContent = 'RECONNECT';
@@ -535,17 +539,20 @@ function batchLayout(action) {
   finishEdit(before);
 }
 
+function renderHint() {
+  document.querySelector('.canvas-hint').textContent = mode === 'move-all'
+    ? '拖动任意位置整体移动全部内容 · Ctrl+Z 撤销 · Esc 退出'
+    : mode === 'box-select' ? '拖出矩形完整框住对象 · Shift 追加选择 · Esc 取消'
+    : mode === 'reconnect' ? '点击设备端口或三通完成重接 · 空格拖动平移 · Esc 取消'
+    : mode === 'select' && !placement && multiSelection.some(ref => ['node', 'junction', 'label'].includes(ref.kind)) ? '方向键微调 1 单位 · Shift+方向键 10 单位 · Ctrl+Z 撤销'
+    : '滚轮缩放 · 空白拖动平移 · Shift+空白拖动框选 · 双击管线加折点';
+}
 function render() {
   if (!doc) return;
   $('title').value = doc.title;
   $('save-state').textContent = dirty ? '已修改 · 本机草稿' : 'JSON 图纸 · 本机编辑';
   $('undo').disabled = !undo.length; $('redo').disabled = !redo.length;
   $('counts').textContent = `${doc.nodes.length} 个设备 · ${doc.edges.length} 条管路`;
-  document.querySelector('.canvas-hint').textContent = mode === 'move-all'
-    ? '拖动任意位置整体移动全部内容 · Ctrl+Z 撤销 · Esc 退出'
-    : mode === 'box-select' ? '拖出矩形完整框住对象 · Shift 追加选择 · Esc 取消'
-    : mode === 'reconnect' ? '点击设备端口或三通完成重接 · 空格拖动平移 · Esc 取消'
-    : '滚轮缩放 · 空白拖动平移 · Shift+空白拖动框选 · 双击管线加折点';
   document.querySelectorAll('[data-tool]').forEach(b => {
     const active = b.dataset.tool === mode && !placement;
     b.classList.toggle('active', active); b.setAttribute('aria-pressed', active);
@@ -786,6 +793,7 @@ function setTool(tool) {
 
 svg.addEventListener('pointerdown', event => {
   if (!doc || event.button > 1) return;
+  svg.focus({ preventScroll: true });
   const p = world(event), hit = event.target.closest('[data-kind]');
   if (event.button === 1 || spaceDown) return startPan(event);
   if (mode === 'reconnect') {
@@ -964,9 +972,35 @@ $('file-input').addEventListener('change', async event => {
   } catch (error) { message('无法打开图纸：' + error.message); }
   event.target.value = '';
 });
+function endNudge() {
+  if (!nudge) return;
+  nudge = null;
+  if (doc) void refresh();
+}
+function nudgeSelected(event) {
+  if (!doc || mode !== 'select' || placement || reconnect || pendingPort || drag || spaceDown
+    || !multiSelection.some(ref => ['node', 'junction', 'label'].includes(ref.kind))) return;
+  const refs = JSON.stringify(multiSelection);
+  try {
+    const next = nudgeSelection(doc, multiSelection, event.key, event.shiftKey);
+    const merge = !!event.repeat && nudge?.key === event.key && nudge.refs === refs && nudge.version === revision;
+    const before = doc; doc = next;
+    ++request;
+    finishEdit(before, { merge, deferRefresh: true });
+    nudge = { key: event.key, refs, version: revision };
+    status(`已微调 ${event.shiftKey ? 10 : 1} 单位 · 松开方向键结束 · Ctrl+Z 撤销`);
+  } catch (error) { endNudge(); message(error.message); }
+}
+document.addEventListener('pointerdown', endNudge, true);
+document.addEventListener('focusin', endNudge);
 window.addEventListener('beforeunload', event => { if (dirty) { event.preventDefault(); event.returnValue = ''; } });
 window.addEventListener('keydown', async event => {
-  if (event.target.matches('input,textarea,select') || document.querySelector('dialog[open]')) return;
+  if (event.target.matches('input,textarea,select') || event.target.isContentEditable || event.isComposing || document.querySelector('dialog[open]')) return;
+  if (event.key.startsWith('Arrow') && !event.ctrlKey && !event.metaKey && !event.altKey
+    && (event.target === document.body || event.target === svg || svg.contains(event.target))) {
+    event.preventDefault(); nudgeSelected(event); return;
+  }
+  if (!['Shift', 'Alt', 'Control', 'Meta'].includes(event.key)) endNudge();
   if (event.key === 'Escape' && reconnect) { event.preventDefault(); cancelReconnect(); return; }
   const modifier = event.ctrlKey || event.metaKey;
   if (event.code === 'Space') { spaceDown = true; event.preventDefault(); }
@@ -979,8 +1013,11 @@ window.addEventListener('keydown', async event => {
   if (modifier && event.key.toLowerCase() === 'd') { event.preventDefault(); copySelected(); }
   if (modifier && event.key.toLowerCase() === 's') { event.preventDefault(); try { await actions.save(); } catch (error) { message(error.message); } }
 });
-window.addEventListener('keyup', event => { if (event.code === 'Space') spaceDown = false; });
-window.addEventListener('blur', () => { spaceDown = false; });
+window.addEventListener('keyup', event => {
+  if (event.key === nudge?.key) endNudge();
+  if (event.code === 'Space') spaceDown = false;
+});
+window.addEventListener('blur', () => { spaceDown = false; endNudge(); });
 new ResizeObserver(() => { if (doc) updateView(); }).observe(svg);
 
 async function init() {
