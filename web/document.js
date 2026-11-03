@@ -33,18 +33,6 @@ export function copySelection(document, selection, newId, offset = [20, 20]) {
       result[collections[kind]].push(copy);
     }
   }
-  for (const label of document.labels) {
-    const parent = ids.get(key({ kind: 'node', id: label.nodeId }));
-    if (!parent && !selected.has(key({ kind: 'label', id: label.id }))) continue;
-    const copy = structuredClone(label); copy.id = allocate('label', label.id);
-    if (parent) copy.nodeId = parent;
-    else if (label.nodeId) {
-      // A label copied alone stays attached, with the same offset on the page.
-      const delta = localOffset(offset, document.nodes.find(n => n.id === label.nodeId).rotation);
-      copy.x += delta[0]; copy.y += delta[1];
-    } else shift(copy);
-    result.labels.push(copy);
-  }
   const remap = ref => ref.nodeId
     ? ids.has(key({ kind: 'node', id: ref.nodeId })) && { ...ref, nodeId: ids.get(key({ kind: 'node', id: ref.nodeId })) }
     : ids.has(key({ kind: 'junction', id: ref.junctionId })) && { junctionId: ids.get(key({ kind: 'junction', id: ref.junctionId })) };
@@ -53,6 +41,19 @@ export function copySelection(document, selection, newId, offset = [20, 20]) {
     if (!source || !target) continue;
     result.edges.push({ ...structuredClone(edge), id: allocate('edge', edge.id), source, target,
       vertices: edge.vertices.map(p => p.map((v, i) => v + offset[i])) });
+  }
+  for (const label of document.labels) {
+    const parent = ids.get(key({ kind: 'node', id: label.nodeId }));
+    const pipe = ids.get(key({ kind: 'edge', id: label.edgeId }));
+    if (!parent && !pipe && !selected.has(key({ kind: 'label', id: label.id }))) continue;
+    const copy = structuredClone(label); copy.id = allocate('label', label.id);
+    if (parent) copy.nodeId = parent;
+    else if (pipe) copy.edgeId = pipe;
+    else if (label.nodeId) {
+      const delta = localOffset(offset, document.nodes.find(n => n.id === label.nodeId).rotation);
+      copy.x += delta[0]; copy.y += delta[1];
+    } else shift(copy);
+    result.labels.push(copy);
   }
   for (const name of Object.values(collections)) {
     if (result[name].length > 2000) throw new Error('复制后对象数量超过上限（每类最多 2000 项）。');
@@ -68,25 +69,27 @@ export function translateSelection(document, selection, offset) {
   const selected = new Set(selectedRefs(document, selection).map(key));
   const moving = (kind, id) => selected.has(key({ kind, id }));
   const result = structuredClone(document);
+  const movedEndpoint = ref => ref.nodeId ? moving('node', ref.nodeId) : moving('junction', ref.junctionId);
+  const movedEdges = new Set(document.edges.filter(e => [e.source, e.target].every(movedEndpoint)).map(e => e.id));
   for (const kind of ['node', 'junction']) {
     for (const item of result[collections[kind]]) if (moving(kind, item.id)) {
       item.x += offset[0]; item.y += offset[1];
     }
   }
   for (const label of result.labels) {
-    if (!moving('label', label.id) || moving('node', label.nodeId)) continue;
+    if (!moving('label', label.id) || moving('node', label.nodeId) || movedEdges.has(label.edgeId)) continue;
     const delta = label.nodeId ? localOffset(offset, document.nodes.find(n => n.id === label.nodeId).rotation) : offset;
     label.x += delta[0]; label.y += delta[1];
   }
-  const movedEndpoint = ref => ref.nodeId ? moving('node', ref.nodeId) : moving('junction', ref.junctionId);
   for (const edge of result.edges) if ([edge.source, edge.target].every(movedEndpoint))
     edge.vertices = edge.vertices.map(p => p.map((v, i) => v + offset[i]));
   return result;
 }
 
-export function deleteSelection(document, selection) {
+export function deleteSelection(document, selection, routes = new Map()) {
   const selected = new Set(selectedRefs(document, selection).map(key));
   const result = structuredClone(document);
+  routes = new Map(routes);
   const removing = (kind, id) => selected.has(key({ kind, id }));
   result.nodes = result.nodes.filter(n => !removing('node', n.id));
   result.labels = result.labels.filter(l => !removing('label', l.id) && !removing('node', l.nodeId));
@@ -98,11 +101,43 @@ export function deleteSelection(document, selection) {
     const outgoing = incident.find(e => e.source.junctionId === junction.id);
     result.edges = result.edges.filter(e => !incident.includes(e));
     if (incident.length === 2 && incoming && outgoing && incoming !== outgoing) {
-      const vertices = [...incoming.vertices, ...outgoing.vertices];
+      const a = routes.get(incoming.id), b = routes.get(outgoing.id);
+      const points = a && b ? [...a, ...b.slice(1)] : null;
+      const vertices = points ? points.slice(1, -1) : [...incoming.vertices, ...outgoing.vertices];
       if (vertices.length > 100) throw new Error('合并后的管路折点超过 100 个，请先清除部分折点再删除三通。');
       result.edges.push({ ...incoming, target: outgoing.target, vertices });
+      const attached = result.labels.filter(l => [incoming.id, outgoing.id].includes(l.edgeId));
+      if (attached.length) {
+        if (!points) throw new Error('无法计算管路状态点位置，请等待图纸更新后重试。');
+        const length = path => path.slice(1).reduce((sum, p, i) => sum + Math.hypot(p[0] - path[i][0], p[1] - path[i][1]), 0);
+        const first = length(a), total = first + length(b);
+        for (const label of attached) {
+          label.at = total ? (label.edgeId === incoming.id ? label.at * first : first + label.at * (total - first)) / total : 0;
+          label.edgeId = incoming.id;
+        }
+      }
+      if (points) routes.set(incoming.id, points);
     }
   }
   result.junctions = result.junctions.filter(j => !removing('junction', j.id));
+  const remaining = new Set(result.edges.map(e => e.id));
+  result.labels = result.labels.filter(l => !l.edgeId || remaining.has(l.edgeId));
   return result;
+}
+
+export function reverseEdge(document, edgeId, points = null) {
+  const result = structuredClone(document), edge = result.edges.find(e => e.id === edgeId);
+  const vertices = points ? points.slice(1, -1).reverse() : [...edge.vertices].reverse();
+  if (vertices.length > 100) throw new Error('反向后的管路折点超过 100 个，请先清除部分折点。');
+  [edge.source, edge.target] = [edge.target, edge.source]; edge.vertices = vertices;
+  for (const label of result.labels) if (label.edgeId === edgeId) label.at = 1 - label.at;
+  return result;
+}
+
+export function splitEdgeLabels(labels, edgeId, nextId, fraction = .5) {
+  return labels.map(label => {
+    if (label.edgeId !== edgeId) return { ...label };
+    return label.at <= fraction ? { ...label, at: label.at / fraction }
+      : { ...label, edgeId: nextId, at: (label.at - fraction) / (1 - fraction) };
+  });
 }

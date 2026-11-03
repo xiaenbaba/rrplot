@@ -1,5 +1,5 @@
-import { rotate, endpoint, route, along, nearestSegment, splitRoute, translateDocument, editableSegments, moveSegment, transformedBox, selectInBox } from './geometry.js';
-import { copySelection, deleteSelection, translateSelection } from './document.js';
+import { rotate, endpoint, route, along, nearestSegment, splitRoute, translateDocument, editableSegments, moveSegment, transformedBox, selectInBox, projectOnRoute } from './geometry.js';
+import { copySelection, deleteSelection, translateSelection, reverseEdge, splitEdgeLabels } from './document.js';
 
 const $ = id => document.getElementById(id);
 const svg = $('diagram');
@@ -10,6 +10,7 @@ const DRAFT = 'rrplot-web-v1-draft';
 let doc = null, catalog = [], geometries = new Map(), fontFamily = 'Times New Roman, SimSun, serif';
 let selection = null, multiSelection = [], mode = 'select', placement = null, ports = [], pendingPort = null;
 let previewTarget = null;
+let edgeLabelsSupported = false;
 let undo = [], redo = [], drag = null, dirty = false, spaceDown = false;
 let revision = 0, request = 0, previewUrl = null, messageTimer = null;
 let view = { x: -40, y: -30, w: 840, h: 640 };
@@ -37,6 +38,8 @@ function message(text) {
 }
 
 async function api(path, body) {
+  if (body?.document?.labels?.some(label => label.edgeId) && !edgeLabelsSupported)
+    throw new Error('管路状态点需要新版服务，请保存当前图纸后重启 start-web.cmd，再刷新页面。');
   const response = await fetch('/api/' + path, body === undefined ? {} : {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
   });
@@ -85,10 +88,35 @@ function world(event) {
   return [p.x, p.y];
 }
 function labelPosition(label) {
+  if (label.edgeId) {
+    const edge = doc.edges.find(e => e.id === label.edgeId);
+    return along(edgePoints(edge), label.at).point.map((v, i) => v + [label.x, label.y][i]);
+  }
   if (!label.nodeId) return [label.x, label.y];
   const n = doc.nodes.find(n => n.id === label.nodeId);
   const p = rotate([label.x, label.y], n.rotation);
   return [n.x + p[0], n.y + p[1]];
+}
+function attachLabelToEdge(label, edgeId) {
+  const p = labelPosition(label);
+  delete label.edgeId; delete label.at;
+  if (edgeId) {
+    const projected = projectOnRoute(edgePoints(doc.edges.find(e => e.id === edgeId)), p);
+    label.edgeId = edgeId; label.at = projected.at;
+    [label.x, label.y] = p.map((v, i) => v - projected.point[i]);
+  } else [label.x, label.y] = p;
+}
+function addStateLabel(edge) {
+  if (!edgeLabelsSupported) return message('管路状态点需要新版服务，请保存图纸后重启 start-web.cmd，再刷新页面。');
+  if (doc.labels.length >= 2000) return message('标签数量已达上限，请先删除部分标签。');
+  const used = new Set(doc.labels.map(l => l.text));
+  let number = 1; while (used.has(String(number))) number++;
+  edit(() => {
+    const id = uid('label');
+    doc.labels.push({ id, edgeId: edge.id, at: .5, x: 0, y: -16, text: String(number),
+      size: 12, ha: 'center', boxed: true, color: '#111111' });
+    setSelection('label', id);
+  });
 }
 function selectionCandidates() {
   const candidates = currentNodes().map(n => ({ kind: 'node', id: n.id,
@@ -153,6 +181,7 @@ function clearDraft() {
 async function replaceDocument(next, preserveDraft = false) {
   const token = ++request, version = revision;
   const result = await api('resolve', { document: next });
+  edgeLabelsSupported = result.features?.includes('edgeLabels') || false;
   if (token !== request || version !== revision) return;
   ++revision;
   doc = result.document; geometries = new Map(result.nodes.map(n => [n.id, n.geometry]));
@@ -306,10 +335,13 @@ function field(parent, caption, value, setter, options = {}) {
   const wrap = html('label', undefined, 'field'); wrap.append(html('span', caption));
   const input = html(options.multiline ? 'textarea' : options.options ? 'select' : 'input');
   input.setAttribute('aria-label', caption);
-  if (options.options) options.options.forEach(v => { const o = html('option', String(v)); o.value = v; input.append(o); });
+  if (options.options) options.options.forEach(v => {
+    const o = html('option', typeof v === 'object' ? v.label : String(v)); o.value = typeof v === 'object' ? v.value : v; input.append(o);
+  });
   else if (!options.multiline) input.type = options.type || (typeof value === 'number' ? 'number' : 'text');
   if (options.min !== undefined) input.min = options.min;
   if (options.max !== undefined) input.max = options.max;
+  input.disabled = !!options.disabled;
   if (input.type === 'number') input.step = options.step || 'any';
   if (input.type === 'checkbox') input.checked = value; else input.value = value;
   let committed = value;
@@ -379,7 +411,14 @@ function renderInspector() {
     }));
   } else if (kind === 'label') {
     field(root, '标签内容', item.text, v => { item.text = v; }, { multiline: true });
-    coordinateFields(root, item, item.nodeId ? '相对偏移' : '');
+    if (!item.nodeId) {
+      field(root, '附着管路', item.edgeId || '', v => attachLabelToEdge(item, v), {
+        options: [{ value: '', label: '独立文字' }, ...doc.edges.map(e => ({ value: e.id,
+          label: refName(e.source) + ' → ' + refName(e.target) }))], disabled: !edgeLabelsSupported });
+      if (!edgeLabelsSupported) root.append(html('p', '使用管路状态点前，请重启 start-web.cmd 并刷新页面。', 'muted'));
+    }
+    if (item.edgeId) field(root, '沿管路位置（%）', item.at * 100, v => { item.at = v / 100; }, { min: 0, max: 100 });
+    coordinateFields(root, item, item.nodeId || item.edgeId ? '相对偏移' : '');
     field(root, '字号（pt）', item.size, v => { item.size = v; }, { min: 6, max: 72 });
     field(root, '文字对齐', item.ha, v => { item.ha = v; }, { options: ['left', 'center', 'right'] });
     field(root, '文字颜色', item.color, v => { item.color = v; }, { type: 'color' });
@@ -399,9 +438,15 @@ function renderInspector() {
     field(root, '显示流向箭头', item.head, v => { item.head = v; }, { type: 'checkbox' });
     root.append(html('p', `${item.vertices.length} 个手动顶点。拖动线段中间的长条手柄调整走线；双击管线添加折点，Alt+点击方形折点删除。`, 'muted'));
     const buttons = html('div', undefined, 'button-row'); root.append(buttons);
-    inspectorButton(buttons, '反向', () => edit(() => { [item.source, item.target] = [item.target, item.source]; item.vertices.reverse(); }));
+    inspectorButton(buttons, '反向', () => {
+      try {
+        const next = reverseEdge(doc, item.id, edgePoints(item));
+        edit(() => { doc = next; });
+      } catch (error) { message(error.message); }
+    });
     inspectorButton(buttons, '清除折点', () => edit(() => { item.vertices = []; }));
     inspectorButton(root, '在管路中间插入三通', () => splitEdge(item));
+    inspectorButton(root, '添加状态点', () => addStateLabel(item));
   }
 }
 function coordinateFields(parent, item, prefix = '') {
@@ -432,6 +477,9 @@ function moveLayoutRef(entry, x, y) {
     const node = doc.nodes.find(candidate => candidate.id === item.nodeId);
     const local = rotate([x - node.x, y - node.y], -node.rotation);
     item.x = +local[0].toFixed(4); item.y = +local[1].toFixed(4);
+  } else if (item.edgeId) {
+    const anchor = along(edgePoints(doc.edges.find(e => e.id === item.edgeId)), item.at).point;
+    item.x = +(x - anchor[0]).toFixed(4); item.y = +(y - anchor[1]).toFixed(4);
   } else { item.x = +x.toFixed(4); item.y = +y.toFixed(4); }
 }
 function batchLayout(action) {
@@ -534,13 +582,18 @@ function splitEdge(edge) {
     const other = { ...clone(edge), id: uid('edge'), source: { junctionId: id }, vertices: suffix };
     edge.target = { junctionId: id }; edge.vertices = prefix;
     doc.edges.push(other); setSelection('junction', id);
+    doc.labels = splitEdgeLabels(doc.labels, edge.id, other.id);
   });
 }
 
 function removeSelected() {
   if (!multiSelection.length) return;
   try {
-    const next = deleteSelection(doc, multiSelection);
+    const routes = new Map();
+    for (const edge of doc.edges) {
+      try { routes.set(edge.id, edgePoints(edge)); } catch { /* Newly placed geometry may still be loading. */ }
+    }
+    const next = deleteSelection(doc, multiSelection, routes);
     edit(() => {
       doc = next;
       ports = ports.filter(ref => ref.nodeId ? doc.nodes.some(n => n.id === ref.nodeId)
@@ -553,6 +606,11 @@ function copySelected() {
   if (!multiSelection.some(ref => ['node', 'label', 'junction'].includes(ref.kind))) return;
   try {
     const result = copySelection(doc, multiSelection, uid);
+    const originalNodes = multiSelection.filter(ref => ref.kind === 'node');
+    result.selection.filter(ref => ref.kind === 'node').forEach((ref, index) => {
+      const geometry = geometries.get(originalNodes[index].id);
+      if (geometry) geometries.set(ref.id, geometry);
+    });
     edit(() => {
       doc = result.document; multiSelection = result.selection; selection = multiSelection.at(-1) || null;
       pendingPort = null; previewTarget = null; mode = 'select'; placement = null;

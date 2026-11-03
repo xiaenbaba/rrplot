@@ -289,6 +289,9 @@ def test_frontend_translate_preserves_entire_resolved_layout(name, offset):
     original["nodes"][0]["x"] += 0.25
     original["edges"][0]["vertices"] = [[120.25, 87.5], [160.25, 87.5]]
     original["labels"].append(dict(id="free-label", text="独立文字", x=17.25, y=29.5))
+    original["labels"].append(dict(id="pipe-label", text="状态点",
+                                   edgeId=original["edges"][0]["id"],
+                                   at=.4, x=5, y=-12))
     original = validate_scene(original)
     raw = Path(__file__).resolve().parents[1].joinpath("web/geometry.js").read_bytes()
     module = "data:text/javascript;base64," + base64.b64encode(raw).decode()
@@ -305,7 +308,7 @@ def test_frontend_translate_preserves_entire_resolved_layout(name, offset):
     assert data["original"] == original
     assert moved["page"] == original["page"]
     for before, after in zip(original["labels"], moved["labels"]):
-        if "nodeId" in before:
+        if "nodeId" in before or "edgeId" in before:
             assert after == before  # 保持附着标签的局部偏移，避免重复移动。
     for before, after in zip(original["edges"], moved["edges"]):
         assert after["source"] == before["source"]

@@ -35,6 +35,7 @@ def resolve_for_editor(document):
         node["geometry"]["image"] = _glyph(
             node["type"], json.dumps(node["params"], sort_keys=True))
     result["fontFamily"] = ", ".join(FONT_STACK)
+    result["features"] = ["edgeLabels"]
     return result
 
 

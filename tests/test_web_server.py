@@ -111,3 +111,21 @@ def test_unknown_post_and_invalid_port(service):
     document["edges"][0]["source"]["portId"] = "missing"
     status, _, data = post(service, "/api/resolve", {"document": document})
     assert status == 400 and json.loads(data)["error"]
+
+
+def test_pipe_state_label_resolve_reopen_preview_and_exports(service):
+    document = json.loads(request(service, "/api/templates/evi_ftvi")[2])
+    document["labels"].append(dict(id="pipe-state", edgeId="injection", at=.25,
+                                    x=8, y=-14, text="T1"))
+    status, _, data = post(service, "/api/resolve", {"document": document})
+    assert status == 200
+    resolved = json.loads(data)
+    assert "edgeLabels" in resolved["features"]
+    state = next(label for label in resolved["labels"] if label["id"] == "pipe-state")
+    assert state["position"] == [254.75, 258]
+    reopened = json.loads(json.dumps(resolved["document"]))
+    assert post(service, "/api/resolve", {"document": reopened})[0] == 200
+    assert post(service, "/api/preview", {"document": reopened})[0] == 200
+    for fmt, signature in (("svg", b"<?xml"), ("png", b"\x89PNG"), ("pdf", b"%PDF")):
+        status, _, data = post(service, "/api/export/" + fmt, {"document": reopened})
+        assert status == 200 and data.startswith(signature)

@@ -6,7 +6,7 @@ from importlib.resources import files
 
 from matplotlib.colors import is_color_like
 
-from .core import _orthogonalize
+from .core import _orthogonalize, _polyline_point
 from .registry import describe, normalize_params
 
 SCHEMA_VERSION = 1
@@ -66,6 +66,7 @@ def validate_scene(document):
             ids.add(key)
     nodes = {n["id"]: n for n in d["nodes"]}
     junctions = {j["id"]: j for j in d["junctions"]}
+    edge_ids = {edge["id"] for edge in d["edges"]}
     descriptions = {}
     for node in d["nodes"]:
         node["params"] = normalize_params(node.get("type"), node.get("params", {}))
@@ -125,6 +126,13 @@ def validate_scene(document):
         color(label.setdefault("color", "#111111"), "标签颜色")
         if "nodeId" in label and label["nodeId"] not in nodes:
             raise ValueError("标签引用了不存在的设备")
+        if "edgeId" in label:
+            if "nodeId" in label:
+                raise ValueError("标签不能同时附着于设备和管路")
+            if (not isinstance(label["edgeId"], str)
+                    or label["edgeId"] not in edge_ids):
+                raise ValueError("标签引用了不存在的管路")
+            finite(label.setdefault("at", 0.5), "状态点位置", 0, 1)
     return d
 
 
@@ -181,11 +189,15 @@ def resolve_scene(document):
         b = endpoint(edge["target"], nodes, junctions)
         edges.append(dict(edge, points=route(a, b, edge["vertices"])))
     labels = []
+    edge_points = {edge["id"]: edge["points"] for edge in edges}
     for label in d["labels"]:
         x, y = label["x"], label["y"]
         if "nodeId" in label:
             node = nodes[label["nodeId"]]
             x, y = rotate([x, y], node["rotation"])
             x, y = x + node["x"], y + node["y"]
+        elif "edgeId" in label:
+            px, py = _polyline_point(edge_points[label["edgeId"]], label["at"])[0]
+            x, y = x + px, y + py
         labels.append(dict(label, position=[x, y]))
     return dict(document=d, nodes=list(nodes.values()), edges=edges, labels=labels)

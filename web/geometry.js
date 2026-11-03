@@ -5,7 +5,7 @@ export function translateDocument(document, dx, dy) {
   moved.nodes.forEach(shift);
   moved.junctions.forEach(shift);
   // Attached labels already follow their nodes; their coordinates are local offsets.
-  moved.labels.filter(label => !label.nodeId).forEach(shift);
+  moved.labels.filter(label => !label.nodeId && !label.edgeId).forEach(shift);
   moved.edges.forEach(edge => {
     edge.vertices = edge.vertices.map(([x, y]) => [x + dx, y + dy]);
   });
@@ -105,6 +105,20 @@ export function nearestSegment(points, point) {
     if (distance < best.distance) best = { index: i, distance };
   });
   return best.index;
+}
+
+export function projectOnRoute(points, point) {
+  const lengths = points.slice(1).map((b, i) => Math.hypot(b[0] - points[i][0], b[1] - points[i][1]));
+  const total = lengths.reduce((sum, length) => sum + length, 0);
+  let travelled = 0, best = { point: points[0], at: 0, distance: Infinity };
+  lengths.forEach((length, i) => {
+    const a = points[i], delta = points[i + 1].map((v, j) => v - a[j]);
+    const t = length ? Math.max(0, Math.min(1, point.reduce((sum, v, j) => sum + (v - a[j]) * delta[j], 0) / length ** 2)) : 0;
+    const projected = a.map((v, j) => v + delta[j] * t), distance = Math.hypot(...point.map((v, j) => v - projected[j]));
+    if (distance < best.distance) best = { point: projected, at: total ? (travelled + t * length) / total : 0, distance };
+    travelled += length;
+  });
+  return best;
 }
 
 // Port lead-ins stay fixed; only offer handles where a usable span remains.
