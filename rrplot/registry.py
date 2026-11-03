@@ -31,6 +31,12 @@ REGISTRY = {
         "w": number("宽度", 66, 16, 300),
         "h": number("高度", 130, 20, 600),
         "liquid": number("液位比例", 0.42, 0, 1)}),
+    "separator_utube": dict(label="气液分离器", factory=parts.make_separator_utube,
+                             fields={
+        "w": number("宽度", 120, 40, 500),
+        "h": number("高度", 118, 40, 600),
+        "stub": number("接管长度", 16, 4, 100),
+        "flip": choice("入口方向", False, [False, True])}),
     "intermediate_hex": dict(label="中间换热器",
                              factory=parts.make_intermediate_hex, fields={
         "w": number("宽度", 80, 20, 500),

@@ -7,15 +7,15 @@
     {"id": "eev", "type": "expansion_valve", "title": "EEV", "x": 120, "y": 280, "params": {"r": 10, "orient": "v"}, "rotation": 0},
     {"id": "evap", "type": "heat_exchanger", "title": "蒸发器", "x": 360, "y": 480, "params": {"w": 220, "h": 60, "shape": "rect_x", "orient": "h"}, "rotation": 0},
     {"id": "comp", "type": "compressor", "title": "压缩机", "x": 620, "y": 280, "params": {"r": 42, "style": "圆形"}, "rotation": 0},
-    {"id": "separator", "type": "vessel", "title": "气液分离器", "x": 520, "y": 400, "params": {"w": 66, "h": 130, "liquid": 0.35}, "rotation": 0}
+    {"id": "separator", "type": "separator_utube", "title": "气液分离器", "x": 520, "y": 400, "params": {"w": 120, "h": 118, "stub": 16, "flip": false}, "rotation": 0}
   ],
   "junctions": [],
   "edges": [
     {"id": "discharge", "source": {"nodeId": "comp", "portId": "top"}, "target": {"nodeId": "cond", "portId": "right"}, "vertices": [[620, 80]], "headAt": [0.3, 0.7], "head": true, "width": 1.8, "color": "#111111", "linestyle": "solid"},
     {"id": "liquid", "source": {"nodeId": "cond", "portId": "left"}, "target": {"nodeId": "eev", "portId": "in"}, "vertices": [[120, 80]], "headAt": [0.55], "head": true, "width": 1.8, "color": "#111111", "linestyle": "solid"},
     {"id": "expansion", "source": {"nodeId": "eev", "portId": "out"}, "target": {"nodeId": "evap", "portId": "left"}, "vertices": [[120, 480]], "headAt": [0.55], "head": true, "width": 1.8, "color": "#111111", "linestyle": "solid"},
-    {"id": "separator-in", "source": {"nodeId": "evap", "portId": "right"}, "target": {"nodeId": "separator", "portId": "left"}, "vertices": [[520, 480]], "headAt": [0.55], "head": true, "width": 1.8, "color": "#111111", "linestyle": "solid"},
-    {"id": "separator-vapor", "source": {"nodeId": "separator", "portId": "vapor"}, "target": {"nodeId": "comp", "portId": "bottom"}, "vertices": [[620, 372]], "headAt": [0.55], "head": true, "width": 1.8, "color": "#111111", "linestyle": "solid"}
+    {"id": "separator-in", "source": {"nodeId": "evap", "portId": "right"}, "target": {"nodeId": "separator", "portId": "in"}, "vertices": [[470, 325]], "headAt": [0.55], "head": true, "width": 1.8, "color": "#111111", "linestyle": "solid"},
+    {"id": "separator-vapor", "source": {"nodeId": "separator", "portId": "out"}, "target": {"nodeId": "comp", "portId": "bottom"}, "vertices": [[620, 325]], "headAt": [0.55], "head": true, "width": 1.8, "color": "#111111", "linestyle": "solid"}
   ],
   "labels": [
     {"id": "label-cond", "text": "冷凝器", "x": 0, "y": -44, "size": 15, "ha": "center", "boxed": false, "color": "#111111", "nodeId": "cond"},

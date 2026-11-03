@@ -49,11 +49,12 @@ def test_heat_pump_receiver_template_uses_gas_liquid_separator_on_suction():
     separator = next(node for node in document["nodes"] if node["id"] == "separator")
     assert document["title"] == "带气液分离器的普通热泵"
     assert separator["title"] == "气液分离器"
+    assert separator["type"] == "separator_utube"
     inlet = next(edge for edge in document["edges"] if edge["id"] == "separator-in")
     vapor = next(edge for edge in document["edges"] if edge["id"] == "separator-vapor")
     assert inlet["source"] == {"nodeId": "evap", "portId": "right"}
-    assert inlet["target"] == {"nodeId": "separator", "portId": "left"}
-    assert vapor["source"] == {"nodeId": "separator", "portId": "vapor"}
+    assert inlet["target"] == {"nodeId": "separator", "portId": "in"}
+    assert vapor["source"] == {"nodeId": "separator", "portId": "out"}
     assert vapor["target"] == {"nodeId": "comp", "portId": "bottom"}
 
 
