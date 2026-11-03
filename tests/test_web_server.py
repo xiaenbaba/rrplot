@@ -60,6 +60,9 @@ def test_static_and_catalog_interfaces(service):
     status, headers, body = request(service, "/checks.js")
     assert status == 200 and b"inspectDiagram" in body
     assert headers["Content-Type"].startswith("text/javascript")
+    status, headers, body = request(service, "/objects.js")
+    assert status == 200 and b"objectIndex" in body
+    assert headers["Content-Type"].startswith("text/javascript")
     assert json.loads(request(service, "/api/health")[2])["ok"] is True
     assert len(json.loads(request(service, "/api/catalog")[2])) == 6
     assert len(json.loads(request(service, "/api/templates")[2])) == 5

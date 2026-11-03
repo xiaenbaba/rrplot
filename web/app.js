@@ -1,6 +1,7 @@
 import { rotate, endpoint, route, along, nearestSegment, splitRoute, translateDocument, editableSegments, moveSegment, transformedBox, selectInBox, projectOnRoute } from './geometry.js';
 import { copySelection, deleteSelection, translateSelection, reverseEdge, splitEdgeLabels, reconnectEdge, nudgeSelection } from './document.js';
 import { inspectDiagram } from './checks.js';
+import { objectIndex, filterObjects } from './objects.js';
 
 const $ = id => document.getElementById(id);
 const svg = $('diagram');
@@ -192,6 +193,7 @@ async function replaceDocument(next, preserveDraft = false) {
   doc = result.document; geometries = new Map(result.nodes.map(n => [n.id, n.geometry]));
   fontFamily = result.fontFamily; undo = []; redo = []; clearSelection(); ports = [];
   pendingPort = null; previewTarget = null; reconnect = null; mode = 'select'; placement = null; dirty = false;
+  $('object-search').value = ''; $('object-kind').value = '';
   if (!preserveDraft) clearDraft();
   render(); fit(); status('图纸已打开 · 点击对象编辑'); message('');
 }
@@ -377,6 +379,7 @@ function inspectorButton(parent, caption, action) {
 }
 function renderInspector() {
   renderHint();
+  renderObjectList();
   const root = $('inspector'); root.replaceChildren();
   if (mode === 'reconnect' && reconnect) {
     $('selection-kind').textContent = 'RECONNECT';
@@ -694,13 +697,13 @@ function objectName(ref) {
   if (ref.kind === 'edge') return '管路：' + refName(item.source) + ' → ' + refName(item.target);
   return ref.kind === 'node' ? '设备：' + item.title : ref.kind === 'label' ? '文字：' + item.text : '三通 · ' + item.id.slice(-5);
 }
-function locateIssue(ref) {
-  $('checks-dialog').close();
+function locateObject(ref, additive = false) {
+  if (drag || reconnect || pendingPort) return message('请先完成当前连接或拖动，或按 Esc 取消，再定位对象。');
   mode = 'select'; placement = null; reconnect = null; pendingPort = null; previewTarget = null; ports = [];
-  setSelection(ref.kind, ref.id); render();
+  setSelection(ref.kind, ref.id, additive); render();
   let box = selectionCandidates().find(item => item.kind === ref.kind && item.id === ref.id)?.box;
   if (ref.kind === 'edge') {
-    const points = edgePoints(findSelected()), xs = points.map(p => p[0]), ys = points.map(p => p[1]);
+    const points = edgePoints(doc.edges.find(item => item.id === ref.id)), xs = points.map(p => p[0]), ys = points.map(p => p[1]);
     box = [Math.min(...xs), Math.min(...ys), Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)];
   }
   if (box) {
@@ -712,6 +715,37 @@ function locateIssue(ref) {
   document.querySelector('.properties').scrollTop = 0;
   svg.focus({ preventScroll: true }); status('已定位：' + objectName(ref));
 }
+function locateIssue(ref) {
+  $('checks-dialog').close(); locateObject(ref);
+}
+function renderObjectList() {
+  if (!doc || $('objects-panel').hidden) return;
+  const entries = objectIndex(doc, catalog), found = filterObjects(entries, $('object-search').value, $('object-kind').value);
+  $('object-count').textContent = `显示 ${Math.min(found.length, 200)} / 匹配 ${found.length} / 共 ${entries.length} 项`;
+  const root = $('object-list'); root.replaceChildren();
+  for (const entry of found.slice(0, 200)) {
+    const active = selected(entry.kind, entry.id);
+    const button = html('button', undefined, 'object-entry' + (active ? ' active' : ''));
+    button.dataset.kind = entry.kind; button.dataset.id = entry.id;
+    button.setAttribute('aria-pressed', active);
+    button.title = `${entry.type}：${entry.title}\nID：${entry.id}\n${entry.detail}`;
+    button.append(html('strong', `${entry.type} · ${entry.title}`), html('small', entry.id));
+    button.addEventListener('click', event => locateObject(entry, event.shiftKey)); root.append(button);
+  }
+  if (!found.length) root.append(html('p', entries.length ? '没有匹配的对象，请调整搜索或类型。' : '图纸为空，请从图元库添加设备。', 'muted'));
+  if (found.length > 200) root.append(html('p', '仅显示前 200 项，请搜索名称或 ID 缩小范围。', 'muted'));
+}
+for (const [id, showObjects] of [['show-parts', false], ['show-objects', true]]) {
+  $(id).addEventListener('click', () => {
+    $('library-parts').hidden = showObjects; $('objects-panel').hidden = !showObjects;
+    for (const [buttonId, active] of [['show-parts', !showObjects], ['show-objects', showObjects]]) {
+      $(buttonId).classList.toggle('active', active); $(buttonId).setAttribute('aria-pressed', active);
+    }
+    renderObjectList();
+  });
+}
+$('object-search').addEventListener('input', renderObjectList);
+$('object-kind').addEventListener('change', renderObjectList);
 async function runChecks() {
   if (reconnect || drag || pendingPort) return message('请先完成当前连接或拖动，或按 Esc 取消，再检查图纸。');
   const version = revision;

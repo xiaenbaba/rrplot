@@ -22,11 +22,24 @@
   </header>
   <main class="editor">
     <aside class="library">
-      <div class="panel-heading"><span>图元库</span><span class="eyebrow">PARTS</span></div>
+      <div class="panel-heading"><span>图元与对象</span><span class="eyebrow">LIBRARY</span></div>
+      <div class="library-switch" role="group" aria-label="左侧面板">
+        <button id="show-parts" aria-pressed="true" aria-controls="library-parts" class="active">图元模板</button>
+        <button id="show-objects" aria-pressed="false" aria-controls="objects-panel">图纸对象</button>
+      </div>
+      <div id="library-parts">
       <p class="muted panel-note">选择图元，再点击画布放置</p>
       <div id="palette" class="palette"></div>
       <div class="panel-heading section-heading"><span>系统模板</span></div>
       <div id="templates" class="template-list"></div>
+      </div>
+      <section id="objects-panel" aria-label="图纸对象列表" hidden>
+        <label class="field"><span>搜索对象</span><input id="object-search" type="search" placeholder="名称、文字或 ID" autocomplete="off"></label>
+        <label class="field"><span>对象类型</span><select id="object-kind"><option value="">全部类型</option><option value="node">设备</option><option value="edge">管路</option><option value="junction">三通</option><option value="label">文字</option></select></label>
+        <p id="object-count" class="muted" role="status"></p>
+        <p class="muted">点击定位并编辑；Shift+点击多选设备、三通和文字。</p>
+        <div id="object-list"></div>
+      </section>
       <div class="library-footer"><span class="local-dot"></span> 本机运行 · 文件由你保存<br><span class="muted">图元与最终出图来自 rrplot</span></div>
     </aside>
     <section class="workspace" aria-label="绘图工作区">
