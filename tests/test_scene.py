@@ -44,6 +44,19 @@ def test_intermediate_evi_injection_enters_compressor_left_port():
     assert injection["points"][-1] == [578, 280]
 
 
+def test_heat_pump_receiver_template_uses_gas_liquid_separator_on_suction():
+    document = load_template("heat_pump_receiver")
+    separator = next(node for node in document["nodes"] if node["id"] == "separator")
+    assert document["title"] == "带气液分离器的普通热泵"
+    assert separator["title"] == "气液分离器"
+    inlet = next(edge for edge in document["edges"] if edge["id"] == "separator-in")
+    vapor = next(edge for edge in document["edges"] if edge["id"] == "separator-vapor")
+    assert inlet["source"] == {"nodeId": "evap", "portId": "right"}
+    assert inlet["target"] == {"nodeId": "separator", "portId": "left"}
+    assert vapor["source"] == {"nodeId": "separator", "portId": "vapor"}
+    assert vapor["target"] == {"nodeId": "comp", "portId": "bottom"}
+
+
 def test_node_move_updates_pipe_and_attached_label_without_mutating_document():
     d = load_template("evi_ftvi")
     old = resolve_scene(d)

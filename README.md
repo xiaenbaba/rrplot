@@ -53,7 +53,7 @@ ruff check rrplot tests examples server
 .\.venv\Scripts\python.exe server\run.py
 ```
 
-打开 <http://127.0.0.1:8765>，可编辑普通热泵、带储液器的普通热泵、EVI 过冷器、FTVI 闪蒸罐和 EVI 中间换热器模板，放置图元、连接端口、
+打开 <http://127.0.0.1:8765>，可编辑普通热泵、带气液分离器的普通热泵、EVI 过冷器、FTVI 闪蒸罐和 EVI 中间换热器模板，放置图元、连接端口、
 调整折点和标签，保存 JSON，并导出 PNG/SVG/PDF。前端使用原生 SVG，
 服务使用 Python 标准库，无需安装 Node.js、npm 或图编辑器框架。
 
