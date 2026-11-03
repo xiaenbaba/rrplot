@@ -188,7 +188,7 @@ function renderCanvas() {
   svg.classList.toggle('placing', !!placement || ['junction', 'text'].includes(mode));
   const defs = shape('defs');
   const pattern = shape('pattern', { id: 'grid-pattern', width: 10, height: 10, patternUnits: 'userSpaceOnUse' }, defs);
-  shape('circle', { cx: 0, cy: 0, r: .5, fill: '#b7c5cf' }, pattern);
+  shape('path', { d: 'M 10 0 L 0 0 0 10', fill: 'none', stroke: '#c6d6d1', 'stroke-width': .65 }, pattern);
   shape('rect', { x: 0, y: 0, width: doc.page.width, height: doc.page.height, fill: '#fff', class: 'page' });
   if ($('grid').checked) shape('rect', { width: doc.page.width, height: doc.page.height, fill: 'url(#grid-pattern)', opacity: .65, 'pointer-events': 'none' });
   const nodes = currentNodes();
@@ -750,7 +750,12 @@ svg.addEventListener('dragover', event => event.preventDefault());
 svg.addEventListener('drop', event => { event.preventDefault(); const type = event.dataTransfer.getData('text/rrplot-part'); if (catalog.some(c => c.type === type)) addNode(type, world(event)); });
 
 $('title').addEventListener('change', event => edit(() => { doc.title = event.target.value; }));
-$('grid').addEventListener('change', renderCanvas);
+ $('grid').addEventListener('change', () => {
+  renderCanvas(); status($('grid').checked ? '网格已显示' : '网格已隐藏');
+ });
+ $('snap').addEventListener('change', () => {
+  status($('snap').checked ? '网格吸附已开启' : '网格吸附已关闭');
+ });
 $('file-input').addEventListener('change', async event => {
   const file = event.target.files[0]; if (!file) return;
   try {
