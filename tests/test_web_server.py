@@ -64,7 +64,11 @@ def test_static_and_catalog_interfaces(service):
     assert status == 200 and b"objectIndex" in body
     assert headers["Content-Type"].startswith("text/javascript")
     assert json.loads(request(service, "/api/health")[2])["ok"] is True
-    assert len(json.loads(request(service, "/api/catalog")[2])) == 6
+    kinds = {entry["type"] for entry in
+             json.loads(request(service, "/api/catalog")[2])}
+    assert {"compressor", "heat_exchanger", "expansion_valve", "vessel",
+            "separator_utube", "intermediate_hex", "four_way_valve",
+            "globe_valve", "solenoid_valve", "check_valve", "filter"} == kinds
     assert len(json.loads(request(service, "/api/templates")[2])) == 5
     for path in ("/../pyproject.toml", "/missing", "/api/missing"):
         assert request(service, path)[0] == 404

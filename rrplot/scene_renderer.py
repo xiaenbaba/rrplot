@@ -45,11 +45,16 @@ def _rotated(part, angle):
 
     def draw(ax, x, y, label=None, **kw):
         before_lines, before_patches = len(ax.lines), len(ax.patches)
+        before_texts = len(ax.texts)
         part.draw(ax, x, y, label=None)
         transform = Affine2D().rotate_deg_around(x, y, angle) + ax.transData
         for artist in (list(ax.lines)[before_lines:]
                        + list(ax.patches)[before_patches:]):
             artist.set_transform(transform)
+        for text in list(ax.texts)[before_texts:]:
+            text.set_transform(transform)
+            text.set_rotation(text.get_rotation() - angle)
+            text.set_rotation_mode("anchor")
 
     from .part import Part
     return Part(part.name, draw, {})

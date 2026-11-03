@@ -435,6 +435,8 @@ function renderInspector() {
     root.append(html('div', '图元参数', 'section-label'));
     const entry = catalog.find(c => c.type === item.type);
     for (const [key, f] of Object.entries(entry.fields)) field(root, f.label, item.params[key], v => { item.params[key] = v; }, f);
+    if (item.type === 'four_way_valve') root.append(html('p', 'D / exhaust：排气；S / suction：回气；C / condenser、E / evaporator：两侧换热器。端口随旋转移动，图元只表示接管关系。', 'muted'));
+    if (item.type === 'check_valve') root.append(html('p', '三角尖端指向 out；改变流通方向会交换 in/out 的位置，已有管路继续按端口 ID 跟随。', 'muted'));
     inspectorButton(root, '添加设备标签', () => edit(() => {
       const id = uid('label'); doc.labels.push({ id, nodeId: item.id, x: 0, y: 70, text: item.title, size: 15, ha: 'center', boxed: true, color: '#111111' }); setSelection('label', id);
     }));
@@ -571,7 +573,7 @@ function addNode(type, position) {
   edit(() => {
     const params = Object.fromEntries(Object.entries(entry.fields).map(([k, v]) => [k, v.default]));
     doc.nodes.push({ id, type, title: entry.label, x: snapped(position[0]), y: snapped(position[1]), params, rotation: 0 });
-    doc.labels.push({ id: uid('label'), nodeId: id, x: 0, y: (params.h || 2 * params.r) / 2 + 24,
+    doc.labels.push({ id: uid('label'), nodeId: id, x: 0, y: (params.h || 2 * params.r) / 2 + 24 + (type === 'four_way_valve' && params.mark ? 30 : 0),
       text: entry.label, size: 15, ha: 'center', color: '#111111', boxed: false });
     setSelection('node', id); placement = null; mode = 'select';
   });
@@ -746,6 +748,17 @@ for (const [id, showObjects] of [['show-parts', false], ['show-objects', true]])
 }
 $('object-search').addEventListener('input', renderObjectList);
 $('object-kind').addEventListener('change', renderObjectList);
+function filterPalette() {
+  const words = $('part-search').value.normalize('NFKC').toLowerCase().trim().split(/\s+/).filter(Boolean);
+  let count = 0;
+  document.querySelectorAll('[data-part]').forEach(button => {
+    button.hidden = !words.every(word => button.textContent.normalize('NFKC').toLowerCase().includes(word));
+    if (!button.hidden) count++;
+  });
+  $('part-count').textContent = `显示 ${count} / 共 ${catalog.length} 种图元`;
+  $('part-empty').hidden = count > 0;
+}
+$('part-search').addEventListener('input', filterPalette);
 async function runChecks() {
   if (reconnect || drag || pendingPort) return message('请先完成当前连接或拖动，或按 Esc 取消，再检查图纸。');
   const version = revision;
@@ -1071,6 +1084,7 @@ async function init() {
       b.addEventListener('click', async () => { try { if (await confirmReplace()) await replaceDocument(await api('templates/' + template.id)); } catch (error) { message(error.message); } });
       $('templates').append(b);
     }
+    filterPalette();
     await replaceDocument(data[2], true);
     try { if (JSON.parse(localStorage.getItem(DRAFT))?.document) $('draft-banner').hidden = false; } catch { /* Ignore invalid old drafts. */ }
   } catch (error) { message('无法连接本机服务。请运行 python server/run.py。' + error.message); status('服务未连接'); }
