@@ -66,6 +66,8 @@ input[type=checkbox] { min-height: unset; accent-color: var(--accent); }
 .connection-preview { fill: none; stroke: var(--accent); stroke-width: 1.8; stroke-dasharray: 6 4; stroke-linecap: round; opacity: .8; pointer-events: none; }
 .edge-hit { fill: none; stroke: transparent; stroke-width: 13; }
 .edge.selected .edge-visible { stroke: #208b7a; }
+.edge.reconnecting-edge { opacity: .25; pointer-events: none; }
+.reconnect-buttons { margin-top: 12px; }
 .edge:hover .edge-hit { stroke: #26897611; }
 .vertex { fill: #fff; stroke: var(--accent); stroke-width: 1.5; cursor: move; }
 .segment-handle { fill: #d6eee4; stroke: var(--accent); stroke-width: 1.5; }

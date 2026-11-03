@@ -8,7 +8,14 @@ from pathlib import Path
 
 import pytest
 
-from rrplot.scene import TEMPLATES, load_template, resolve_scene, validate_scene
+from rrplot.scene import (
+    TEMPLATES,
+    endpoint,
+    load_template,
+    resolve_scene,
+    validate_scene,
+)
+from rrplot.scene_renderer import export_scene
 
 
 def edit_document(document, selection, operation="copy", **options):
@@ -25,6 +32,8 @@ def edit_document(document, selection, operation="copy", **options):
               "input.collision || 'copy-'+kind+'-'+(++index),input.offset) : "
               "input.operation==='move' ? "
               "edits.translateSelection(input.document,input.selection,input.offset) : "
+              "input.operation==='reconnect' ? "
+              "edits.reconnectEdge(input.document,input.edgeId,input.side,input.ref) : "
               "edits.deleteSelection(input.document,input.selection);"
               "console.log(JSON.stringify({result,original:input.document}));"
               "}catch(error){console.log(JSON.stringify({error:error.message,"
@@ -263,3 +272,67 @@ def test_valid_unusual_ids_do_not_match_missing_node_references(identity):
     assert [edge["id"] for edge in deleted["edges"]] == ["b", "c"]
     assert any(label["id"] == "free" for label in deleted["labels"])
     resolve_scene(deleted)
+
+
+@pytest.mark.parametrize("name", list(TEMPLATES))
+@pytest.mark.parametrize("side", ["source", "target"])
+def test_reconnect_preserves_pipe_identity_bends_labels_and_resolves(name, side):
+    document = load_template(name)
+    edge = document["edges"][0]
+    edge.update(vertices=[[210, 170], [240, 170]], color="#663399",
+                width=2.4, linestyle="dashed", headAt=[.25, .75])
+    document["junctions"].append(dict(id="new-junction", x=180, y=260))
+    document["labels"].append(dict(id="state", edgeId=edge["id"], at=.4,
+                                    x=6, y=-14, text="T1"))
+    document = validate_scene(document)
+    scene = resolve_scene(document)
+    nodes = {node["id"]: node for node in scene["nodes"]}
+    junctions = {j["id"]: j for j in document["junctions"]}
+    # Reconnect first to a different device port, then to a branch junction.
+    candidate = next(dict(nodeId=node["id"], portId=port)
+                     for node in scene["nodes"]
+                     for port in node["geometry"]["ports"]
+                     if dict(nodeId=node["id"], portId=port)
+                     not in [edge["source"], edge["target"]])
+    previous = document
+    for ref in (candidate, dict(junctionId="new-junction")):
+        result = edit_document(previous, [], "reconnect", edgeId=edge["id"],
+                               side=side, ref=ref)["result"]
+        resolved = resolve_scene(json.loads(json.dumps(result)))
+        expected = endpoint(ref, nodes, junctions)["point"]
+        assert resolved["edges"][0]["points"][0 if side == "source" else -1] == expected
+        points = resolved["edges"][0]["points"]
+        assert all(a[0] == b[0] or a[1] == b[1] for a, b in zip(points, points[1:]))
+        assert result["labels"] == document["labels"]
+        assert result["edges"][0] == dict(edge, **{side: ref})
+        assert result["edges"][1:] == document["edges"][1:]
+        assert result["nodes"] == document["nodes"]
+        assert result["junctions"] == document["junctions"]
+        previous = result
+    assert export_scene(previous, "svg").startswith(b"<?xml")
+
+
+@pytest.mark.parametrize("change", [
+    dict(edgeId="missing"), dict(side="invalid"), dict(ref=None),
+    dict(ref={}), dict(ref=dict(nodeId="missing", portId="top")),
+    dict(ref=dict(nodeId="comp", portId="")),
+    dict(ref=dict(junctionId="missing")),
+    dict(ref=dict(nodeId="comp", portId="top", junctionId="split")),
+])
+def test_reconnect_invalid_reference_leaves_original_document_intact(change):
+    document = load_template("evi_ftvi")
+    options = dict(edgeId=document["edges"][0]["id"], side="target",
+                   ref=dict(nodeId="comp", portId="left"))
+    options.update(change)
+    assert "error" in edit_document(document, [], "reconnect", **options)
+
+
+def test_reconnect_same_endpoint_is_noop_and_opposite_endpoint_is_rejected():
+    document = load_template("evi_ftvi")
+    edge = document["edges"][0]
+    edge["source"] = dict(reversed(list(edge["source"].items())))
+    unchanged = edit_document(document, [], "reconnect", edgeId=edge["id"],
+                              side="source", ref=edge["source"])["result"]
+    assert json.dumps(unchanged) == json.dumps(document)
+    assert "error" in edit_document(document, [], "reconnect", edgeId=edge["id"],
+                                    side="source", ref=edge["target"])

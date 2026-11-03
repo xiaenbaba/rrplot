@@ -141,3 +141,22 @@ export function splitEdgeLabels(labels, edgeId, nextId, fraction = .5) {
       : { ...label, edgeId: nextId, at: (label.at - fraction) / (1 - fraction) };
   });
 }
+
+export function reconnectEdge(document, edgeId, side, ref) {
+  const edge = document.edges.find(e => e.id === edgeId);
+  if (!edge || !['source', 'target'].includes(side)) throw new Error('找不到需要重接的管路端点。');
+  const node = typeof ref?.nodeId === 'string' && document.nodes.some(n => n.id === ref.nodeId);
+  const junction = typeof ref?.junctionId === 'string' && document.junctions.some(j => j.id === ref.junctionId);
+  if (node ? typeof ref.portId !== 'string' || !ref.portId || 'junctionId' in ref
+    : !junction || 'nodeId' in ref) throw new Error('请选择有效的设备端口或三通。');
+  const next = node ? { nodeId: ref.nodeId, portId: ref.portId } : { junctionId: ref.junctionId };
+  const other = edge[side === 'source' ? 'target' : 'source'];
+  if (node ? next.nodeId === other.nodeId && next.portId === other.portId : next.junctionId === other.junctionId)
+    throw new Error('管路两端不能连接到同一端口或三通。');
+  const result = structuredClone(document);
+  const current = edge[side];
+  if (node ? next.nodeId === current.nodeId && next.portId === current.portId : next.junctionId === current.junctionId)
+    return result;
+  result.edges.find(e => e.id === edgeId)[side] = next;
+  return result;
+}

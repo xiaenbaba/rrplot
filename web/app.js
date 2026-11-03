@@ -1,5 +1,5 @@
 import { rotate, endpoint, route, along, nearestSegment, splitRoute, translateDocument, editableSegments, moveSegment, transformedBox, selectInBox, projectOnRoute } from './geometry.js';
-import { copySelection, deleteSelection, translateSelection, reverseEdge, splitEdgeLabels } from './document.js';
+import { copySelection, deleteSelection, translateSelection, reverseEdge, splitEdgeLabels, reconnectEdge } from './document.js';
 
 const $ = id => document.getElementById(id);
 const svg = $('diagram');
@@ -10,6 +10,7 @@ const DRAFT = 'rrplot-web-v1-draft';
 let doc = null, catalog = [], geometries = new Map(), fontFamily = 'Times New Roman, SimSun, serif';
 let selection = null, multiSelection = [], mode = 'select', placement = null, ports = [], pendingPort = null;
 let previewTarget = null;
+let reconnect = null;
 let edgeLabelsSupported = false;
 let undo = [], redo = [], drag = null, dirty = false, spaceDown = false;
 let revision = 0, request = 0, previewUrl = null, messageTimer = null;
@@ -186,7 +187,7 @@ async function replaceDocument(next, preserveDraft = false) {
   ++revision;
   doc = result.document; geometries = new Map(result.nodes.map(n => [n.id, n.geometry]));
   fontFamily = result.fontFamily; undo = []; redo = []; clearSelection(); ports = [];
-  pendingPort = null; previewTarget = null; mode = 'select'; placement = null; dirty = false;
+  pendingPort = null; previewTarget = null; reconnect = null; mode = 'select'; placement = null; dirty = false;
   if (!preserveDraft) clearDraft();
   render(); fit(); status('图纸已打开 · 点击对象编辑'); message('');
 }
@@ -223,7 +224,7 @@ function zoom(factor, at) {
 function renderCanvas() {
   if (!doc) return;
   svg.replaceChildren();
-  svg.classList.toggle('connecting', mode === 'connect');
+  svg.classList.toggle('connecting', mode === 'connect' || mode === 'reconnect');
   svg.classList.toggle('moving-all', mode === 'move-all');
   svg.classList.toggle('box-selecting', mode === 'box-select' || drag?.kind === 'box');
   svg.classList.toggle('placing', !!placement || ['junction', 'text'].includes(mode));
@@ -236,7 +237,8 @@ function renderCanvas() {
   for (const edge of doc.edges) {
     let points;
     try { points = edgePoints(edge); } catch { continue; }
-    const g = shape('g', { class: 'edge' + (selected('edge', edge.id) ? ' selected' : ''), 'data-kind': 'edge', 'data-id': edge.id });
+    const g = shape('g', { class: 'edge' + (selected('edge', edge.id) ? ' selected' : '')
+      + (reconnect?.edgeId === edge.id ? ' reconnecting-edge' : ''), 'data-kind': 'edge', 'data-id': edge.id });
     const p = points.map(p => p.join(',')).join(' ');
     shape('polyline', { points: p, class: 'edge-hit' }, g);
     shape('polyline', { points: p, class: 'edge-visible', fill: 'none', stroke: edge.color,
@@ -258,6 +260,15 @@ function renderCanvas() {
       const points = route(start, previewTarget, []);
       shape('polyline', { points: points.map(p => p.join(',')).join(' '), class: 'connection-preview' });
     } catch { /* The source may have been removed while connecting. */ }
+  }
+  if (mode === 'reconnect' && reconnect && previewTarget) {
+    try {
+      const edge = doc.edges.find(e => e.id === reconnect.edgeId);
+      const source = reconnect.side === 'source' ? previewTarget : endpoint(edge.source, nodes, doc.junctions);
+      const target = reconnect.side === 'target' ? previewTarget : endpoint(edge.target, nodes, doc.junctions);
+      const points = route(source, target, edge.vertices);
+      shape('polyline', { points: points.map(p => p.join(',')).join(' '), class: 'connection-preview' });
+    } catch { /* Geometry may still be loading. */ }
   }
   for (const n of nodes) {
     const g = shape('g', { class: 'node' + (selected('node', n.id) ? ' selected' : ''),
@@ -312,6 +323,7 @@ function renderCanvas() {
 
 function renderVertices() {
   svg.querySelectorAll('[data-kind="vertex"], [data-kind="segment"]').forEach(element => element.remove());
+  if (mode === 'reconnect') return;
   const e = selection?.kind === 'edge' && findSelected();
   if (e && mode === 'select') {
     const nodes = currentNodes();
@@ -361,6 +373,15 @@ function inspectorButton(parent, caption, action) {
 }
 function renderInspector() {
   const root = $('inspector'); root.replaceChildren();
+  if (mode === 'reconnect' && reconnect) {
+    $('selection-kind').textContent = 'RECONNECT';
+    root.append(html('h2', reconnect.side === 'source' ? '重新连接起点' : '重新连接终点', 'object-heading'));
+    const edge = doc.edges.find(e => e.id === reconnect.edgeId);
+    root.append(html('p', '当前端点：' + refName(edge[reconnect.side]), 'muted'));
+    root.append(html('p', '点击新的设备端口或三通。靠近时吸附并预览走线，折点、样式和状态点保留。', 'muted'));
+    inspectorButton(root, '取消重接（Esc）', cancelReconnect);
+    return;
+  }
   if (mode === 'move-all') {
     $('selection-kind').textContent = 'ALL';
     root.append(html('h2', '整体移动', 'object-heading'));
@@ -447,6 +468,9 @@ function renderInspector() {
     inspectorButton(buttons, '清除折点', () => edit(() => { item.vertices = []; }));
     inspectorButton(root, '在管路中间插入三通', () => splitEdge(item));
     inspectorButton(root, '添加状态点', () => addStateLabel(item));
+    const endpoints = html('div', undefined, 'button-row reconnect-buttons'); root.append(endpoints);
+    inspectorButton(endpoints, '重接起点', () => beginReconnect(item, 'source'));
+    inspectorButton(endpoints, '重接终点', () => beginReconnect(item, 'target'));
   }
 }
 function coordinateFields(parent, item, prefix = '') {
@@ -519,6 +543,7 @@ function render() {
   document.querySelector('.canvas-hint').textContent = mode === 'move-all'
     ? '拖动任意位置整体移动全部内容 · Ctrl+Z 撤销 · Esc 退出'
     : mode === 'box-select' ? '拖出矩形完整框住对象 · Shift 追加选择 · Esc 取消'
+    : mode === 'reconnect' ? '点击设备端口或三通完成重接 · 空格拖动平移 · Esc 取消'
     : '滚轮缩放 · 空白拖动平移 · Shift+空白拖动框选 · 双击管线加折点';
   document.querySelectorAll('[data-tool]').forEach(b => {
     const active = b.dataset.tool === mode && !placement;
@@ -541,7 +566,30 @@ function addNode(type, position) {
   });
 }
 
+function beginReconnect(edge, side) {
+  message('');
+  reconnect = { edgeId: edge.id, side }; mode = 'reconnect'; placement = null; pendingPort = null; ports = [];
+  previewTarget = endpoint(edge[side], currentNodes(), doc.junctions);
+  render(); status('请选择新的' + (side === 'source' ? '起点' : '终点') + '端口或三通 · Esc 取消');
+}
+function cancelReconnect() {
+  message('');
+  reconnect = null; previewTarget = null; mode = 'select'; render(); status('已取消重接，管路保持原连接');
+}
 function onPort(ref) {
+  if (mode === 'reconnect' && reconnect) {
+    try {
+      const edge = doc.edges.find(e => e.id === reconnect.edgeId);
+      const other = edge[reconnect.side === 'source' ? 'target' : 'source'];
+      const a = endpoint(ref, currentNodes(), doc.junctions), b = endpoint(other, currentNodes(), doc.junctions);
+      if (a.point.every((v, i) => v === b.point[i])) throw new Error('管路两端不能连接到同一位置，请选择其他端口或三通。');
+      const next = reconnectEdge(doc, edge.id, reconnect.side, ref);
+      message('');
+      reconnect = null; previewTarget = null; mode = 'select';
+      edit(() => { doc = next; });
+    } catch (error) { message(error.message); }
+    return;
+  }
   if (mode === 'connect') {
     if (!pendingPort) {
       pendingPort = ref;
@@ -587,6 +635,7 @@ function splitEdge(edge) {
 }
 
 function removeSelected() {
+  if (reconnect) return message('请先完成重接，或按 Esc 取消。');
   if (!multiSelection.length) return;
   try {
     const routes = new Map();
@@ -603,6 +652,7 @@ function removeSelected() {
   } catch (error) { message(error.message); }
 }
 function copySelected() {
+  if (reconnect) return message('请先完成重接，或按 Esc 取消。');
   if (!multiSelection.some(ref => ['node', 'label', 'junction'].includes(ref.kind))) return;
   try {
     const result = copySelection(doc, multiSelection, uid);
@@ -618,6 +668,7 @@ function copySelected() {
   } catch (error) { message(error.message); }
 }
 function history(direction) {
+  if (reconnect) cancelReconnect();
   const from = direction === 'undo' ? undo : redo, to = direction === 'undo' ? redo : undo;
   if (!from.length) return;
   to.push(clone(doc)); doc = from.pop(); clearSelection(); ports = []; pendingPort = null; previewTarget = null;
@@ -676,7 +727,7 @@ document.addEventListener('click', async event => {
 });
 
 function setTool(tool) {
-  mode = tool; placement = null; pendingPort = null; previewTarget = null;
+  mode = tool; placement = null; pendingPort = null; previewTarget = null; reconnect = null;
   if (tool === 'move-all') { clearSelection(); ports = []; }
   render();
   status('工具：' + { select: '选择', 'box-select': '框选：拖出矩形完整框住对象，Shift 可追加', 'move-all': '整体移动：按住左键拖动全部内容', connect: '连线：点击起点和终点端口，鼠标靠近时自动吸附', junction: '在空白处放三通，或选中管路后在属性中插入', text: '在画布点击放置文字' }[tool]);
@@ -686,6 +737,13 @@ svg.addEventListener('pointerdown', event => {
   if (!doc || event.button > 1) return;
   const p = world(event), hit = event.target.closest('[data-kind]');
   if (event.button === 1 || spaceDown) return startPan(event);
+  if (mode === 'reconnect') {
+    event.preventDefault();
+    if (hit?.dataset.kind === 'port') onPort(JSON.parse(hit.dataset.ref));
+    else if (hit?.dataset.kind === 'junction') onPort({ junctionId: hit.dataset.id });
+    else status('请点击设备端口或三通 · 空格拖动平移 · Esc 取消');
+    return;
+  }
   if (mode === 'box-select' || (mode === 'select' && !placement && event.shiftKey && !hit)) {
     drag = { kind: 'box', start: p, point: p, candidates: selectionCandidates(),
       beforeSelection: clone(multiSelection), additive: event.shiftKey, moved: false, pointerId: event.pointerId };
@@ -751,7 +809,7 @@ function startPan(event) {
 }
 svg.addEventListener('pointermove', event => {
   if (!drag) {
-    if (mode === 'connect' && pendingPort) {
+    if ((mode === 'connect' && pendingPort) || reconnect) {
       const next = connectionTarget(event, world(event));
       const changed = !previewTarget || next.point.some((value, index) => value !== previewTarget.point[index])
         || next.direction.some((value, index) => value !== previewTarget.direction[index]);
@@ -800,7 +858,7 @@ svg.addEventListener('pointermove', event => {
   renderCanvas();
 });
 svg.addEventListener('pointerleave', () => {
-  if (!drag && mode === 'connect' && pendingPort && previewTarget) { previewTarget = null; renderCanvas(); }
+  if (!drag && ((mode === 'connect' && pendingPort) || reconnect) && previewTarget) { previewTarget = null; renderCanvas(); }
 });
 function endDrag(event) {
   if (!drag) return;
@@ -828,7 +886,7 @@ function cancelDrag() {
 }
 svg.addEventListener('pointercancel', cancelDrag);
 svg.addEventListener('dblclick', event => {
-  if (mode === 'move-all' || mode === 'box-select') return;
+  if (mode === 'move-all' || mode === 'box-select' || reconnect) return;
   if (event.target.closest('[data-kind="segment"]')) return;
   const hit = event.target.closest('[data-kind="edge"]'); if (!hit) return;
   const edge = doc.edges.find(e => e.id === hit.dataset.id), points = edgePoints(edge), p = world(event);
@@ -837,7 +895,7 @@ svg.addEventListener('dblclick', event => {
 });
 svg.addEventListener('wheel', event => { event.preventDefault(); if (doc) zoom(event.deltaY > 0 ? 1.1 : 1 / 1.1, world(event)); }, { passive: false });
 svg.addEventListener('dragover', event => event.preventDefault());
-svg.addEventListener('drop', event => { event.preventDefault(); const type = event.dataTransfer.getData('text/rrplot-part'); if (catalog.some(c => c.type === type)) addNode(type, world(event)); });
+svg.addEventListener('drop', event => { event.preventDefault(); const type = event.dataTransfer.getData('text/rrplot-part'); if (catalog.some(c => c.type === type)) { reconnect = null; addNode(type, world(event)); } });
 
 $('title').addEventListener('change', event => edit(() => { doc.title = event.target.value; }));
  $('grid').addEventListener('change', () => {
@@ -858,6 +916,7 @@ $('file-input').addEventListener('change', async event => {
 window.addEventListener('beforeunload', event => { if (dirty) { event.preventDefault(); event.returnValue = ''; } });
 window.addEventListener('keydown', async event => {
   if (event.target.matches('input,textarea,select') || document.querySelector('dialog[open]')) return;
+  if (event.key === 'Escape' && reconnect) { event.preventDefault(); cancelReconnect(); return; }
   const modifier = event.ctrlKey || event.metaKey;
   if (event.code === 'Space') { spaceDown = true; event.preventDefault(); }
   if (event.key === 'Escape') { mode = 'select'; placement = null; pendingPort = null; previewTarget = null; ports = []; cancelDrag(); }
@@ -881,7 +940,7 @@ async function init() {
       const b = html('button', undefined, 'part-button'); b.dataset.part = entry.type; b.draggable = true;
       b.append(html('span', entry.label.slice(0, 1), 'part-icon'));
       const name = html('span', entry.label); name.append(html('small', entry.type)); b.append(name);
-      b.addEventListener('click', () => { placement = entry.type; mode = 'select'; pendingPort = null; previewTarget = null; document.body.classList.remove('library-open'); render(); status('在画布点击放置：' + entry.label); });
+      b.addEventListener('click', () => { placement = entry.type; mode = 'select'; pendingPort = null; previewTarget = null; reconnect = null; document.body.classList.remove('library-open'); render(); status('在画布点击放置：' + entry.label); });
       b.addEventListener('dragstart', event => event.dataTransfer.setData('text/rrplot-part', entry.type));
       $('palette').append(b);
     }
