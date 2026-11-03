@@ -58,6 +58,50 @@ def test_heat_pump_receiver_template_uses_gas_liquid_separator_on_suction():
     assert vapor["target"] == {"nodeId": "comp", "portId": "bottom"}
 
 
+def test_separator_template_pipes_stay_outside_body_and_exit_straight():
+    scene = resolve_scene(load_template("heat_pump_receiver"))
+    separator = next(node for node in scene["nodes"] if node["id"] == "separator")
+    left = separator["x"] - separator["params"]["w"] / 2
+    right = separator["x"] + separator["params"]["w"] / 2
+    top = separator["y"] - separator["params"]["h"] / 2
+    bottom = separator["y"] + separator["params"]["h"] / 2
+    for edge in scene["edges"]:
+        for a, b in zip(edge["points"], edge["points"][1:]):
+            if a[0] == b[0]:
+                assert not (left < a[0] < right
+                            and max(a[1], b[1]) > top
+                            and min(a[1], b[1]) < bottom)
+            else:
+                assert not (top < a[1] < bottom
+                            and max(a[0], b[0]) > left
+                            and min(a[0], b[0]) < right)
+    vapor = next(edge for edge in scene["edges"] if edge["id"] == "separator-vapor")
+    assert len(vapor["points"]) == 2
+    assert vapor["points"][0][0] == vapor["points"][1][0]
+
+
+@pytest.mark.parametrize("flip", [False, True])
+@pytest.mark.parametrize("stub", [16, 100])
+def test_separator_svg_bounds_include_connections_and_mirrored_ports(flip, stub):
+    geometry = describe("separator_utube", {"flip": flip, "stub": stub})
+    x, y, w, h = geometry["box"]
+    for port in geometry["ports"].values():
+        px, py = port["point"]
+        assert x < px < x + w and y < py < y + h
+    assert (geometry["ports"]["in"]["point"][0] > 0) is flip
+    assert (geometry["ports"]["out"]["point"][0] < 0) is flip
+    field = next(item for item in catalog()
+                 if item["type"] == "separator_utube")["fields"]["flip"]
+    assert field["type"] == "checkbox"
+    assert normalize_params("separator_utube", {"flip": flip})["flip"] is flip
+
+
+@pytest.mark.parametrize("value", ["true", "false", 0, 1, None])
+def test_separator_rejects_non_boolean_mirror_values(value):
+    with pytest.raises(ValueError, match="布尔值"):
+        normalize_params("separator_utube", {"flip": value})
+
+
 def test_node_move_updates_pipe_and_attached_label_without_mutating_document():
     d = load_template("evi_ftvi")
     old = resolve_scene(d)

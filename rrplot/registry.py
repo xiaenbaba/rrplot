@@ -13,6 +13,10 @@ def choice(label, default, values):
     return dict(label=label, default=default, options=list(values), kind="select")
 
 
+def boolean(label, default=False):
+    return dict(label=label, default=default, kind="boolean", type="checkbox")
+
+
 REGISTRY = {
     "compressor": dict(label="压缩机", factory=parts.make_compressor, fields={
         "r": number("半径", 42, 8, 250),
@@ -36,7 +40,7 @@ REGISTRY = {
         "w": number("宽度", 120, 40, 500),
         "h": number("高度", 118, 40, 600),
         "stub": number("接管长度", 16, 4, 100),
-        "flip": choice("入口方向", False, [False, True])}),
+        "flip": boolean("镜像进出管")}),
     "intermediate_hex": dict(label="中间换热器",
                              factory=parts.make_intermediate_hex, fields={
         "w": number("宽度", 80, 20, 500),
@@ -64,7 +68,10 @@ def normalize_params(kind, params):
     result = {}
     for key, field in fields.items():
         value = params.get(key, field["default"])
-        if field["kind"] == "select":
+        if field["kind"] == "boolean":
+            if not isinstance(value, bool):
+                raise ValueError(f"{key} 必须为布尔值")
+        elif field["kind"] == "select":
             if value not in field["options"]:
                 raise ValueError(f"{key} 必须为 {field['options']} 之一")
         elif (isinstance(value, bool) or not isinstance(value, (int, float))
@@ -92,7 +99,11 @@ def describe(kind, params):
             w = params["r"]
     else:
         w, h = params["w"], params["h"]
-    return dict(width=w, height=h, box=[-w / 2 - 3, -h / 2 - 3, w + 6, h + 6],
+    top = -h / 2
+    if kind == "separator_utube":
+        top -= params["stub"]
+    return dict(width=w, height=h, box=[-w / 2 - 3, top - 3,
+                                      w + 6, h / 2 - top + 6],
                 ports={key: dict(point=list(point),
                                  direction=list(part.direction(key)))
                        for key, point in part.ports.items()})
