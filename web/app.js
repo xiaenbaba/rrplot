@@ -1,5 +1,6 @@
 import { rotate, endpoint, route, along, nearestSegment, splitRoute, translateDocument, editableSegments, moveSegment, transformedBox, selectInBox, projectOnRoute } from './geometry.js';
 import { copySelection, deleteSelection, translateSelection, reverseEdge, splitEdgeLabels, reconnectEdge } from './document.js';
+import { inspectDiagram } from './checks.js';
 
 const $ = id => document.getElementById(id);
 const svg = $('diagram');
@@ -681,6 +682,55 @@ function download(blob, filename) {
 }
 function filename(extension) { return (doc.title || 'rrplot').replace(/[\\/:*?"<>|]/g, '_') + '.' + extension; }
 
+function objectName(ref) {
+  const item = doc[{ node: 'nodes', edge: 'edges', junction: 'junctions', label: 'labels' }[ref.kind]].find(i => i.id === ref.id);
+  if (ref.kind === 'edge') return '管路：' + refName(item.source) + ' → ' + refName(item.target);
+  return ref.kind === 'node' ? '设备：' + item.title : ref.kind === 'label' ? '文字：' + item.text : '三通 · ' + item.id.slice(-5);
+}
+function locateIssue(ref) {
+  $('checks-dialog').close();
+  mode = 'select'; placement = null; reconnect = null; pendingPort = null; previewTarget = null; ports = [];
+  setSelection(ref.kind, ref.id); render();
+  let box = selectionCandidates().find(item => item.kind === ref.kind && item.id === ref.id)?.box;
+  if (ref.kind === 'edge') {
+    const points = edgePoints(findSelected()), xs = points.map(p => p[0]), ys = points.map(p => p[1]);
+    box = [Math.min(...xs), Math.min(...ys), Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)];
+  }
+  if (box) {
+    const [x, y, w, h] = box, ratio = svg.clientWidth / svg.clientHeight;
+    view.w = Math.max(view.w, w + 80, (h + 80) * ratio); view.h = view.w / ratio;
+    view.x = x + w / 2 - view.w / 2; view.y = y + h / 2 - view.h / 2; updateView();
+  }
+  document.body.classList.remove('library-open'); document.body.classList.add('properties-open');
+  document.querySelector('.properties').scrollTop = 0;
+  svg.focus({ preventScroll: true }); status('已定位：' + objectName(ref));
+}
+async function runChecks() {
+  if (reconnect || drag || pendingPort) return message('请先完成当前连接或拖动，或按 Esc 取消，再检查图纸。');
+  const version = revision;
+  status('正在检查图纸…');
+  let result;
+  try { result = await api('resolve', { document: clone(doc) }); }
+  catch (error) { status('检查未完成，请查看提示'); throw error; }
+  if (version !== revision || drag || reconnect || pendingPort) {
+    status('图纸已变化，请重新检查');
+    return message('图纸或当前操作已变化，请完成后重新点击“检查”。');
+  }
+  geometries = new Map(result.nodes.map(n => [n.id, n.geometry])); fontFamily = result.fontFamily; renderCanvas();
+  const routes = new Map(doc.edges.map(edge => [edge.id, edgePoints(edge)]));
+  const issues = inspectDiagram(doc, { nodes: currentNodes(), routes, bounds: selectionCandidates() });
+  const root = $('checks-results'); root.replaceChildren();
+  $('checks-summary').textContent = issues.length ? `发现 ${issues.length} 项待核对，点击结果定位并查看属性。` : '未发现连接或页面越界问题。';
+  for (const issue of issues.slice(0, 100)) {
+    const button = html('button', undefined, 'check-result');
+    button.append(html('strong', issue.title), html('span', objectName(issue.ref), 'check-object'), html('span', issue.detail, 'check-detail'), html('span', '定位 →', 'check-locate'));
+    button.addEventListener('click', () => locateIssue(issue.ref)); root.append(button);
+  }
+  if (issues.length > 100) root.append(html('p', '仅显示前 100 项；修改后再次检查可查看剩余结果。', 'muted'));
+  if (!$('checks-dialog').open) $('checks-dialog').showModal();
+  status(issues.length ? `检查完成 · ${issues.length} 项待核对` : '检查完成 · 未发现问题');
+}
+
 const actions = {
   new: async () => { if (await confirmReplace()) await replaceDocument({ schemaVersion: 1, title: '未命名图纸', page: { width: 1000, height: 700 }, nodes: [], edges: [], junctions: [], labels: [] }); },
   open: () => $('file-input').click(),
@@ -705,6 +755,7 @@ const actions = {
     $('preview-dialog').showModal(); status('正式出图预览已生成');
   },
   'close-preview': () => $('preview-dialog').close(),
+  check: runChecks, 'close-checks': () => $('checks-dialog').close(),
   'toggle-library': () => { document.body.classList.toggle('library-open'); document.body.classList.remove('properties-open'); },
   'toggle-properties': () => { document.body.classList.toggle('properties-open'); document.body.classList.remove('library-open'); },
   undo: () => history('undo'), redo: () => history('redo'), copy: copySelected, delete: removeSelected,

@@ -117,6 +117,15 @@ dialog::backdrop { background: #18322c66; }
 .preview-body { height: calc(100% - 58px); background: #eef1f4; display: flex; justify-content: center; align-items: center; padding: 20px; }
 .preview-body img { max-width: 100%; max-height: 100%; background: white; box-shadow: 0 2px 12px #0001; }
 #replace-dialog { width: min(420px, 90vw); height: fit-content; max-height: calc(100vh - 40px); }
+#checks-dialog { width: min(640px, 94vw); height: auto; max-height: 85vh; }
+.checks-body { padding: 8px 20px 20px; overflow-y: auto; max-height: calc(85vh - 65px); }
+#checks-summary { font-size: 12px; line-height: 1.7; }
+#checks-results { display: grid; gap: 8px; }
+.check-result { display: grid; gap: 5px; text-align: left; white-space: normal; padding: 12px; }
+.check-result strong { color: #875520; font-size: 12px; }
+.check-object { overflow-wrap: anywhere; color: #344254; font-size: 12px; }
+.check-detail { color: #75818b; font-size: 11px; line-height: 1.6; }
+.check-locate { color: var(--accent); font-size: 11px; justify-self: end; }
 #replace-dialog form { padding: 24px; }
 #replace-dialog h2 { margin: 0 0 12px; font-size: 17px; }
 #replace-dialog p { color: #75818b; line-height: 1.8; margin-bottom: 22px; }
