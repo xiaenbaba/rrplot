@@ -1,4 +1,5 @@
 import { rotate, endpoint, route, along, nearestSegment, splitRoute, translateDocument, editableSegments, moveSegment, transformedBox, selectInBox } from './geometry.js';
+import { copySelection, deleteSelection, translateSelection } from './document.js';
 
 const $ = id => document.getElementById(id);
 const svg = $('diagram');
@@ -339,6 +340,7 @@ function renderInspector() {
     $('selection-kind').textContent = 'MULTI';
     root.append(html('h2', `已选择 ${multiSelection.length} 项`, 'object-heading'));
     root.append(html('p', '按住 Shift 点击可添加或取消选择，Shift+拖动空白可追加框选。拖动任意已选对象，可一起移动设备、三通和文字。', 'muted'));
+    root.append(html('p', '复制会包含设备标签和组内管路；删除作用于全部选择，两种操作均可一次撤销。', 'muted'));
     const layout = html('div', undefined, 'layout-grid');
     for (const [action, caption] of [
       ['align-left', '左对齐'], ['align-center-x', '水平居中'], ['align-right', '右对齐'],
@@ -535,51 +537,27 @@ function splitEdge(edge) {
   });
 }
 
-function removeJunction(junction) {
-  const incident = doc.edges.filter(edge =>
-    [edge.source, edge.target].some(ref => ref.junctionId === junction.id));
-  const incoming = incident.find(edge => edge.target.junctionId === junction.id);
-  const outgoing = incident.find(edge => edge.source.junctionId === junction.id);
-  if (incident.length === 2 && incoming && outgoing) {
-    const merged = { ...clone(incoming), target: clone(outgoing.target),
-      vertices: [...incoming.vertices, ...outgoing.vertices] };
-    doc.edges = doc.edges.filter(edge => edge !== incoming && edge !== outgoing);
-    doc.edges.push(merged);
-  } else {
-    doc.edges = doc.edges.filter(edge =>
-      ![edge.source, edge.target].some(ref => ref.junctionId === junction.id));
-  }
-  doc.junctions = doc.junctions.filter(item => item.id !== junction.id);
-  ports = ports.filter(ref => ref.junctionId !== junction.id);
-  pendingPort = null; previewTarget = null;
-  clearSelection();
-}
-
 function removeSelected() {
-  const item = findSelected(); if (!item) return;
-  edit(() => {
-    const key = selection.kind;
-    if (key === 'junction') { removeJunction(item); return; }
-    if (key === 'node' || key === 'junction') {
-      const prop = key === 'node' ? 'nodeId' : 'junctionId';
-      doc.edges = doc.edges.filter(e => e.source[prop] !== item.id && e.target[prop] !== item.id);
-      doc.labels = doc.labels.filter(l => l.nodeId !== item.id);
-      ports = ports.filter(p => p[prop] !== item.id); pendingPort = null; previewTarget = null;
-    }
-    const collection = { node: 'nodes', label: 'labels', edge: 'edges', junction: 'junctions' }[key];
-    doc[collection] = doc[collection].filter(o => o.id !== item.id); clearSelection();
-  });
+  if (!multiSelection.length) return;
+  try {
+    const next = deleteSelection(doc, multiSelection);
+    edit(() => {
+      doc = next;
+      ports = ports.filter(ref => ref.nodeId ? doc.nodes.some(n => n.id === ref.nodeId)
+        : doc.junctions.some(j => j.id === ref.junctionId));
+      pendingPort = null; previewTarget = null; clearSelection();
+    });
+  } catch (error) { message(error.message); }
 }
 function copySelected() {
-  const item = findSelected(); if (!item || !['node', 'label', 'junction'].includes(selection.kind)) return;
-  edit(() => {
-    const n = clone(item); n.id = uid(selection.kind); n.x += 20; n.y += 20;
-    if (selection.kind === 'node') {
-      doc.nodes.push(n);
-      doc.labels.filter(l => l.nodeId === item.id).forEach(l => doc.labels.push({ ...clone(l), id: uid('label'), nodeId: n.id }));
-    } else doc[selection.kind === 'label' ? 'labels' : 'junctions'].push(n);
-    setSelection(selection.kind, n.id);
-  });
+  if (!multiSelection.some(ref => ['node', 'label', 'junction'].includes(ref.kind))) return;
+  try {
+    const result = copySelection(doc, multiSelection, uid);
+    edit(() => {
+      doc = result.document; multiSelection = result.selection; selection = multiSelection.at(-1) || null;
+      pendingPort = null; previewTarget = null; mode = 'select'; placement = null;
+    });
+  } catch (error) { message(error.message); }
 }
 function history(direction) {
   const from = direction === 'undo' ? undo : redo, to = direction === 'undo' ? redo : undo;
@@ -752,28 +730,7 @@ svg.addEventListener('pointermove', event => {
     renderCanvas(); return;
   }
   if (drag.kind === 'multi') {
-    doc = clone(drag.before);
-    const movedNodes = new Set(multiSelection.filter(ref => ref.kind === 'node').map(ref => ref.id));
-    const dx = snapped(delta[0]), dy = snapped(delta[1]);
-    for (const ref of multiSelection) {
-      if (ref.kind === 'node') {
-        const item = doc.nodes.find(node => node.id === ref.id);
-        item.x += dx; item.y += dy;
-      } else if (ref.kind === 'junction') {
-        const item = doc.junctions.find(junction => junction.id === ref.id);
-        item.x += dx; item.y += dy;
-      } else if (ref.kind === 'label') {
-        const item = doc.labels.find(label => label.id === ref.id);
-        if (item.nodeId && movedNodes.has(item.nodeId)) continue;
-        if (item.nodeId) {
-          const node = doc.nodes.find(candidate => candidate.id === item.nodeId);
-          const local = rotate(delta, -node.rotation);
-          item.x += snapped(local[0]); item.y += snapped(local[1]);
-        } else {
-          item.x += dx; item.y += dy;
-        }
-      }
-    }
+    doc = translateSelection(drag.before, multiSelection, delta.map(snapped));
     renderCanvas(); return;
   }
   const item = findSelected();

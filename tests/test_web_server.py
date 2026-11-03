@@ -54,6 +54,9 @@ def test_static_and_catalog_interfaces(service):
     assert status == 200 and b'id="diagram"' in body
     assert headers["Content-Type"] == "text/html; charset=utf-8"
     assert request(service, "/app.js")[1]["Content-Type"].startswith("text/javascript")
+    status, headers, body = request(service, "/document.js")
+    assert status == 200 and b"copySelection" in body
+    assert headers["Content-Type"].startswith("text/javascript")
     assert json.loads(request(service, "/api/health")[2])["ok"] is True
     assert len(json.loads(request(service, "/api/catalog")[2])) == 6
     assert len(json.loads(request(service, "/api/templates")[2])) == 5
