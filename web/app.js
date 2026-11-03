@@ -1,4 +1,4 @@
-import { rotate, endpoint, route, along, nearestSegment, splitRoute, translateDocument } from './geometry.js';
+import { rotate, endpoint, route, along, nearestSegment, splitRoute, translateDocument, editableSegments, moveSegment } from './geometry.js';
 
 const $ = id => document.getElementById(id);
 const svg = $('diagram');
@@ -264,8 +264,19 @@ function renderCanvas() {
 }
 
 function renderVertices() {
-  svg.querySelectorAll('[data-kind="vertex"]').forEach(element => element.remove());
+  svg.querySelectorAll('[data-kind="vertex"], [data-kind="segment"]').forEach(element => element.remove());
   const e = selection?.kind === 'edge' && findSelected();
+  if (e && mode === 'select') {
+    const nodes = currentNodes();
+    const source = endpoint(e.source, nodes, doc.junctions), target = endpoint(e.target, nodes, doc.junctions);
+    for (const { index, axis, point: [x, y] } of editableSegments(source, target, e.vertices)) {
+      const handle = shape('rect', { x: x - (axis ? 9 : 4), y: y - (axis ? 4 : 9),
+        width: axis ? 18 : 8, height: axis ? 8 : 18, rx: 3,
+        class: 'segment-handle ' + (axis ? 'horizontal' : 'vertical'),
+        'data-kind': 'segment', 'data-id': e.id, 'data-index': index });
+      shape('title', {}, handle).textContent = axis ? '上下拖动水平线段' : '左右拖动垂直线段';
+    }
+  }
   if (e) e.vertices.forEach((v, i) => {
     const c = shape('rect', { x: v[0] - 4, y: v[1] - 4, width: 8, height: 8,
       class: 'vertex', 'data-kind': 'vertex', 'data-id': e.id, 'data-index': i });
@@ -366,7 +377,7 @@ function renderInspector() {
     field(root, '管路颜色', item.color, v => { item.color = v; }, { type: 'color' });
     field(root, '线型', item.linestyle, v => { item.linestyle = v; }, { options: ['solid', 'dashed'] });
     field(root, '显示流向箭头', item.head, v => { item.head = v; }, { type: 'checkbox' });
-    root.append(html('p', `${item.vertices.length} 个手动顶点。双击管线添加，Alt+点击控制点删除。`, 'muted'));
+    root.append(html('p', `${item.vertices.length} 个手动顶点。拖动线段中间的长条手柄调整走线；双击管线添加折点，Alt+点击方形折点删除。`, 'muted'));
     const buttons = html('div', undefined, 'button-row'); root.append(buttons);
     inspectorButton(buttons, '反向', () => edit(() => { [item.source, item.target] = [item.target, item.source]; item.vertices.reverse(); }));
     inspectorButton(buttons, '清除折点', () => edit(() => { item.vertices = []; }));
@@ -636,13 +647,23 @@ svg.addEventListener('pointerdown', event => {
   if (kind === 'vertex' && event.altKey) {
     edit(() => doc.edges.find(e => e.id === id).vertices.splice(Number(hit.dataset.index), 1)); return;
   }
-  const selectedKind = kind === 'vertex' ? 'edge' : kind;
+  const selectedKind = ['vertex', 'segment'].includes(kind) ? 'edge' : kind;
   const additive = event.shiftKey && ['node', 'label', 'junction'].includes(selectedKind);
   const keepMulti = !additive && multiSelection.length > 1
     && multiSelection.some(ref => ref.kind === selectedKind && ref.id === id);
   if (!keepMulti) setSelection(selectedKind, id, additive);
   if (additive) { render(); return; }
   const item = findSelected();
+  if (kind === 'segment') {
+    ++request;
+    const nodes = currentNodes(), index = Number(hit.dataset.index);
+    const source = endpoint(item.source, nodes, doc.junctions), target = endpoint(item.target, nodes, doc.junctions);
+    const segment = editableSegments(source, target, item.vertices).find(s => s.index === index);
+    if (!segment) return;
+    drag = { kind, id, index, source, target, axis: segment.axis, coordinate: segment.point[segment.axis],
+      vertices: clone(item.vertices), start: p, before: clone(doc), pointerId: event.pointerId, moved: false };
+    svg.setPointerCapture(event.pointerId); event.preventDefault(); return;
+  }
   if (kind === 'edge') {
     // Keep the clicked path alive so the browser can deliver a double click.
     svg.querySelectorAll('.selected').forEach(element => element.classList.remove('selected'));
@@ -681,6 +702,15 @@ svg.addEventListener('pointermove', event => {
     updateView(); return;
   }
   const p = world(event), delta = p.map((v, i) => v - drag.start[i]);
+  if (drag.kind === 'segment') {
+    if (!drag.moved && Math.abs(delta[drag.axis]) < 1) return;
+    const offset = snapped(drag.coordinate + delta[drag.axis]) - drag.coordinate;
+    const vertices = moveSegment(drag.source, drag.target, drag.vertices, drag.index, offset);
+    if (vertices.length > 100) return message('管路折点已达上限，请先清除部分折点。');
+    drag.moved = true;
+    doc.edges.find(e => e.id === drag.id).vertices = vertices;
+    renderCanvas(); return;
+  }
   if (!drag.moved && Math.hypot(...delta) < 1) return;
   drag.moved = true;
   if (drag.kind === 'all') {
@@ -740,6 +770,7 @@ function cancelDrag() {
 svg.addEventListener('pointercancel', cancelDrag);
 svg.addEventListener('dblclick', event => {
   if (mode === 'move-all') return;
+  if (event.target.closest('[data-kind="segment"]')) return;
   const hit = event.target.closest('[data-kind="edge"]'); if (!hit) return;
   const edge = doc.edges.find(e => e.id === hit.dataset.id), points = edgePoints(edge), p = world(event);
   const index = nearestSegment(points, p);

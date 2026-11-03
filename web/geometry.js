@@ -87,6 +87,30 @@ export function nearestSegment(points, point) {
   return best.index;
 }
 
+// Port lead-ins stay fixed; only offer handles where a usable span remains.
+export function editableSegments(source, target, vertices = []) {
+  const points = route(source, target, vertices), segments = [];
+  for (let index = 0; index < points.length - 1; index++) {
+    const a = points[index], b = points[index + 1];
+    const axis = a[1] === b[1] ? 1 : 0, alongAxis = 1 - axis;
+    const start = index === 0 ? source.point.map((v, i) => v + source.direction[i] * 20) : a;
+    const end = index === points.length - 2 ? target.point.map((v, i) => v + target.direction[i] * 20) : b;
+    if ((end[alongAxis] - start[alongAxis]) * Math.sign(b[alongAxis] - a[alongAxis]) < 24) continue;
+    segments.push({ index, axis, start, end, point: start.map((v, i) => (v + end[i]) / 2) });
+  }
+  return segments;
+}
+
+export function moveSegment(source, target, vertices, index, offset) {
+  const segment = editableSegments(source, target, vertices).find(s => s.index === index);
+  if (!segment || !offset) return vertices.map(p => [...p]);
+  const points = route(source, target, vertices), { axis, start, end } = segment;
+  const shift = p => p.map((v, i) => i === axis ? v + offset : v);
+  const prefix = index === 0 ? [source.point, start] : points.slice(0, index);
+  const suffix = index === points.length - 2 ? [end, target.point] : points.slice(index + 2);
+  return [...prefix, shift(start), shift(end), ...suffix].slice(1, -1);
+}
+
 // Split a routed polyline while retaining the exact split point in both
 // halves.  This is used when inserting a junction into an existing edge;
 // explicit endpoints keep the two rendered edges anchored to the junction

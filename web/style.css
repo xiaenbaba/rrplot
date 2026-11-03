@@ -66,6 +66,10 @@ input[type=checkbox] { min-height: unset; accent-color: var(--accent); }
 .edge.selected .edge-visible { stroke: #208b7a; }
 .edge:hover .edge-hit { stroke: #26897611; }
 .vertex { fill: #fff; stroke: var(--accent); stroke-width: 1.5; cursor: move; }
+.segment-handle { fill: #d6eee4; stroke: var(--accent); stroke-width: 1.5; }
+.segment-handle:hover { fill: #a9d8c8; }
+.segment-handle.horizontal { cursor: ns-resize; }
+.segment-handle.vertical { cursor: ew-resize; }
 #diagram.moving-all, #diagram.moving-all [data-kind] { cursor: move; }
 .moving-all .node-hit { stroke: #95c5b9; stroke-dasharray: 4 3; }
 .moving-all .port { opacity: 0; pointer-events: none; }
