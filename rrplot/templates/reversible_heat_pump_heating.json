@@ -1,0 +1,456 @@
+{
+  "schemaVersion": 1,
+  "title": "四通阀热泵（制热）",
+  "page": {
+    "width": 1100,
+    "height": 760
+  },
+  "nodes": [
+    {
+      "id": "comp",
+      "type": "compressor",
+      "title": "压缩机",
+      "x": 220,
+      "y": 450,
+      "params": {
+        "r": 42,
+        "style": "圆形"
+      },
+      "rotation": 0
+    },
+    {
+      "id": "reversing",
+      "type": "four_way_valve",
+      "title": "四通换向阀",
+      "x": 480,
+      "y": 250,
+      "params": {
+        "r": 32,
+        "mark": false
+      },
+      "rotation": 0
+    },
+    {
+      "id": "indoor",
+      "type": "heat_exchanger",
+      "title": "室内换热器",
+      "x": 760,
+      "y": 160,
+      "params": {
+        "w": 200,
+        "h": 60,
+        "shape": "rect_x",
+        "orient": "h"
+      },
+      "rotation": 0
+    },
+    {
+      "id": "outdoor",
+      "type": "heat_exchanger",
+      "title": "室外换热器",
+      "x": 760,
+      "y": 600,
+      "params": {
+        "w": 200,
+        "h": 60,
+        "shape": "rect_x",
+        "orient": "h"
+      },
+      "rotation": 0
+    },
+    {
+      "id": "filter",
+      "type": "filter",
+      "title": "过滤器",
+      "x": 960,
+      "y": 240,
+      "params": {
+        "w": 48,
+        "h": 26,
+        "stub": 10,
+        "n": 7
+      },
+      "rotation": 90
+    },
+    {
+      "id": "eev",
+      "type": "expansion_valve",
+      "title": "EEV",
+      "x": 960,
+      "y": 390,
+      "params": {
+        "r": 10,
+        "orient": "v"
+      },
+      "rotation": 0
+    },
+    {
+      "id": "separator",
+      "type": "separator_utube",
+      "title": "气液分离器",
+      "x": 263.5,
+      "y": 610,
+      "params": {
+        "w": 100,
+        "h": 110,
+        "stub": 14,
+        "flip": true
+      },
+      "rotation": 0
+    }
+  ],
+  "junctions": [],
+  "edges": [
+    {
+      "id": "discharge",
+      "source": {
+        "nodeId": "comp",
+        "portId": "top"
+      },
+      "target": {
+        "nodeId": "reversing",
+        "portId": "exhaust"
+      },
+      "vertices": [
+        [
+          220,
+          100
+        ],
+        [
+          480,
+          100
+        ]
+      ],
+      "head": true,
+      "headAt": [
+        0.55
+      ],
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid"
+    },
+    {
+      "id": "indoor-gas",
+      "source": {
+        "nodeId": "reversing",
+        "portId": "condenser"
+      },
+      "target": {
+        "nodeId": "indoor",
+        "portId": "left"
+      },
+      "vertices": [
+        [
+          600,
+          250
+        ],
+        [
+          600,
+          160
+        ]
+      ],
+      "head": true,
+      "headAt": [
+        0.55
+      ],
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid"
+    },
+    {
+      "id": "outdoor-gas",
+      "source": {
+        "nodeId": "outdoor",
+        "portId": "left"
+      },
+      "target": {
+        "nodeId": "reversing",
+        "portId": "evaporator"
+      },
+      "vertices": [
+        [
+          480,
+          600
+        ]
+      ],
+      "head": true,
+      "headAt": [
+        0.55
+      ],
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid"
+    },
+    {
+      "id": "indoor-liquid",
+      "source": {
+        "nodeId": "indoor",
+        "portId": "right"
+      },
+      "target": {
+        "nodeId": "filter",
+        "portId": "in"
+      },
+      "vertices": [
+        [
+          960,
+          160
+        ]
+      ],
+      "head": true,
+      "headAt": [
+        0.55
+      ],
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid"
+    },
+    {
+      "id": "filter-eev",
+      "source": {
+        "nodeId": "filter",
+        "portId": "out"
+      },
+      "target": {
+        "nodeId": "eev",
+        "portId": "in"
+      },
+      "vertices": [],
+      "head": true,
+      "headAt": [
+        0.55
+      ],
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid"
+    },
+    {
+      "id": "outdoor-liquid",
+      "source": {
+        "nodeId": "eev",
+        "portId": "out"
+      },
+      "target": {
+        "nodeId": "outdoor",
+        "portId": "right"
+      },
+      "vertices": [
+        [
+          960,
+          600
+        ]
+      ],
+      "head": true,
+      "headAt": [
+        0.55
+      ],
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid"
+    },
+    {
+      "id": "suction-in",
+      "source": {
+        "nodeId": "reversing",
+        "portId": "suction"
+      },
+      "target": {
+        "nodeId": "separator",
+        "portId": "in"
+      },
+      "vertices": [
+        [
+          360,
+          250
+        ],
+        [
+          360,
+          500
+        ],
+        [
+          300,
+          500
+        ]
+      ],
+      "head": true,
+      "headAt": [
+        0.55
+      ],
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid"
+    },
+    {
+      "id": "suction",
+      "source": {
+        "nodeId": "separator",
+        "portId": "out"
+      },
+      "target": {
+        "nodeId": "comp",
+        "portId": "bottom"
+      },
+      "vertices": [],
+      "head": true,
+      "headAt": [
+        0.55
+      ],
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid"
+    }
+  ],
+  "labels": [
+    {
+      "id": "mode-heading",
+      "text": "四通阀热泵 · 制热工况",
+      "x": 550,
+      "y": 42,
+      "size": 18,
+      "ha": "center",
+      "boxed": false,
+      "color": "#111111"
+    },
+    {
+      "id": "label-comp",
+      "text": "压缩机",
+      "x": -70,
+      "y": 0,
+      "size": 14,
+      "ha": "right",
+      "boxed": false,
+      "color": "#111111",
+      "nodeId": "comp"
+    },
+    {
+      "id": "label-reversing",
+      "text": "四通换向阀",
+      "x": 110,
+      "y": 85,
+      "size": 14,
+      "ha": "center",
+      "boxed": false,
+      "color": "#111111",
+      "nodeId": "reversing"
+    },
+    {
+      "id": "label-indoor",
+      "text": "室内换热器\n（冷凝器）",
+      "x": 0,
+      "y": -65,
+      "size": 14,
+      "ha": "center",
+      "boxed": false,
+      "color": "#111111",
+      "nodeId": "indoor"
+    },
+    {
+      "id": "label-outdoor",
+      "text": "室外换热器\n（蒸发器）",
+      "x": 0,
+      "y": -65,
+      "size": 14,
+      "ha": "center",
+      "boxed": false,
+      "color": "#111111",
+      "nodeId": "outdoor"
+    },
+    {
+      "id": "label-filter",
+      "text": "过滤器",
+      "x": 0,
+      "y": -55,
+      "size": 13,
+      "ha": "left",
+      "boxed": false,
+      "color": "#111111",
+      "nodeId": "filter"
+    },
+    {
+      "id": "label-eev",
+      "text": "EEV",
+      "x": 25,
+      "y": 0,
+      "size": 13,
+      "ha": "left",
+      "boxed": false,
+      "color": "#111111",
+      "nodeId": "eev"
+    },
+    {
+      "id": "label-separator",
+      "text": "气液分离器",
+      "x": 0,
+      "y": 88,
+      "size": 14,
+      "ha": "center",
+      "boxed": false,
+      "color": "#111111",
+      "nodeId": "separator"
+    },
+    {
+      "id": "port-d",
+      "text": "D",
+      "x": -14,
+      "y": -48,
+      "size": 12,
+      "ha": "right",
+      "boxed": true,
+      "color": "#111111",
+      "nodeId": "reversing"
+    },
+    {
+      "id": "port-c",
+      "text": "C",
+      "x": 48,
+      "y": -16,
+      "size": 12,
+      "ha": "left",
+      "boxed": true,
+      "color": "#111111",
+      "nodeId": "reversing"
+    },
+    {
+      "id": "port-e",
+      "text": "E",
+      "x": 14,
+      "y": 48,
+      "size": 12,
+      "ha": "left",
+      "boxed": true,
+      "color": "#111111",
+      "nodeId": "reversing"
+    },
+    {
+      "id": "port-s",
+      "text": "S",
+      "x": -48,
+      "y": 16,
+      "size": 12,
+      "ha": "right",
+      "boxed": true,
+      "color": "#111111",
+      "nodeId": "reversing"
+    },
+    {
+      "id": "valve-state",
+      "text": "阀内连通：D→C，E→S",
+      "x": 720,
+      "y": 400,
+      "size": 13,
+      "ha": "center",
+      "boxed": false,
+      "color": "#111111"
+    },
+    {
+      "id": "mode-note",
+      "text": "室内放热 · 室外吸热",
+      "x": 720,
+      "y": 450,
+      "size": 13,
+      "ha": "center",
+      "boxed": false,
+      "color": "#111111"
+    }
+  ]
+}

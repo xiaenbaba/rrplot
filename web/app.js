@@ -737,10 +737,12 @@ function renderObjectList() {
   if (!found.length) root.append(html('p', entries.length ? '没有匹配的对象，请调整搜索或类型。' : '图纸为空，请从图元库添加设备。', 'muted'));
   if (found.length > 200) root.append(html('p', '仅显示前 200 项，请搜索名称或 ID 缩小范围。', 'muted'));
 }
-for (const [id, showObjects] of [['show-parts', false], ['show-objects', true]]) {
+const libraryPanes = [['show-parts', 'library-parts'], ['show-templates', 'templates-panel'], ['show-objects', 'objects-panel']];
+for (const [id] of libraryPanes) {
   $(id).addEventListener('click', () => {
-    $('library-parts').hidden = showObjects; $('objects-panel').hidden = !showObjects;
-    for (const [buttonId, active] of [['show-parts', !showObjects], ['show-objects', showObjects]]) {
+    for (const [buttonId, paneId] of libraryPanes) {
+      const active = buttonId === id;
+      $(paneId).hidden = !active;
       $(buttonId).classList.toggle('active', active); $(buttonId).setAttribute('aria-pressed', active);
     }
     renderObjectList();
@@ -759,6 +761,19 @@ function filterPalette() {
   $('part-empty').hidden = count > 0;
 }
 $('part-search').addEventListener('input', filterPalette);
+function filterTemplates() {
+  const words = $('template-search').value.normalize('NFKC').toLowerCase().trim().split(/\s+/).filter(Boolean);
+  const buttons = [...document.querySelectorAll('[data-template]')];
+  let count = 0;
+  for (const button of buttons) {
+    const text = `${button.textContent} ${button.dataset.template}`.normalize('NFKC').toLowerCase();
+    button.hidden = !words.every(word => text.includes(word));
+    if (!button.hidden) count++;
+  }
+  $('template-count').textContent = `显示 ${count} / 共 ${buttons.length} 个模板`;
+  $('template-empty').hidden = count > 0;
+}
+$('template-search').addEventListener('input', filterTemplates);
 async function runChecks() {
   if (reconnect || drag || pendingPort) return message('请先完成当前连接或拖动，或按 Esc 取消，再检查图纸。');
   const version = revision;
@@ -1080,11 +1095,12 @@ async function init() {
       $('palette').append(b);
     }
     for (const template of data[1]) {
-      const b = html('button', template.title);
-      b.addEventListener('click', async () => { try { if (await confirmReplace()) await replaceDocument(await api('templates/' + template.id)); } catch (error) { message(error.message); } });
+      const b = html('button', template.title); b.dataset.template = template.id;
+      b.addEventListener('click', async () => { try { if (await confirmReplace()) { await replaceDocument(await api('templates/' + template.id)); document.body.classList.remove('library-open'); } } catch (error) { message(error.message); } });
       $('templates').append(b);
     }
     filterPalette();
+    filterTemplates();
     await replaceDocument(data[2], true);
     try { if (JSON.parse(localStorage.getItem(DRAFT))?.document) $('draft-banner').hidden = false; } catch { /* Ignore invalid old drafts. */ }
   } catch (error) { message('无法连接本机服务。请运行 python server/run.py。' + error.message); status('服务未连接'); }

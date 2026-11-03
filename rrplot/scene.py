@@ -16,6 +16,8 @@ TEMPLATES = {
     "heat_pump": "普通热泵循环",
     "heat_pump_receiver": "带气液分离器的普通热泵",
     "evi_intermediate": "EVI 中间换热器喷气增焓",
+    "reversible_heat_pump_heating": "四通阀热泵（制热）",
+    "reversible_heat_pump_cooling": "四通阀热泵（制冷）",
 }
 
 

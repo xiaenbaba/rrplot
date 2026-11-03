@@ -6,6 +6,7 @@ import threading
 
 import pytest
 
+from rrplot.scene import TEMPLATES
 from server.run import make_server
 
 
@@ -69,15 +70,14 @@ def test_static_and_catalog_interfaces(service):
     assert {"compressor", "heat_exchanger", "expansion_valve", "vessel",
             "separator_utube", "intermediate_hex", "four_way_valve",
             "globe_valve", "solenoid_valve", "check_valve", "filter"} == kinds
-    assert len(json.loads(request(service, "/api/templates")[2])) == 5
+    templates = json.loads(request(service, "/api/templates")[2])
+    assert {entry["id"]: entry["title"] for entry in templates} == TEMPLATES
     for path in ("/../pyproject.toml", "/missing", "/api/missing"):
         assert request(service, path)[0] == 404
     assert request(service, "/api/templates/missing")[0] == 400
 
 
-@pytest.mark.parametrize("name", [
-    "evi_ftvi", "ftvi", "heat_pump", "heat_pump_receiver", "evi_intermediate"
-])
+@pytest.mark.parametrize("name", list(TEMPLATES))
 def test_template_edit_reopen_preview_and_exports(service, name):
     document = json.loads(request(service, "/api/templates/" + name)[2])
     node = next(item for item in document["nodes"] if item["id"] in {"eev1", "eev"})

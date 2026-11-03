@@ -22,10 +22,11 @@
   </header>
   <main class="editor">
     <aside class="library">
-      <div class="panel-heading"><span>图元与对象</span><span class="eyebrow">LIBRARY</span></div>
+      <div class="panel-heading"><span>图纸资源</span><span class="eyebrow">LIBRARY</span></div>
       <div class="library-switch" role="group" aria-label="左侧面板">
-        <button id="show-parts" aria-pressed="true" aria-controls="library-parts" class="active">图元模板</button>
-        <button id="show-objects" aria-pressed="false" aria-controls="objects-panel">图纸对象</button>
+        <button id="show-parts" aria-label="图元库" aria-pressed="true" aria-controls="library-parts" class="active">图元</button>
+        <button id="show-templates" aria-label="系统模板" aria-pressed="false" aria-controls="templates-panel">模板</button>
+        <button id="show-objects" aria-label="图纸对象" aria-pressed="false" aria-controls="objects-panel">对象</button>
       </div>
       <div id="library-parts">
       <p class="muted panel-note">选择图元，再点击画布放置</p>
@@ -33,9 +34,14 @@
       <p id="part-count" class="muted" role="status"></p>
       <div id="palette" class="palette"></div>
       <p id="part-empty" class="muted" hidden>未找到图元，请调整搜索内容。</p>
-      <div class="panel-heading section-heading"><span>系统模板</span></div>
-      <div id="templates" class="template-list"></div>
       </div>
+      <section id="templates-panel" aria-label="系统模板列表" hidden>
+        <p class="muted panel-note">选择系统模板，载入完整图纸</p>
+        <label class="field"><span>搜索模板</span><input id="template-search" type="search" placeholder="名称或英文 ID" autocomplete="off"></label>
+        <p id="template-count" class="muted" role="status"></p>
+        <div id="templates" class="template-list"></div>
+        <p id="template-empty" class="muted" hidden>未找到模板，请调整搜索内容。</p>
+      </section>
       <section id="objects-panel" aria-label="图纸对象列表" hidden>
         <label class="field"><span>搜索对象</span><input id="object-search" type="search" placeholder="名称、文字或 ID" autocomplete="off"></label>
         <label class="field"><span>对象类型</span><select id="object-kind"><option value="">全部类型</option><option value="node">设备</option><option value="edge">管路</option><option value="junction">三通</option><option value="label">文字</option></select></label>
