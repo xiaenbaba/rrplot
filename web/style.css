@@ -49,6 +49,8 @@ input[type=checkbox] { min-height: unset; accent-color: var(--accent); }
 #diagram { width: 100%; flex: 1; min-height: 0; touch-action: none; user-select: none; outline: none; cursor: default; }
 #diagram.placing { cursor: crosshair; }
 #diagram.panning { cursor: grabbing; }
+#diagram.box-selecting, #diagram.box-selecting [data-kind] { cursor: crosshair; }
+.selection-marquee { fill: #208b7a18; stroke: var(--accent); stroke-width: 1; stroke-dasharray: 5 3; vector-effect: non-scaling-stroke; pointer-events: none; }
 .page { filter: drop-shadow(0 3px 10px #1c33451c); }
 .node-image { pointer-events: none; }
 .node-hit { fill: transparent; stroke: transparent; stroke-width: 1; }
@@ -74,6 +76,7 @@ input[type=checkbox] { min-height: unset; accent-color: var(--accent); }
 .moving-all .node-hit { stroke: #95c5b9; stroke-dasharray: 4 3; }
 .moving-all .port { opacity: 0; pointer-events: none; }
 .label-highlight { fill: #e1f3eb; opacity: .65; }
+.diagram-label.selected > rect { stroke: var(--accent); stroke-width: 1; stroke-dasharray: 3 2; }
 .junction-hit { fill: transparent; cursor: crosshair; pointer-events: all; }
 .junction-dot { fill: #111; stroke: none; }
 .junction:hover .junction-dot { stroke: var(--accent); stroke-width: 3; }

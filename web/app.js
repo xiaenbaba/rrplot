@@ -1,4 +1,4 @@
-import { rotate, endpoint, route, along, nearestSegment, splitRoute, translateDocument, editableSegments, moveSegment } from './geometry.js';
+import { rotate, endpoint, route, along, nearestSegment, splitRoute, translateDocument, editableSegments, moveSegment, transformedBox, selectInBox } from './geometry.js';
 
 const $ = id => document.getElementById(id);
 const svg = $('diagram');
@@ -88,6 +88,16 @@ function labelPosition(label) {
   const n = doc.nodes.find(n => n.id === label.nodeId);
   const p = rotate([label.x, label.y], n.rotation);
   return [n.x + p[0], n.y + p[1]];
+}
+function selectionCandidates() {
+  const candidates = currentNodes().map(n => ({ kind: 'node', id: n.id,
+    box: transformedBox(n.geometry.box, [n.x, n.y], n.rotation) }));
+  for (const j of doc.junctions) candidates.push({ kind: 'junction', id: j.id, box: [j.x - 4, j.y - 4, 8, 8] });
+  for (const element of svg.querySelectorAll('.diagram-label')) {
+    const b = element.querySelector('text').getBBox();
+    candidates.push({ kind: 'label', id: element.dataset.id, box: [b.x, b.y, b.width, b.height] });
+  }
+  return candidates;
 }
 function edgePoints(edge) {
   const nodes = currentNodes();
@@ -185,6 +195,7 @@ function renderCanvas() {
   svg.replaceChildren();
   svg.classList.toggle('connecting', mode === 'connect');
   svg.classList.toggle('moving-all', mode === 'move-all');
+  svg.classList.toggle('box-selecting', mode === 'box-select' || drag?.kind === 'box');
   svg.classList.toggle('placing', !!placement || ['junction', 'text'].includes(mode));
   const defs = shape('defs');
   const pattern = shape('pattern', { id: 'grid-pattern', width: 10, height: 10, patternUnits: 'userSpaceOnUse' }, defs);
@@ -246,7 +257,8 @@ function renderCanvas() {
   }
   for (const label of doc.labels) {
     const [x, y] = labelPosition(label);
-    const g = shape('g', { class: 'diagram-label', 'data-kind': 'label', 'data-id': label.id });
+    const g = shape('g', { class: 'diagram-label' + (selected('label', label.id) ? ' selected' : ''),
+      'data-kind': 'label', 'data-id': label.id });
     const text = shape('text', { x, y, fill: label.color, 'font-family': fontFamily,
       'font-size': label.size * 100 / 72, 'text-anchor': { left: 'start', center: 'middle', right: 'end' }[label.ha],
       'dominant-baseline': 'central' }, g);
@@ -260,6 +272,11 @@ function renderCanvas() {
     }
   }
   renderVertices();
+  if (drag?.kind === 'box' && drag.moved) {
+    const [x, y] = drag.start, [ex, ey] = drag.point;
+    shape('rect', { x: Math.min(x, ex), y: Math.min(y, ey), width: Math.abs(ex - x),
+      height: Math.abs(ey - y), class: 'selection-marquee' });
+  }
   updateView();
 }
 
@@ -321,7 +338,7 @@ function renderInspector() {
   if (multiSelection.length > 1) {
     $('selection-kind').textContent = 'MULTI';
     root.append(html('h2', `已选择 ${multiSelection.length} 项`, 'object-heading'));
-    root.append(html('p', '按住 Shift 点击可继续添加或取消选择。拖动任意已选对象，可一起移动设备、三通和文字。', 'muted'));
+    root.append(html('p', '按住 Shift 点击可添加或取消选择，Shift+拖动空白可追加框选。拖动任意已选对象，可一起移动设备、三通和文字。', 'muted'));
     const layout = html('div', undefined, 'layout-grid');
     for (const [action, caption] of [
       ['align-left', '左对齐'], ['align-center-x', '水平居中'], ['align-right', '右对齐'],
@@ -340,7 +357,8 @@ function renderInspector() {
     const pair = html('div', undefined, 'field-pair'); root.append(pair);
     field(pair, '页面宽度', doc.page.width, v => { doc.page.width = v; }, { min: 100, max: 4000 });
     field(pair, '页面高度', doc.page.height, v => { doc.page.height = v; }, { min: 100, max: 4000 });
-    root.append(html('p', '选择设备、标签或管路查看属性。坐标单位与 rrplot 画布一致。', 'muted')); return;
+    root.append(html('p', mode === 'box-select' ? '拖出矩形，完整框住设备、三通或文字。松开后可直接拖动已选对象，按住 Shift 可追加选择。'
+      : '选择设备、标签或管路查看属性；使用“框选”或 Shift+拖动空白可多选。坐标单位与 rrplot 画布一致。', 'muted')); return;
   }
   const kind = selection.kind;
   root.append(html('h2', kind === 'node' ? item.title : { edge: '管路', label: '文字标签', junction: '分流三通' }[kind], 'object-heading'));
@@ -450,8 +468,12 @@ function render() {
   $('counts').textContent = `${doc.nodes.length} 个设备 · ${doc.edges.length} 条管路`;
   document.querySelector('.canvas-hint').textContent = mode === 'move-all'
     ? '拖动任意位置整体移动全部内容 · Ctrl+Z 撤销 · Esc 退出'
-    : '滚轮缩放 · 拖动空白平移 · 双击管线添加折点 · Esc 取消';
-  document.querySelectorAll('[data-tool]').forEach(b => b.classList.toggle('active', b.dataset.tool === mode && !placement));
+    : mode === 'box-select' ? '拖出矩形完整框住对象 · Shift 追加选择 · Esc 取消'
+    : '滚轮缩放 · 空白拖动平移 · Shift+空白拖动框选 · 双击管线加折点';
+  document.querySelectorAll('[data-tool]').forEach(b => {
+    const active = b.dataset.tool === mode && !placement;
+    b.classList.toggle('active', active); b.setAttribute('aria-pressed', active);
+  });
   document.querySelectorAll('[data-part]').forEach(b => b.classList.toggle('active', b.dataset.part === placement));
   $('align-description').textContent = ports.length ? ports.map(refName).join(' → ') : '选择模式下依次点击两个端口，移动第二个对象。';
   for (const action of ['align-x', 'align-y']) document.querySelector(`[data-action="${action}"]`).disabled = ports.length !== 2;
@@ -621,13 +643,18 @@ function setTool(tool) {
   mode = tool; placement = null; pendingPort = null; previewTarget = null;
   if (tool === 'move-all') { clearSelection(); ports = []; }
   render();
-  status('工具：' + { select: '选择', 'move-all': '整体移动：按住左键拖动全部内容', connect: '连线：点击起点和终点端口，鼠标靠近时自动吸附', junction: '在空白处放三通，或选中管路后在属性中插入', text: '在画布点击放置文字' }[tool]);
+  status('工具：' + { select: '选择', 'box-select': '框选：拖出矩形完整框住对象，Shift 可追加', 'move-all': '整体移动：按住左键拖动全部内容', connect: '连线：点击起点和终点端口，鼠标靠近时自动吸附', junction: '在空白处放三通，或选中管路后在属性中插入', text: '在画布点击放置文字' }[tool]);
 }
 
 svg.addEventListener('pointerdown', event => {
   if (!doc || event.button > 1) return;
   const p = world(event), hit = event.target.closest('[data-kind]');
   if (event.button === 1 || spaceDown) return startPan(event);
+  if (mode === 'box-select' || (mode === 'select' && !placement && event.shiftKey && !hit)) {
+    drag = { kind: 'box', start: p, point: p, candidates: selectionCandidates(),
+      beforeSelection: clone(multiSelection), additive: event.shiftKey, moved: false, pointerId: event.pointerId };
+    svg.setPointerCapture(event.pointerId); event.preventDefault(); return;
+  }
   if (mode === 'move-all') {
     ++request;
     drag = { kind: 'all', start: p, before: clone(doc), pointerId: event.pointerId, moved: false };
@@ -702,6 +729,13 @@ svg.addEventListener('pointermove', event => {
     updateView(); return;
   }
   const p = world(event), delta = p.map((v, i) => v - drag.start[i]);
+  if (drag.kind === 'box') {
+    if (!drag.moved && Math.hypot(...delta) < 2) return;
+    drag.moved = true; drag.point = p;
+    multiSelection = selectInBox(drag.candidates, drag.start, p, drag.additive ? drag.beforeSelection : []);
+    selection = multiSelection.at(-1) || null;
+    renderCanvas(); renderInspector(); return;
+  }
   if (drag.kind === 'segment') {
     if (!drag.moved && Math.abs(delta[drag.axis]) < 1) return;
     const offset = snapped(drag.coordinate + delta[drag.axis]) - drag.coordinate;
@@ -757,19 +791,29 @@ function endDrag(event) {
   if (!drag) return;
   const current = drag; drag = null; svg.classList.remove('panning');
   if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
+  if (current.kind === 'box') {
+    if (!current.moved && !current.additive) clearSelection();
+    mode = 'select'; render();
+    status(multiSelection.length ? `已选择 ${multiSelection.length} 项 · 拖动已选对象可一起移动` : '未框选对象，请完整框住设备、三通或文字');
+    return;
+  }
   if (current.kind !== 'pan') finishEdit(current.before);
 }
 svg.addEventListener('pointerup', endDrag);
 function cancelDrag() {
   const current = drag;
   if (drag?.before) doc = drag.before;
+  if (drag?.kind === 'box') {
+    multiSelection = drag.beforeSelection;
+    selection = multiSelection.at(-1) || null;
+  }
   drag = null; svg.classList.remove('panning');
   if (current && svg.hasPointerCapture(current.pointerId)) svg.releasePointerCapture(current.pointerId);
   render();
 }
 svg.addEventListener('pointercancel', cancelDrag);
 svg.addEventListener('dblclick', event => {
-  if (mode === 'move-all') return;
+  if (mode === 'move-all' || mode === 'box-select') return;
   if (event.target.closest('[data-kind="segment"]')) return;
   const hit = event.target.closest('[data-kind="edge"]'); if (!hit) return;
   const edge = doc.edges.find(e => e.id === hit.dataset.id), points = edgePoints(edge), p = world(event);

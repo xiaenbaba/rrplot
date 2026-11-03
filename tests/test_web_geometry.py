@@ -1,4 +1,4 @@
-"""浏览器管路线段拖动与正式输出的一致性。"""
+"""浏览器路由与框选几何。"""
 import base64
 import json
 import shutil
@@ -10,25 +10,29 @@ import pytest
 from rrplot.scene import TEMPLATES, endpoint, load_template, resolve_scene, route
 
 
-def run_geometry(cases):
+def run_geometry_script(script, cases):
     executable = shutil.which("node")
     if not executable:
         pytest.skip("Node not installed; optional JavaScript geometry check")
     raw = Path(__file__).resolve().parents[1].joinpath("web/geometry.js").read_bytes()
     module = "data:text/javascript;base64," + base64.b64encode(raw).decode()
-    script = ("import fs from 'node:fs';"
-              "const {route,editableSegments,moveSegment}=await import("
+    script = ("import fs from 'node:fs';const geometry=await import("
               + json.dumps(module) + ");"
-              "const cases=JSON.parse(fs.readFileSync(0,'utf8'));"
+              "const cases=JSON.parse(fs.readFileSync(0,'utf8'));" + script)
+    result = subprocess.run([executable, "--input-type=module", "-e", script],
+                            input=json.dumps(cases), encoding="utf-8",
+                            capture_output=True, check=True)
+    return json.loads(result.stdout)
+
+
+def run_geometry(cases):
+    script = ("const {route,editableSegments,moveSegment}=geometry;"
               "console.log(JSON.stringify(cases.map(([a,b,vertices])=>({"
               "original:vertices, moves:editableSegments(a,b,vertices).map(s=>({"
               "segment:s, results:[0,-35,26.5].map(offset=>{"
               "const v=moveSegment(a,b,vertices,s.index,offset);"
               "return {offset,vertices:v,points:route(a,b,v)};})}))}))));")
-    result = subprocess.run([executable, "--input-type=module", "-e", script],
-                            input=json.dumps(cases), encoding="utf-8",
-                            capture_output=True, check=True)
-    return json.loads(result.stdout)
+    return run_geometry_script(script, cases)
 
 
 def check_moves(cases, results):
@@ -95,3 +99,45 @@ def test_short_pipe_and_port_lead_ins_do_not_offer_drag_handles():
     last_segment = len(route(*cases[1])) - 2
     assert all(move["segment"]["index"] not in (0, last_segment)
                for move in results[1]["moves"])
+
+
+@pytest.mark.parametrize("start,end", [([0, 0], [100, 100]),
+                                     ([100, 100], [0, 0]),
+                                     ([0, 100], [100, 0]),
+                                     ([100, 0], [0, 100])])
+def test_box_selection_contains_whole_objects_and_appends_without_duplicates(
+        start, end):
+    candidates = [dict(kind="node", id="same", box=[0, 0, 40, 40]),
+                  dict(kind="label", id="same", box=[50, 50, 50, 50]),
+                  dict(kind="junction", id="j", box=[16, 16, 8, 8]),
+                  dict(kind="node", id="partial", box=[90, 20, 30, 30]),
+                  dict(kind="node", id="outside", box=[200, 200, 40, 40])]
+    base = [dict(kind="node", id="outside"), dict(kind="node", id="same"),
+            dict(kind="node", id="same"), dict(kind="edge", id="missing")]
+    script = ("const {candidates,start,end,base}=cases;"
+              "console.log(JSON.stringify({"
+              "replace:geometry.selectInBox(candidates,start,end),"
+              "append:geometry.selectInBox(candidates,start,end,base),"
+              "empty:geometry.selectInBox(candidates,[101,101],[150,150]),"
+              "candidates,base}));")
+    result = run_geometry_script(script, dict(candidates=candidates, start=start,
+                                             end=end, base=base))
+    enclosed = [dict(kind="node", id="same"), dict(kind="label", id="same"),
+                dict(kind="junction", id="j")]
+    assert result["replace"] == enclosed
+    assert result["append"] == [base[0], *enclosed]
+    assert result["empty"] == []
+    assert result["candidates"] == candidates
+    assert result["base"] == base
+
+
+def test_box_selection_uses_rotated_asymmetric_symbol_bounds():
+    script = ("const bounds=[0,90,180,270].map(angle=>"
+              "geometry.transformedBox([-20,-50,40,120],[200,200],angle));"
+              "const candidates=bounds.map((box,i)=>({kind:'node',id:i,box}));"
+              "console.log(JSON.stringify({bounds,selected:"
+              "geometry.selectInBox(candidates,[130,180],[250,220])}));")
+    result = run_geometry_script(script, [])
+    assert result["bounds"] == [[180, 150, 40, 120], [130, 180, 120, 40],
+                                [180, 130, 40, 120], [150, 180, 120, 40]]
+    assert result["selected"] == [dict(kind="node", id=1)]
