@@ -13,7 +13,7 @@
     <div class="document-title"><input id="title" aria-label="图纸名称" value="载入中…"><span id="save-state">本机编辑</span></div>
     <div class="header-actions">
       <button data-action="new">新建</button><button data-action="open">打开</button>
-      <button data-action="save">保存 JSON</button><span class="divider"></span>
+      <button data-action="save" id="save-json">保存 JSON</button><span class="divider"></span>
       <button data-action="undo" id="undo" title="撤销 Ctrl+Z">↶</button><button data-action="redo" id="redo" title="重做 Ctrl+Y">↷</button>
       <button data-action="check" title="检查连接关系和页面边界">检查</button><button data-action="preview">预览</button>
       <select id="export-format" aria-label="导出格式"><option value="svg">SVG 矢量</option><option value="png">PNG 图片</option><option value="pdf">PDF 文档</option></select>
@@ -77,6 +77,7 @@
         <button data-action="toggle-properties" class="mobile-only">属性</button>
       </div>
       <div id="draft-banner" hidden>发现上次未导出的本地草稿。<button data-action="restore">恢复草稿</button><button data-action="dismiss-draft">忽略</button></div>
+      <div id="download-banner" role="status" hidden>JSON 下载已发起，请检查文件已保存。<button data-action="confirm-download">确认已保存</button><button data-action="dismiss-download">暂不确认</button><span>确认前保留未保存标记和本机草稿。</span></div>
       <div id="message" role="status" aria-live="polite" hidden></div>
       <svg id="diagram" xmlns="http://www.w3.org/2000/svg" aria-label="系统图画布" tabindex="0"></svg>
       <div class="canvas-hint">滚轮缩放 · 拖动空白平移 · 双击管线添加折点 · Esc 取消</div>

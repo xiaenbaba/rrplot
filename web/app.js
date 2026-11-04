@@ -20,6 +20,7 @@ let nudge = null;
 let editorClipboard = null, clipboardPastes = 0;
 let pageMargin = 40, pageLayoutBusy = false;
 let styleSession = null;
+let saving = false, pendingDownload = null;
 let revision = 0, request = 0, previewUrl = null, messageTimer = null;
 let view = { x: -40, y: -30, w: 840, h: 640 };
 
@@ -608,7 +609,7 @@ function renderHint() {
 function render() {
   if (!doc) return;
   $('title').value = doc.title;
-  $('save-state').textContent = dirty ? '已修改 · 本机草稿' : 'JSON 图纸 · 本机编辑';
+  renderSaveState();
   $('undo').disabled = !undo.length; $('redo').disabled = !redo.length;
   const clipboardBusy = mode !== 'select' || placement || pendingPort || reconnect || drag;
   $('clipboard-copy').disabled = !!clipboardBusy || !multiSelection.some(ref => ['node', 'label', 'junction'].includes(ref.kind));
@@ -859,6 +860,66 @@ function download(blob, filename) {
 }
 function filename(extension) { return (doc.title || 'rrplot').replace(/[\\/:*?"<>|]/g, '_') + '.' + extension; }
 
+function renderSaveState() {
+  $('save-state').textContent = dirty ? '已修改 · 本机草稿' : 'JSON 图纸 · 本机编辑';
+  $('save-json').disabled = saving || !doc || !!drag || pageLayoutBusy;
+  $('save-json').textContent = saving ? '保存中…' : '保存 JSON';
+  if (pendingDownload?.version !== revision) pendingDownload = null;
+  $('download-banner').hidden = !pendingDownload;
+}
+function markJSONSaved(version) {
+  if (version !== revision || drag) return false;
+  // A clean template can coexist with an older recoverable draft at startup.
+  if (dirty) clearDraft();
+  dirty = false; pendingDownload = null;
+  return true;
+}
+async function saveJSON() {
+  if (!doc || saving || document.querySelector('dialog[open]')) return;
+  if (drag || pageLayoutBusy) return message('请先完成拖动或页面排版，再保存图纸。');
+  const snapshot = clone(doc), version = revision, name = filename('json');
+  saving = true; renderSaveState();
+  let writable = null;
+  try {
+    let handle = null;
+    if (typeof window.showSaveFilePicker === 'function') {
+      try {
+        // Open before awaiting the server, while the click/shortcut is still active.
+        handle = await window.showSaveFilePicker({ suggestedName: name, excludeAcceptAllOption: true,
+          types: [{ description: 'rrplot JSON 图纸', accept: { 'application/json': ['.json'] } }] });
+      } catch (error) {
+        if (error.name === 'AbortError') { status('已取消保存 · 图纸与本机草稿保留'); return; }
+        if (!['SecurityError', 'NotSupportedError'].includes(error.name)) throw error;
+      }
+    }
+    const result = await api('resolve', { document: snapshot });
+    const contents = JSON.stringify(result.document, null, 2);
+    if (handle) {
+      writable = await handle.createWritable();
+      await writable.write(contents);
+      await writable.close(); writable = null;
+      const current = markJSONSaved(version);
+      status(current ? '图纸 JSON 已保存：' + handle.name
+        : '已保存操作开始时的图纸 · 当前图纸状态保留，请保存后续修改');
+    } else {
+      download(new Blob([contents], { type: 'application/json' }), name);
+      if (version === revision && !drag) {
+        if (dirty) pendingDownload = { version };
+        status('JSON 下载已发起 · 请确认文件已保存');
+      } else status('已发起操作开始时图纸的 JSON 下载 · 当前图纸状态保留');
+    }
+  } catch (error) {
+    if (writable) try { await writable.abort(); } catch { /* Preserve the original write error. */ }
+    message('保存 JSON 失败：' + error.message);
+    status('JSON 未保存完成 · 图纸与本机草稿保留');
+  } finally { saving = false; renderSaveState(); }
+}
+function confirmJSONDownload() {
+  if (!pendingDownload || saving || document.querySelector('dialog[open]')) return;
+  if (markJSONSaved(pendingDownload.version)) status('已确认 JSON 文件保存 · 后续修改将继续记录草稿');
+  renderSaveState();
+}
+
 function objectName(ref) {
   const item = doc[{ node: 'nodes', edge: 'edges', junction: 'junctions', label: 'labels' }[ref.kind]].find(i => i.id === ref.id);
   if (ref.kind === 'edge') return '管路：' + refName(item.source) + ' → ' + refName(item.target);
@@ -968,13 +1029,9 @@ async function runChecks() {
 const actions = {
   new: async () => { if (await confirmReplace()) await replaceDocument({ schemaVersion: 1, title: '未命名图纸', page: { width: 1000, height: 700 }, nodes: [], edges: [], junctions: [], labels: [] }); },
   open: () => $('file-input').click(),
-  save: async () => {
-    const version = revision;
-    const result = await api('resolve', { document: clone(doc) });
-    download(new Blob([JSON.stringify(result.document, null, 2)], { type: 'application/json' }), filename('json'));
-    if (version === revision && !drag) { dirty = false; clearDraft(); }
-    render(); status('图纸 JSON 已下载');
-  },
+  save: saveJSON,
+  'confirm-download': confirmJSONDownload,
+  'dismiss-download': () => { pendingDownload = null; renderSaveState(); },
   export: async () => {
     status('正在生成导出文件…');
     const format = $('export-format').value;

@@ -120,8 +120,9 @@ input[type=checkbox] { min-height: unset; accent-color: var(--accent); }
 .statusbar { display: flex; justify-content: space-between; gap: 12px; min-height: 28px; padding: 6px 16px; background: white; border-top: 1px solid var(--border); font-size: 10px; color: #84919c; }
 #status { color: #4f7269; }
 #message { position: absolute; top: 58px; left: 20px; right: 20px; padding: 10px 14px; color: #875520; background: #fff5e5; border: 1px solid #efd8b1; border-radius: 6px; z-index: 4; font-size: 12px; }
-#draft-banner { padding: 8px 14px; color: #4c7569; background: #e8f3ed; font-size: 11px; z-index: 2; }
-#draft-banner button { font-size: 10px; min-height: 24px; padding: 3px 7px; margin-left: 8px; }
+#draft-banner, #download-banner { padding: 8px 14px; color: #4c7569; background: #e8f3ed; font-size: 11px; z-index: 2; }
+#draft-banner button, #download-banner button { font-size: 10px; min-height: 24px; padding: 3px 7px; margin-left: 8px; }
+#download-banner span { display: block; margin-top: 5px; }
 dialog { border: 1px solid var(--border); border-radius: 9px; padding: 0; width: min(1050px, 94vw); height: 90vh; box-shadow: 0 20px 80px #16352d38; }
 dialog::backdrop { background: #18322c66; }
 .preview-heading { display: flex; align-items: center; gap: 14px; padding: 12px 18px; border-bottom: 1px solid var(--border); }
