@@ -123,6 +123,14 @@ input[type=checkbox] { min-height: unset; accent-color: var(--accent); }
 #draft-banner, #download-banner { padding: 8px 14px; color: #4c7569; background: #e8f3ed; font-size: 11px; z-index: 2; }
 #draft-banner button, #download-banner button { font-size: 10px; min-height: 24px; padding: 3px 7px; margin-left: 8px; }
 #download-banner span { display: block; margin-top: 5px; }
+#draft-description { overflow-wrap: anywhere; }
+#drafts-dialog { width: min(560px, 94vw); height: fit-content; max-height: 85vh; }
+.drafts-body { padding: 8px 20px 20px; }
+#draft-list { display: grid; gap: 10px; }
+.draft-entry { display: grid; gap: 5px; border: 1px solid var(--border); border-radius: 6px; padding: 12px; }
+.draft-entry strong { overflow-wrap: anywhere; }
+.draft-entry button { justify-self: start; margin-top: 4px; }
+#draft-error { color: #a34324; font-size: 12px; }
 dialog { border: 1px solid var(--border); border-radius: 9px; padding: 0; width: min(1050px, 94vw); height: 90vh; box-shadow: 0 20px 80px #16352d38; }
 dialog::backdrop { background: #18322c66; }
 .preview-heading { display: flex; align-items: center; gap: 14px; padding: 12px 18px; border-bottom: 1px solid var(--border); }

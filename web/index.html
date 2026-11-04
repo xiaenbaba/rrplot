@@ -13,6 +13,7 @@
     <div class="document-title"><input id="title" aria-label="图纸名称" value="载入中…"><span id="save-state">本机编辑</span></div>
     <div class="header-actions">
       <button data-action="new">新建</button><button data-action="open">打开</button>
+      <button data-action="drafts" id="draft-open">草稿</button>
       <button data-action="save" id="save-json">保存 JSON</button><span class="divider"></span>
       <button data-action="undo" id="undo" title="撤销 Ctrl+Z">↶</button><button data-action="redo" id="redo" title="重做 Ctrl+Y">↷</button>
       <button data-action="check" title="检查连接关系和页面边界">检查</button><button data-action="preview" id="preview-open">预览</button>
@@ -75,7 +76,7 @@
         <button data-action="fit" title="适应页面">适应页面</button>
         <button data-action="toggle-properties" class="mobile-only">属性</button>
       </div>
-      <div id="draft-banner" hidden>发现上次未导出的本地草稿。<button data-action="restore">恢复草稿</button><button data-action="dismiss-draft">忽略</button></div>
+      <div id="draft-banner" hidden><span id="draft-description"></span><button data-action="restore">恢复草稿</button><button data-action="dismiss-draft">暂不恢复</button></div>
       <div id="download-banner" role="status" hidden>JSON 下载已发起，请检查文件已保存。<button data-action="confirm-download">确认已保存</button><button data-action="dismiss-download">暂不确认</button><span>确认前保留未保存标记和本机草稿。</span></div>
       <div id="message" role="status" aria-live="polite" hidden></div>
       <svg id="diagram" xmlns="http://www.w3.org/2000/svg" aria-label="系统图画布" tabindex="0"></svg>
@@ -96,6 +97,7 @@
   </main>
   <footer class="statusbar"><span id="status">正在连接本机绘图服务…</span><span id="counts"></span><span>原生 SVG · 无图编辑器依赖</span></footer>
   <input id="file-input" type="file" accept=".json,application/json" hidden>
+  <dialog id="drafts-dialog" aria-labelledby="drafts-heading"><div class="preview-heading"><strong id="drafts-heading">恢复本机草稿</strong><button data-action="close-drafts">关闭</button></div><div class="drafts-body"><p id="draft-summary" role="status"></p><p class="muted">保留当前自动草稿及最近 5 份受保护的历史草稿。草稿只在当前浏览器与服务地址中可用，清理浏览器数据会删除草稿；请保存 JSON 作为文件备份。</p><p id="draft-error" role="alert"></p><div id="draft-list"></div></div></dialog>
   <dialog id="export-dialog" aria-labelledby="export-heading"><form id="export-form">
     <div class="preview-heading"><strong id="export-heading">导出图纸</strong><button type="button" id="export-close" data-action="close-export">取消</button></div>
     <div class="export-body">

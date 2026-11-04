@@ -10,6 +10,8 @@ const NS = 'http://www.w3.org/2000/svg';
 const clone = value => structuredClone(value);
 const uid = prefix => prefix + '-' + crypto.randomUUID().slice(0, 8);
 const DRAFT = 'rrplot-web-v1-draft';
+const DRAFT_HISTORY = 'rrplot-web-v1-draft-history';
+let ownedDraft = null, draftError = false, draftBannerDismissed = false, restoringDraft = false;
 let doc = null, catalog = [], geometries = new Map(), fontFamily = 'Times New Roman, SimSun, serif';
 let selection = null, multiSelection = [], mode = 'select', placement = null, ports = [], pendingPort = null;
 let previewTarget = null;
@@ -158,9 +160,64 @@ function connectionTarget(event, point) {
   return { point, direction: [0, 0] };
 }
 
+function parseDraft(raw) {
+  try {
+    const saved = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    const d = saved?.document;
+    return d && typeof d === 'object' && d.schemaVersion === 1 && typeof d.title === 'string'
+      && d.page && ['nodes', 'edges', 'junctions', 'labels'].every(key => Array.isArray(d[key])) ? saved : null;
+  } catch { return null; }
+}
+function draftHistory() {
+  const raw = localStorage.getItem(DRAFT_HISTORY);
+  try {
+    const history = JSON.parse(raw || '[]');
+    return Array.isArray(history) ? history.map(parseDraft).filter(Boolean).slice(0, 5) : [];
+  } catch { return []; }
+}
+function draftRecords() {
+  const current = parseDraft(localStorage.getItem(DRAFT)), seen = new Set();
+  return [current, ...draftHistory()].filter(saved => {
+    if (!saved) return false;
+    const key = JSON.stringify(saved.document);
+    if (seen.has(key)) return false;
+    seen.add(key); return true;
+  });
+}
+function draftDate(saved) {
+  const time = new Date(saved.time);
+  return saved.time != null && Number.isFinite(Number(saved.time)) && Number.isFinite(time.getTime())
+    ? time.toLocaleString() : '时间未知';
+}
+function renderDraftBanner() {
+  try {
+    const current = localStorage.getItem(DRAFT);
+    const records = draftRecords();
+    const recoverable = records.filter(saved => current !== ownedDraft
+      || JSON.stringify(saved.document) !== JSON.stringify(doc));
+    $('draft-open').textContent = records.length ? `草稿 (${records.length})` : '草稿';
+    $('draft-description').textContent = recoverable.length
+      ? `可恢复草稿：${recoverable[0].document.title || '未命名图纸'} · ${draftDate(recoverable[0])}` : '';
+    $('draft-banner').hidden = draftBannerDismissed || !recoverable.length;
+  } catch { $('draft-banner').hidden = true; }
+}
 function saveDraft() {
-  try { localStorage.setItem(DRAFT, JSON.stringify({ time: Date.now(), document: doc })); }
-  catch { message('浏览器草稿空间不可用，请使用“保存 JSON”保存图纸。'); }
+  try {
+    const previous = localStorage.getItem(DRAFT), saved = parseDraft(previous);
+    if (previous !== ownedDraft && saved && JSON.stringify(saved.document) !== JSON.stringify(doc)) {
+      const history = [saved, ...draftHistory().filter(item =>
+        JSON.stringify(item.document) !== JSON.stringify(saved.document))].slice(0, 5);
+      // Preserve the previous document before replacing the active autosave.
+      localStorage.setItem(DRAFT_HISTORY, JSON.stringify(history));
+    }
+    const next = JSON.stringify({ time: Date.now(), document: doc });
+    localStorage.setItem(DRAFT, next); ownedDraft = next; draftError = false;
+    renderDraftBanner(); return true;
+  } catch {
+    draftError = true;
+    message('本机草稿未保存，原有草稿已保留。请使用“保存 JSON”保存当前图纸。');
+    return false;
+  }
 }
 
 async function refresh() {
@@ -172,10 +229,11 @@ async function refresh() {
     geometries = new Map(result.nodes.map(n => [n.id, n.geometry]));
     fontFamily = result.fontFamily;
     if (dirty) saveDraft();
+    renderSaveState();
     // Keep input focus and the editor-owned objects while geometry arrives.
     // Replacing inspector fields here can discard a value being typed.
     renderCanvas();
-    status('已更新 · 本机草稿自动保存');
+    status(draftError ? '已更新 · 草稿未保存，请保存 JSON' : '已更新 · 本机草稿自动保存');
   } catch (error) {
     if (token === request) { message(error.message); status('图纸需要调整，或本机服务未连接'); }
   }
@@ -194,15 +252,18 @@ function edit(fn) {
 }
 
 function clearDraft() {
-  try { localStorage.removeItem(DRAFT); } catch { /* Storage may be unavailable. */ }
-  $('draft-banner').hidden = true;
+  try {
+    if (ownedDraft !== null && localStorage.getItem(DRAFT) === ownedDraft) localStorage.removeItem(DRAFT);
+    ownedDraft = null; draftError = false;
+  } catch { /* Keep drafts written by another page or an earlier session. */ }
+  renderDraftBanner();
 }
 
 async function replaceDocument(next, preserveDraft = false) {
   const token = ++request, version = revision;
   const result = await api('resolve', { document: next });
   edgeLabelsSupported = result.features?.includes('edgeLabels') || false;
-  if (token !== request || version !== revision) return;
+  if (token !== request || version !== revision) return false;
   ++revision;
   doc = result.document; geometries = new Map(result.nodes.map(n => [n.id, n.geometry]));
   fontFamily = result.fontFamily; undo = []; redo = []; clearSelection(); ports = [];
@@ -210,7 +271,9 @@ async function replaceDocument(next, preserveDraft = false) {
   clipboardPastes = 0;
   $('object-search').value = ''; $('object-kind').value = '';
   if (!preserveDraft) clearDraft();
+  else ownedDraft = null;
   render(); fit(); status('图纸已打开 · 点击对象编辑'); message('');
+  return true;
 }
 
 async function confirmReplace() {
@@ -865,7 +928,7 @@ function download(blob, filename) {
 function filename(extension) { return (doc.title || 'rrplot').replace(/[\\/:*?"<>|]/g, '_') + '.' + extension; }
 
 function renderSaveState() {
-  $('save-state').textContent = dirty ? '已修改 · 本机草稿' : 'JSON 图纸 · 本机编辑';
+  $('save-state').textContent = dirty ? (draftError ? '已修改 · 草稿未保存' : '已修改 · 本机草稿') : 'JSON 图纸 · 本机编辑';
   $('save-json').disabled = saving || !doc || !!drag || pageLayoutBusy;
   $('save-json').textContent = saving ? '保存中…' : '保存 JSON';
   if (pendingDownload?.version !== revision) pendingDownload = null;
@@ -922,6 +985,44 @@ function confirmJSONDownload() {
   if (!pendingDownload || saving || document.querySelector('dialog[open]')) return;
   if (markJSONSaved(pendingDownload.version)) status('已确认 JSON 文件保存 · 后续修改将继续记录草稿');
   renderSaveState();
+}
+
+function renderDraftList() {
+  const root = $('draft-list'); root.replaceChildren(); $('draft-error').textContent = '';
+  try {
+    const records = draftRecords();
+    $('draft-summary').textContent = records.length ? `共 ${records.length} 份可恢复草稿，点击恢复前会校验图纸。`
+      : '暂无可恢复草稿。编辑后会自动记录当前图纸。';
+    for (const saved of records) {
+      const row = html('div', undefined, 'draft-entry'), d = saved.document;
+      row.append(html('strong', d.title || '未命名图纸'), html('span', draftDate(saved), 'muted'),
+        html('span', `${d.nodes.length} 个设备 · ${d.edges.length} 条管路`, 'muted'));
+      const button = html('button', '恢复此草稿');
+      button.addEventListener('click', () => restoreDraft(clone(saved))); row.append(button); root.append(row);
+    }
+  } catch { $('draft-error').textContent = '浏览器草稿不可用，请打开已保存的 JSON 文件。'; }
+}
+function showDrafts() {
+  if (!doc || document.querySelector('dialog[open]')) return;
+  if (drag || placement || pendingPort || reconnect || pageLayoutBusy) return message('请先完成当前操作，再查看草稿。');
+  renderDraftList(); $('drafts-dialog').showModal();
+}
+async function restoreDraft(saved) {
+  if (restoringDraft || !$('drafts-dialog').open) return;
+  restoringDraft = true;
+  try {
+    if (!await confirmReplace()) return;
+    if (!$('drafts-dialog').open) return;
+    if (!await replaceDocument(saved.document, true)) return;
+    dirty = true; saveDraft(); render(); renderDraftBanner();
+    $('drafts-dialog').close();
+    status(draftError ? '草稿已恢复 · 请保存 JSON' : '草稿已恢复 · 请保存 JSON 作为文件备份');
+  } catch (error) { $('draft-error').textContent = '恢复失败：' + error.message; }
+  finally { restoringDraft = false; }
+}
+function closeDrafts() {
+  if (restoringDraft) ++request;
+  $('drafts-dialog').close();
 }
 
 function exportOptions() {
@@ -1195,12 +1296,9 @@ const actions = {
   fit, 'zoom-in': () => zoom(.85), 'zoom-out': () => zoom(1 / .85),
   'align-x': () => alignPorts('x'), 'align-y': () => alignPorts('y'),
   'clear-ports': () => { ports = []; pendingPort = null; previewTarget = null; render(); },
-  restore: async () => {
-    const saved = JSON.parse(localStorage.getItem(DRAFT));
-    if (saved?.document && await confirmReplace()) { await replaceDocument(saved.document); dirty = true; saveDraft(); render(); }
-    $('draft-banner').hidden = true;
-  },
-  'dismiss-draft': () => { $('draft-banner').hidden = true; }
+  restore: showDrafts, drafts: showDrafts,
+  'close-drafts': closeDrafts,
+  'dismiss-draft': () => { draftBannerDismissed = true; $('draft-banner').hidden = true; }
 };
 
 $('export-format').addEventListener('change', renderExportState);
@@ -1213,6 +1311,12 @@ $('preview-viewport').addEventListener('wheel', event => {
   zoomPreview(previewSession.scale * (event.deltaY < 0 ? 1.15 : 1 / 1.15), [event.clientX, event.clientY]);
 }, { passive: false });
 new ResizeObserver(() => { if (previewSession?.fit) fitPreview(); }).observe($('preview-viewport'));
+window.addEventListener('storage', event => {
+  if (event.key !== null && ![DRAFT, DRAFT_HISTORY].includes(event.key)) return;
+  renderDraftBanner();
+  if ($('drafts-dialog').open && !restoringDraft) renderDraftList();
+});
+$('drafts-dialog').addEventListener('cancel', () => { if (restoringDraft) ++request; });
 
 document.addEventListener('click', async event => {
   const action = event.target.closest('[data-action]')?.dataset.action;
@@ -1563,7 +1667,7 @@ async function init() {
     filterPalette();
     filterTemplates();
     await replaceDocument(data[2], true);
-    try { if (JSON.parse(localStorage.getItem(DRAFT))?.document) $('draft-banner').hidden = false; } catch { /* Ignore invalid old drafts. */ }
+    renderDraftBanner();
   } catch (error) { message('无法连接本机服务。请运行 python server/run.py。' + error.message); status('服务未连接'); }
 }
 void init();
