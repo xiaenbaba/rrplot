@@ -62,7 +62,12 @@
           <button data-tool="junction" title="在画布放置三通，或在选中管路上插入">● <span>三通</span></button>
           <button data-tool="text" title="在画布放置文字">T <span>文字</span></button>
         </div>
-        <div class="tool-group"><button data-action="copy" title="复制所选对象及组内管路 Ctrl+D">复制</button><button data-action="delete" title="删除全部所选对象及关联管路 Delete">删除</button></div>
+        <div class="tool-group" role="group" aria-label="复制粘贴">
+          <button id="clipboard-copy" data-action="clipboard-copy" title="复制到当前页面的编辑器剪贴板，可跨图纸粘贴 Ctrl+C" disabled>复制</button>
+          <button id="clipboard-paste" data-action="clipboard-paste" title="粘贴编辑器剪贴板中的设备组 Ctrl+V" disabled>粘贴</button>
+          <button data-action="copy" title="直接生成所选对象及组内管路的副本 Ctrl+D">副本</button>
+          <button data-action="delete" title="删除全部所选对象及关联管路 Delete">删除</button>
+        </div>
         <div class="spacer"></div>
         <label class="check"><input id="snap" type="checkbox" checked>吸附</label>
         <label class="check"><input id="grid" type="checkbox" checked>网格</label>

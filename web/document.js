@@ -15,11 +15,11 @@ function selectedRefs(document, selection) {
   return [...refs.values()];
 }
 
-export function copySelection(document, selection, newId, offset = [20, 20]) {
+function copyInto(document, selection, newId, offset, destination) {
   const refs = selectedRefs(document, selection).filter(ref => ref.kind !== 'edge');
   const selected = new Set(refs.map(key)), ids = new Map();
-  const used = new Set(Object.values(collections).flatMap(name => document[name].map(item => item.id)));
-  const result = structuredClone(document);
+  const used = new Set(Object.values(collections).flatMap(name => destination[name].map(item => item.id)));
+  const result = structuredClone(destination);
   const allocate = (kind, original) => {
     const id = newId(kind);
     if (typeof id !== 'string' || !id || used.has(id)) throw new Error('无法生成唯一对象 ID，请重试复制。');
@@ -57,12 +57,45 @@ export function copySelection(document, selection, newId, offset = [20, 20]) {
   }
   for (const name of Object.values(collections)) {
     if (result[name].length > 2000) throw new Error('复制后对象数量超过上限（每类最多 2000 项）。');
-    for (const item of result[name].slice(document[name].length)) {
+    for (const item of result[name].slice(destination[name].length)) {
       const values = name === 'edges' ? item.vertices.flat() : [item.x, item.y];
       if (values.some(v => !Number.isFinite(v) || Math.abs(v) > 100000)) throw new Error('复制后坐标超出允许范围。');
     }
   }
   return { document: result, selection: refs.map(ref => ({ ...ref, id: ids.get(key(ref)) })) };
+}
+
+export function copySelection(document, selection, newId, offset = [20, 20]) {
+  return copyInto(document, selection, newId, offset, document);
+}
+
+export function captureSelection(document, selection, labelPositions = new Map()) {
+  const refs = selectedRefs(document, selection).filter(ref => ref.kind !== 'edge');
+  const selected = new Set(refs.map(key));
+  const has = (kind, id) => selected.has(key({ kind, id }));
+  const nodes = document.nodes.filter(n => has('node', n.id));
+  const junctions = document.junctions.filter(j => has('junction', j.id));
+  const inside = ref => ref.nodeId ? has('node', ref.nodeId) : has('junction', ref.junctionId);
+  const edges = document.edges.filter(e => inside(e.source) && inside(e.target));
+  const edgeIds = new Set(edges.map(e => e.id));
+  const labels = document.labels.filter(l => has('label', l.id) || has('node', l.nodeId) || edgeIds.has(l.edgeId));
+  const fragment = structuredClone({ schemaVersion: 1, title: '编辑器剪贴板', page: document.page,
+    nodes, junctions, edges, labels, selection: refs });
+  for (const label of fragment.labels) {
+    if ((label.nodeId && !has('node', label.nodeId)) || (label.edgeId && !edgeIds.has(label.edgeId))) {
+      const point = labelPositions.get(label.id);
+      if (!Array.isArray(point) || point.length !== 2 || point.some(v => !Number.isFinite(v)))
+        throw new Error('无法计算标签位置，请等待图纸更新后重试复制。');
+      [label.x, label.y] = point;
+      delete label.nodeId; delete label.edgeId; delete label.at;
+    }
+  }
+  return fragment;
+}
+
+export function pasteFragment(document, fragment, newId, offset = [20, 20]) {
+  if (!fragment?.selection?.length) throw new Error('编辑器剪贴板为空，请先复制设备、三通或文字。');
+  return copyInto(fragment, fragment.selection, newId, offset, document);
 }
 
 export function translateSelection(document, selection, offset) {

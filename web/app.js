@@ -1,5 +1,5 @@
 import { rotate, endpoint, route, along, nearestSegment, splitRoute, translateDocument, editableSegments, moveSegment, transformedBox, selectInBox, projectOnRoute } from './geometry.js';
-import { copySelection, deleteSelection, translateSelection, reverseEdge, splitEdgeLabels, reconnectEdge, nudgeSelection } from './document.js';
+import { copySelection, captureSelection, pasteFragment, deleteSelection, translateSelection, reverseEdge, splitEdgeLabels, reconnectEdge, nudgeSelection } from './document.js';
 import { inspectDiagram } from './checks.js';
 import { objectIndex, filterObjects } from './objects.js';
 
@@ -16,6 +16,7 @@ let reconnect = null;
 let edgeLabelsSupported = false;
 let undo = [], redo = [], drag = null, dirty = false, spaceDown = false;
 let nudge = null;
+let editorClipboard = null, clipboardPastes = 0;
 let revision = 0, request = 0, previewUrl = null, messageTimer = null;
 let view = { x: -40, y: -30, w: 840, h: 640 };
 
@@ -193,6 +194,7 @@ async function replaceDocument(next, preserveDraft = false) {
   doc = result.document; geometries = new Map(result.nodes.map(n => [n.id, n.geometry]));
   fontFamily = result.fontFamily; undo = []; redo = []; clearSelection(); ports = [];
   pendingPort = null; previewTarget = null; reconnect = null; mode = 'select'; placement = null; dirty = false;
+  clipboardPastes = 0;
   $('object-search').value = ''; $('object-kind').value = '';
   if (!preserveDraft) clearDraft();
   render(); fit(); status('图纸已打开 · 点击对象编辑'); message('');
@@ -401,7 +403,7 @@ function renderInspector() {
     $('selection-kind').textContent = 'MULTI';
     root.append(html('h2', `已选择 ${multiSelection.length} 项`, 'object-heading'));
     root.append(html('p', '按住 Shift 点击可添加或取消选择，Shift+拖动空白可追加框选。拖动任意已选对象，可一起移动设备、三通和文字。', 'muted'));
-    root.append(html('p', '复制会包含设备标签和组内管路；删除作用于全部选择，两种操作均可一次撤销。', 'muted'));
+    root.append(html('p', 'Ctrl+C 复制到编辑器剪贴板，切换图纸后可 Ctrl+V 粘贴；Ctrl+D 直接生成副本。均包含设备标签和组内管路，粘贴和副本可一次撤销。', 'muted'));
     const layout = html('div', undefined, 'layout-grid');
     for (const [action, caption] of [
       ['align-left', '左对齐'], ['align-center-x', '水平居中'], ['align-right', '右对齐'],
@@ -557,6 +559,9 @@ function render() {
   $('title').value = doc.title;
   $('save-state').textContent = dirty ? '已修改 · 本机草稿' : 'JSON 图纸 · 本机编辑';
   $('undo').disabled = !undo.length; $('redo').disabled = !redo.length;
+  const clipboardBusy = mode !== 'select' || placement || pendingPort || reconnect || drag;
+  $('clipboard-copy').disabled = !!clipboardBusy || !multiSelection.some(ref => ['node', 'label', 'junction'].includes(ref.kind));
+  $('clipboard-paste').disabled = !!clipboardBusy || !editorClipboard;
   $('counts').textContent = `${doc.nodes.length} 个设备 · ${doc.edges.length} 条管路`;
   document.querySelectorAll('[data-tool]').forEach(b => {
     const active = b.dataset.tool === mode && !placement;
@@ -678,6 +683,50 @@ function copySelected() {
       doc = result.document; multiSelection = result.selection; selection = multiSelection.at(-1) || null;
       pendingPort = null; previewTarget = null; mode = 'select'; placement = null;
     });
+  } catch (error) { message(error.message); }
+}
+function clipboardReady() {
+  if (!doc) return false;
+  if (drag || reconnect || pendingPort || placement || mode !== 'select') {
+    message('请先完成当前操作或切回选择模式，再复制粘贴。'); return false;
+  }
+  return true;
+}
+function copyToClipboard() {
+  if (!clipboardReady()) return;
+  if (!multiSelection.some(ref => ['node', 'label', 'junction'].includes(ref.kind)))
+    return message('请先选择设备、三通或文字；组内管路会随设备一起复制。');
+  try {
+    const positions = new Map(multiSelection.filter(ref => ref.kind === 'label')
+      .map(ref => { const label = doc.labels.find(l => l.id === ref.id); return [ref.id, labelPosition(label)]; }));
+    const fragment = captureSelection(doc, multiSelection, positions);
+    const geometry = new Map(fragment.nodes.map(node => {
+      const value = geometries.get(node.id);
+      if (!value) throw new Error('图元正在更新，请稍后再复制。');
+      return [node.id, clone(value)];
+    }));
+    editorClipboard = { fragment, geometry }; clipboardPastes = 0;
+    render(); status(`已复制 ${fragment.nodes.length} 台设备、${fragment.junctions.length} 个三通、${fragment.edges.length} 条管路、${fragment.labels.length} 个标签 · 可切换图纸后 Ctrl+V 粘贴`);
+  } catch (error) { message(error.message); }
+}
+function pasteClipboard() {
+  if (!clipboardReady()) return;
+  if (!editorClipboard) return message('编辑器剪贴板为空，请先选择对象并按 Ctrl+C。');
+  try {
+    const offset = 20 * (clipboardPastes + 1);
+    const result = pasteFragment(doc, editorClipboard.fragment, uid, [offset, offset]);
+    const originals = editorClipboard.fragment.selection.filter(ref => ref.kind === 'node');
+    result.selection.filter(ref => ref.kind === 'node').forEach((ref, index) => {
+      geometries.set(ref.id, editorClipboard.geometry.get(originals[index].id));
+    });
+    edit(() => {
+      doc = result.document; multiSelection = result.selection; selection = multiSelection.at(-1) || null;
+      ports = []; pendingPort = null; previewTarget = null;
+    });
+    clipboardPastes++;
+    document.body.classList.remove('library-open');
+    svg.focus({ preventScroll: true });
+    status('已粘贴 · 可拖动整组调整位置 · Ctrl+Z 撤销');
   } catch (error) { message(error.message); }
 }
 function history(direction) {
@@ -828,6 +877,7 @@ const actions = {
   'toggle-library': () => { document.body.classList.toggle('library-open'); document.body.classList.remove('properties-open'); },
   'toggle-properties': () => { document.body.classList.toggle('properties-open'); document.body.classList.remove('library-open'); },
   undo: () => history('undo'), redo: () => history('redo'), copy: copySelected, delete: removeSelected,
+  'clipboard-copy': copyToClipboard, 'clipboard-paste': pasteClipboard,
   fit, 'zoom-in': () => zoom(.85), 'zoom-out': () => zoom(1 / .85),
   'align-x': () => alignPorts('x'), 'align-y': () => alignPorts('y'),
   'clear-ports': () => { ports = []; pendingPort = null; previewTarget = null; render(); },
@@ -1073,6 +1123,8 @@ window.addEventListener('keydown', async event => {
   if (modifier && event.key.toLowerCase() === 'z') { event.preventDefault(); history(event.shiftKey ? 'redo' : 'undo'); }
   if (modifier && event.key.toLowerCase() === 'y') { event.preventDefault(); history('redo'); }
   if (modifier && event.key.toLowerCase() === 'd') { event.preventDefault(); copySelected(); }
+  if (modifier && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'c') { event.preventDefault(); copyToClipboard(); }
+  if (modifier && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'v') { event.preventDefault(); pasteClipboard(); }
   if (modifier && event.key.toLowerCase() === 's') { event.preventDefault(); try { await actions.save(); } catch (error) { message(error.message); } }
 });
 window.addEventListener('keyup', event => {
