@@ -72,7 +72,7 @@ function selected(kind, id) {
 function setSelection(kind, id, additive = false) {
   const key = item => item.kind + ':' + item.id;
   const item = { kind, id };
-  if (additive && ['node', 'label', 'junction'].includes(kind)) {
+  if (additive && ['node', 'label', 'junction', 'edge'].includes(kind)) {
     const index = multiSelection.findIndex(existing => key(existing) === key(item));
     if (index >= 0) multiSelection.splice(index, 1);
     else multiSelection.push(item);
@@ -129,6 +129,13 @@ function addStateLabel(edge) {
 function selectionCandidates() {
   const candidates = currentNodes().map(n => ({ kind: 'node', id: n.id,
     box: transformedBox(n.geometry.box, [n.x, n.y], n.rotation) }));
+  for (const edge of doc.edges) {
+    try {
+      const points = edgePoints(edge), xs = points.map(p => p[0]), ys = points.map(p => p[1]);
+      candidates.push({ kind: 'edge', id: edge.id, box: [Math.min(...xs), Math.min(...ys),
+        Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)] });
+    } catch { /* Geometry for a newly placed endpoint may still be loading. */ }
+  }
   for (const j of doc.junctions) candidates.push({ kind: 'junction', id: j.id, box: [j.x - 4, j.y - 4, 8, 8] });
   for (const element of svg.querySelectorAll('.diagram-label')) {
     const b = element.querySelector('text').getBBox();
@@ -334,7 +341,7 @@ function renderCanvas() {
 
 function renderVertices() {
   svg.querySelectorAll('[data-kind="vertex"], [data-kind="segment"]').forEach(element => element.remove());
-  if (mode === 'reconnect') return;
+  if (mode === 'reconnect' || multiSelection.length > 1) return;
   const e = selection?.kind === 'edge' && findSelected();
   if (e && mode === 'select') {
     const nodes = currentNodes();
@@ -406,15 +413,21 @@ function renderInspector() {
   if (multiSelection.length > 1) {
     $('selection-kind').textContent = 'MULTI';
     root.append(html('h2', `已选择 ${multiSelection.length} 项`, 'object-heading'));
-    root.append(html('p', '按住 Shift 点击可添加或取消选择，Shift+拖动空白可追加框选。拖动任意已选对象，可一起移动设备、三通和文字。', 'muted'));
-    root.append(html('p', 'Ctrl+C 复制到编辑器剪贴板，切换图纸后可 Ctrl+V 粘贴；Ctrl+D 直接生成副本。均包含设备标签和组内管路，粘贴和副本可一次撤销。', 'muted'));
+    const movable = layoutRefs().length, pipes = multiSelection.filter(ref => ref.kind === 'edge').length;
+    root.append(html('p', `设备、三通和文字 ${movable} 项 · 管路 ${pipes} 条。按住 Shift 点击可添加或取消选择，Shift+拖动空白可追加框选。`, 'muted'));
+    root.append(html('p', '可批量修改样式或删除。拖动已选设备、三通或文字可一起移动；管路随端点移动，单选管路后可编辑走线。', 'muted'));
+    root.append(html('p', movable ? 'Ctrl+C 复制设备、三通和文字，Ctrl+D 生成副本，均包含设备标签和组内管路。单独选中的管路不复制，请同时选择其两端设备或三通。'
+      : '复制管路时，请同时选择两端设备或三通，再使用 Ctrl+C 或 Ctrl+D。', 'muted'));
     const layout = html('div', undefined, 'layout-grid');
     for (const [action, caption] of [
       ['align-left', '左对齐'], ['align-center-x', '水平居中'], ['align-right', '右对齐'],
       ['align-top', '上对齐'], ['align-center-y', '垂直居中'], ['align-bottom', '下对齐'],
       ['distribute-x', '水平等距'], ['distribute-y', '垂直等距'],
-    ]) inspectorButton(layout, caption, () => batchLayout(action));
-    root.append(html('div', '批量布局', 'section-label'), layout);
+    ]) {
+      const button = inspectorButton(layout, caption, () => batchLayout(action));
+      button.disabled = movable < (action.startsWith('distribute') ? 3 : 2);
+    }
+    if (movable) root.append(html('div', '批量布局（设备、三通和文字）', 'section-label'), layout);
     inspectorButton(root, '批量样式', showBatchStyles);
     inspectorButton(root, '清除多选', () => { clearSelection(); render(); });
     return;
@@ -438,7 +451,7 @@ function renderInspector() {
       button.dataset.pageLayout = action; button.disabled = empty || pageLayoutBusy;
     }
     root.append(html('p', '作用于整张图纸，包含文字和管路。保持图元大小与连接；适配会调整纸张尺寸，每次排版可一次撤销。“适应页面”只调整视图。', 'muted'));
-    root.append(html('p', mode === 'box-select' ? '拖出矩形，完整框住设备、三通或文字。松开后可直接拖动已选对象，按住 Shift 可追加选择。'
+    root.append(html('p', mode === 'box-select' ? '拖出矩形，完整框住设备、管路、三通或文字。松开后可批量修改样式或删除，拖动设备、三通和文字可移动；按住 Shift 可追加选择。'
       : '选择设备、标签或管路查看属性；使用“框选”或 Shift+拖动空白可多选。坐标单位与 rrplot 画布一致。', 'muted')); return;
   }
   const kind = selection.kind;
@@ -568,6 +581,7 @@ function renderHint() {
     : mode === 'box-select' ? '拖出矩形完整框住对象 · Shift 追加选择 · Esc 取消'
     : mode === 'reconnect' ? '点击设备端口或三通完成重接 · 空格拖动平移 · Esc 取消'
     : mode === 'select' && !placement && multiSelection.some(ref => ['node', 'junction', 'label'].includes(ref.kind)) ? '方向键微调 1 单位 · Shift+方向键 10 单位 · Ctrl+Z 撤销'
+    : mode === 'select' && multiSelection.some(ref => ref.kind === 'edge') ? 'Shift+点击追加管路 · 批量样式统一外观 · 单选管路调整走线'
     : '滚轮缩放 · 空白拖动平移 · Shift+空白拖动框选 · 双击管线加折点';
 }
 function render() {
@@ -577,6 +591,8 @@ function render() {
   $('undo').disabled = !undo.length; $('redo').disabled = !redo.length;
   const clipboardBusy = mode !== 'select' || placement || pendingPort || reconnect || drag;
   $('clipboard-copy').disabled = !!clipboardBusy || !multiSelection.some(ref => ['node', 'label', 'junction'].includes(ref.kind));
+  document.querySelector('[data-action="copy"]').disabled = !!clipboardBusy
+    || !multiSelection.some(ref => ['node', 'label', 'junction'].includes(ref.kind));
   $('clipboard-paste').disabled = !!clipboardBusy || !editorClipboard;
   updateStyleButton();
   $('counts').textContent = `${doc.nodes.length} 个设备 · ${doc.edges.length} 条管路`;
@@ -1015,13 +1031,13 @@ svg.addEventListener('pointerdown', event => {
   if (mode === 'text' && !hit) {
     edit(() => { const id = uid('label'); doc.labels.push({ id, text: '文字', x: snapped(p[0]), y: snapped(p[1]), size: 15, ha: 'center', color: '#111111', boxed: false }); setSelection('label', id); mode = 'select'; }); return;
   }
-  if (!hit) { clearSelection(); renderInspector(); return startPan(event); }
+  if (!hit) { clearSelection(); render(); return startPan(event); }
   const kind = hit.dataset.kind, id = hit.dataset.id;
   if (kind === 'vertex' && event.altKey) {
     edit(() => doc.edges.find(e => e.id === id).vertices.splice(Number(hit.dataset.index), 1)); return;
   }
   const selectedKind = ['vertex', 'segment'].includes(kind) ? 'edge' : kind;
-  const additive = event.shiftKey && ['node', 'label', 'junction'].includes(selectedKind);
+  const additive = event.shiftKey && ['node', 'label', 'junction', 'edge'].includes(selectedKind);
   const keepMulti = !additive && multiSelection.length > 1
     && multiSelection.some(ref => ref.kind === selectedKind && ref.id === id);
   if (!keepMulti) setSelection(selectedKind, id, additive);
@@ -1039,8 +1055,8 @@ svg.addEventListener('pointerdown', event => {
   }
   if (kind === 'edge') {
     // Keep the clicked path alive so the browser can deliver a double click.
-    svg.querySelectorAll('.selected').forEach(element => element.classList.remove('selected'));
-    hit.classList.add('selected');
+    svg.querySelectorAll('[data-kind="node"], [data-kind="edge"], [data-kind="label"], [data-kind="junction"]')
+      .forEach(element => element.classList.toggle('selected', selected(element.dataset.kind, element.dataset.id)));
     renderInspector(); renderVertices(); return;
   }
   if (['node', 'label', 'junction', 'vertex'].includes(kind)) {
@@ -1119,7 +1135,8 @@ function endDrag(event) {
   if (current.kind === 'box') {
     if (!current.moved && !current.additive) clearSelection();
     mode = 'select'; render();
-    status(multiSelection.length ? `已选择 ${multiSelection.length} 项 · 拖动已选对象可一起移动` : '未框选对象，请完整框住设备、三通或文字');
+    status(multiSelection.length ? `已选择 ${multiSelection.length} 项 · 可批量设置样式或删除，拖动设备、三通和文字可移动`
+      : '未框选对象，请完整框住设备、管路、三通或文字');
     return;
   }
   if (current.kind !== 'pan') finishEdit(current.before);
@@ -1138,7 +1155,7 @@ function cancelDrag() {
 }
 svg.addEventListener('pointercancel', cancelDrag);
 svg.addEventListener('dblclick', event => {
-  if (mode === 'move-all' || mode === 'box-select' || reconnect) return;
+  if (event.shiftKey || mode === 'move-all' || mode === 'box-select' || reconnect) return;
   if (event.target.closest('[data-kind="segment"]')) return;
   const hit = event.target.closest('[data-kind="edge"]'); if (!hit) return;
   const edge = doc.edges.find(e => e.id === hit.dataset.id), points = edgePoints(edge), p = world(event);
