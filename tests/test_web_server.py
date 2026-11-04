@@ -64,6 +64,9 @@ def test_static_and_catalog_interfaces(service):
     status, headers, body = request(service, "/objects.js")
     assert status == 200 and b"objectIndex" in body
     assert headers["Content-Type"].startswith("text/javascript")
+    status, headers, body = request(service, "/styles.js")
+    assert status == 200 and b"applyStyles" in body
+    assert headers["Content-Type"].startswith("text/javascript")
     assert json.loads(request(service, "/api/health")[2])["ok"] is True
     kinds = {entry["type"] for entry in
              json.loads(request(service, "/api/catalog")[2])}

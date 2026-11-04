@@ -71,6 +71,7 @@
         <div class="spacer"></div>
         <label class="check"><input id="snap" type="checkbox" checked>吸附</label>
         <label class="check"><input id="grid" type="checkbox" checked>网格</label>
+        <button id="batch-styles" data-action="batch-styles" title="统一当前选择或整图的管路和标签样式">批量样式</button>
         <button data-action="page-layout" title="整张图纸内容居中、按内容调整纸张尺寸">页面排版</button>
         <button data-action="fit" title="适应页面">适应页面</button>
         <button data-action="toggle-properties" class="mobile-only">属性</button>
@@ -98,6 +99,17 @@
   <dialog id="checks-dialog" aria-labelledby="checks-heading"><div class="preview-heading"><strong id="checks-heading">图纸检查</strong><button data-action="close-checks">关闭检查</button></div><div class="checks-body"><p class="muted">检查连接关系和页面边界；设备备用端口无需全部接管。检查不包含热力计算和自动避障。</p><p id="checks-summary" role="status"></p><div id="checks-results"></div></div></dialog>
   <dialog id="preview-dialog"><div class="preview-heading"><strong>正式出图预览</strong><span>与导出使用同一图纸</span><button data-action="close-preview">关闭 ×</button></div><div class="preview-body"><img id="preview-image" alt="rrplot 正式导出预览"></div></dialog>
   <dialog id="replace-dialog" aria-labelledby="replace-heading"><form method="dialog"><h2 id="replace-heading">替换当前图纸？</h2><p>当前修改尚未保存为 JSON。替换后，本机草稿也会更新；如需保留，请先继续编辑并保存 JSON。</p><div class="button-row"><button value="cancel" autofocus>继续编辑</button><button value="replace" class="primary">替换图纸</button></div></form></dialog>
+  <dialog id="styles-dialog" aria-labelledby="styles-heading"><form id="style-form">
+    <div class="preview-heading"><strong id="styles-heading">批量样式</strong><button type="button" data-action="close-styles">取消</button></div>
+    <div class="styles-body">
+      <label class="field"><span>应用范围</span><select id="style-scope" aria-label="应用范围"><option value="selection">当前选择</option><option value="all">整张图纸</option></select></label>
+      <p id="style-summary" class="muted" role="status"></p>
+      <p class="muted">勾选要修改的项目，再设置新值；未勾选的样式保持原值。切换范围会清空本次设置。</p>
+      <div id="style-fields"></div>
+      <p id="style-error" role="alert"></p>
+    </div>
+    <div class="styles-footer"><span class="muted">应用后可用 Ctrl+Z 一次撤销</span><button id="style-apply" type="submit" class="primary" disabled>应用样式</button></div>
+  </form></dialog>
   <script type="module" src="/app.js"></script>
 </body>
 </html>

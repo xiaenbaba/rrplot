@@ -2,6 +2,7 @@ import { rotate, endpoint, route, along, nearestSegment, splitRoute, translateDo
 import { copySelection, captureSelection, pasteFragment, deleteSelection, translateSelection, reverseEdge, splitEdgeLabels, reconnectEdge, nudgeSelection } from './document.js';
 import { inspectDiagram } from './checks.js';
 import { objectIndex, filterObjects } from './objects.js';
+import { styleTargets, applyStyles } from './styles.js';
 
 const $ = id => document.getElementById(id);
 const svg = $('diagram');
@@ -18,6 +19,7 @@ let undo = [], redo = [], drag = null, dirty = false, spaceDown = false;
 let nudge = null;
 let editorClipboard = null, clipboardPastes = 0;
 let pageMargin = 40, pageLayoutBusy = false;
+let styleSession = null;
 let revision = 0, request = 0, previewUrl = null, messageTimer = null;
 let view = { x: -40, y: -30, w: 840, h: 640 };
 
@@ -413,6 +415,7 @@ function renderInspector() {
       ['distribute-x', '水平等距'], ['distribute-y', '垂直等距'],
     ]) inspectorButton(layout, caption, () => batchLayout(action));
     root.append(html('div', '批量布局', 'section-label'), layout);
+    inspectorButton(root, '批量样式', showBatchStyles);
     inspectorButton(root, '清除多选', () => { clearSelection(); render(); });
     return;
   }
@@ -575,6 +578,7 @@ function render() {
   const clipboardBusy = mode !== 'select' || placement || pendingPort || reconnect || drag;
   $('clipboard-copy').disabled = !!clipboardBusy || !multiSelection.some(ref => ['node', 'label', 'junction'].includes(ref.kind));
   $('clipboard-paste').disabled = !!clipboardBusy || !editorClipboard;
+  updateStyleButton();
   $('counts').textContent = `${doc.nodes.length} 个设备 · ${doc.edges.length} 条管路`;
   document.querySelectorAll('[data-tool]').forEach(b => {
     const active = b.dataset.tool === mode && !placement;
@@ -761,6 +765,7 @@ async function applyPageLayout(action) {
   } catch (error) { message(error.message); status('未应用页面排版'); }
   finally {
     pageLayoutBusy = false;
+    updateStyleButton();
     const empty = !['nodes', 'edges', 'junctions', 'labels'].some(name => doc[name].length);
     document.querySelectorAll('[data-page-layout]').forEach(button => { button.disabled = empty; });
     if ($('page-margin')) $('page-margin').disabled = false;
@@ -952,7 +957,8 @@ const actions = {
   'toggle-properties': () => { document.body.classList.toggle('properties-open'); document.body.classList.remove('library-open'); },
   undo: () => history('undo'), redo: () => history('redo'), copy: copySelected, delete: removeSelected,
   'clipboard-copy': copyToClipboard, 'clipboard-paste': pasteClipboard,
-  'page-layout': showPageLayout,
+  'page-layout': showPageLayout, 'batch-styles': showBatchStyles,
+  'close-styles': () => $('styles-dialog').close(),
   fit, 'zoom-in': () => zoom(.85), 'zoom-out': () => zoom(1 / .85),
   'align-x': () => alignPorts('x'), 'align-y': () => alignPorts('y'),
   'clear-ports': () => { ports = []; pendingPort = null; previewTarget = null; render(); },
@@ -1159,6 +1165,89 @@ $('file-input').addEventListener('change', async event => {
   } catch (error) { message('无法打开图纸：' + error.message); }
   event.target.value = '';
 });
+function updateStyleButton() {
+  $('batch-styles').disabled = mode !== 'select' || !!(placement || pendingPort || reconnect || drag || pageLayoutBusy)
+    || !(doc.edges.length || doc.labels.length);
+}
+
+function showBatchStyles() {
+  if (!doc || mode !== 'select' || placement || pendingPort || reconnect || drag || pageLayoutBusy)
+    return message('请先完成当前操作或按 Esc，再设置批量样式。');
+  styleSession = { revision, selection: clone(multiSelection), controls: [] };
+  $('style-scope').value = multiSelection.length ? 'selection' : 'all';
+  renderStyleFields();
+  $('styles-dialog').showModal();
+}
+
+function renderStyleFields() {
+  const scope = $('style-scope').value;
+  const targets = styleTargets(doc, styleSession.selection, scope);
+  $('style-summary').textContent = `将处理 ${targets.edges.length} 条管路、${targets.labels.length} 个标签。`
+    + (scope === 'selection' ? ' 包含所选设备的标签、两端均在组内的管路及其状态点。' : ' 包含独立文字、设备标签和管路状态点。');
+  $('style-error').textContent = '';
+  const root = $('style-fields'); root.replaceChildren(); styleSession.controls = [];
+  for (const [group, title, specs] of [
+    ['edges', '管路', [
+      ['color', '管路颜色', '#111111', { type: 'color' }],
+      ['width', '线宽（pt）', 1.8, { min: .2, max: 8, required: true }],
+      ['linestyle', '线型', 'solid', { options: [{ value: 'solid', label: '实线' }, { value: 'dashed', label: '虚线' }] }],
+      ['head', '流向箭头', true, { options: [{ value: 'true', label: '显示' }, { value: 'false', label: '隐藏' }] }]
+    ]],
+    ['labels', '标签', [
+      ['color', '文字颜色', '#111111', { type: 'color' }],
+      ['size', '字号（pt）', 15, { min: 6, max: 72, required: true }],
+      ['ha', '文字对齐', 'center', { options: [{ value: 'left', label: '左对齐' }, { value: 'center', label: '居中' }, { value: 'right', label: '右对齐' }] }],
+      ['boxed', '白色背景', false, { options: [{ value: 'true', label: '显示' }, { value: 'false', label: '隐藏' }] }]
+    ]]
+  ]) {
+    const section = html('section', undefined, 'style-section');
+    section.append(html('h3', `${title} · ${targets[group].length} 项`)); root.append(section);
+    const ids = new Set(targets[group]), items = doc[group].filter(item => ids.has(item.id));
+    for (const [key, caption, fallback, options] of specs) {
+      const row = html('div', undefined, 'style-row'); section.append(row);
+      const label = html('label', undefined, 'style-enable'), enable = html('input');
+      enable.type = 'checkbox'; enable.disabled = !items.length;
+      enable.setAttribute('aria-label', '修改' + caption); label.append(enable, html('span', caption)); row.append(label);
+      const common = items.length && items.every(item => item[key] === items[0][key]);
+      const initial = common ? items[0][key] : fallback;
+      const namedColor = options.type === 'color' && !/^#[0-9a-f]{6}$/i.test(initial);
+      const input = field(row, '批量' + caption, namedColor ? fallback : initial, () => {}, { ...options, disabled: true, transient: true });
+      if (!common && items.length) row.append(html('small', '当前值不一致', 'muted'));
+      else if (namedColor) row.append(html('small', '请重新选择颜色', 'muted'));
+      enable.addEventListener('change', () => { input.disabled = !enable.checked; updateStyleApply(); });
+      styleSession.controls.push({ group, key, enable, input });
+    }
+  }
+  updateStyleApply();
+}
+
+function updateStyleApply() {
+  $('style-apply').disabled = !styleSession.controls.some(control => control.enable.checked);
+}
+
+$('style-scope').addEventListener('change', renderStyleFields);
+$('styles-dialog').addEventListener('close', () => { styleSession = null; });
+$('style-form').addEventListener('submit', event => {
+  event.preventDefault();
+  if (!styleSession || revision !== styleSession.revision) {
+    $('style-error').textContent = '图纸已变化，请关闭后重新打开批量样式。'; return;
+  }
+  const patch = {};
+  for (const { group, key, enable, input } of styleSession.controls) {
+    if (!enable.checked) continue;
+    (patch[group] ||= {})[key] = input.type === 'number' ? Number(input.value)
+      : ['head', 'boxed'].includes(key) ? input.value === 'true' : input.value;
+  }
+  if (!Object.keys(patch).length) return;
+  try {
+    const next = applyStyles(doc, styleSession.selection, $('style-scope').value, patch);
+    const changed = JSON.stringify(next) !== JSON.stringify(doc);
+    if (changed) edit(() => { doc = next; });
+    $('styles-dialog').close();
+    status(changed ? '批量样式已应用 · Ctrl+Z 可一次撤销' : '样式已一致，无需修改');
+  } catch (error) { $('style-error').textContent = error.message; }
+});
+
 function endNudge() {
   if (!nudge) return;
   nudge = null;
