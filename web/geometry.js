@@ -12,6 +12,42 @@ export function translateDocument(document, dx, dy) {
   return moved;
 }
 
+export function layoutPage(document, boxes, action, margin = 40) {
+  if (!['center', 'fit'].includes(action)) throw new Error('请选择内容居中或页面适配内容。');
+  if (action === 'fit' && (!Number.isFinite(margin) || margin < 10 || margin > 500))
+    throw new Error('页面留白必须为 10～500 的数字。');
+  if (!boxes.length) {
+    if (['nodes', 'edges', 'junctions', 'labels'].some(name => document[name].length))
+      throw new Error('无法确定图纸内容边界，请等待图纸更新后重试。');
+    return structuredClone(document);
+  }
+  if (boxes.some(box => !Array.isArray(box) || box.length !== 4
+    || box.some(v => !Number.isFinite(v)) || box[2] < 0 || box[3] < 0))
+    throw new Error('图纸内容边界无效，请等待图纸更新后重试。');
+  const x = Math.min(...boxes.map(b => b[0])), y = Math.min(...boxes.map(b => b[1]));
+  const w = Math.max(...boxes.map(b => b[0] + b[2])) - x;
+  const h = Math.max(...boxes.map(b => b[1] + b[3])) - y;
+  let width = document.page.width, height = document.page.height, dx, dy;
+  if (action === 'fit') {
+    width = Math.max(100, Math.ceil(w + margin * 2 - 1e-4));
+    height = Math.max(100, Math.ceil(h + margin * 2 - 1e-4));
+    if (width > 4000 || height > 4000) throw new Error('适配后页面超过 4000 单位，请先缩小内容范围或减少留白。');
+  } else if (w > width + 1e-4 || h > height + 1e-4) {
+    throw new Error('内容大于当前页面，请先使用“页面适配内容”。');
+  }
+  dx = (width - w) / 2 - x; dy = (height - h) / 2 - y;
+  const result = translateDocument(document, Math.abs(dx) < 1e-4 ? 0 : dx, Math.abs(dy) < 1e-4 ? 0 : dy);
+  Object.assign(result.page, { width, height });
+  for (const name of ['nodes', 'junctions', 'labels', 'edges']) {
+    for (const item of result[name]) {
+      const values = name === 'edges' ? item.vertices.flat() : [item.x, item.y];
+      if (values.some(v => !Number.isFinite(v) || Math.abs(v) > 100000))
+        throw new Error('排版后坐标超出允许范围，请先调整内容位置。');
+    }
+  }
+  return result;
+}
+
 export function rotate([x, y], angle) {
   const c = Math.round(Math.cos(angle * Math.PI / 180) * 1e12) / 1e12;
   const s = Math.round(Math.sin(angle * Math.PI / 180) * 1e12) / 1e12;

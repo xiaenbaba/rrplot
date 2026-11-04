@@ -1,4 +1,4 @@
-import { rotate, endpoint, route, along, nearestSegment, splitRoute, translateDocument, editableSegments, moveSegment, transformedBox, selectInBox, projectOnRoute } from './geometry.js';
+import { rotate, endpoint, route, along, nearestSegment, splitRoute, translateDocument, layoutPage, editableSegments, moveSegment, transformedBox, selectInBox, projectOnRoute } from './geometry.js';
 import { copySelection, captureSelection, pasteFragment, deleteSelection, translateSelection, reverseEdge, splitEdgeLabels, reconnectEdge, nudgeSelection } from './document.js';
 import { inspectDiagram } from './checks.js';
 import { objectIndex, filterObjects } from './objects.js';
@@ -17,6 +17,7 @@ let edgeLabelsSupported = false;
 let undo = [], redo = [], drag = null, dirty = false, spaceDown = false;
 let nudge = null;
 let editorClipboard = null, clipboardPastes = 0;
+let pageMargin = 40, pageLayoutBusy = false;
 let revision = 0, request = 0, previewUrl = null, messageTimer = null;
 let view = { x: -40, y: -30, w: 840, h: 640 };
 
@@ -361,6 +362,7 @@ function field(parent, caption, value, setter, options = {}) {
   else if (!options.multiline) input.type = options.type || (typeof value === 'number' ? 'number' : 'text');
   if (options.min !== undefined) input.min = options.min;
   if (options.max !== undefined) input.max = options.max;
+  if (options.required) input.required = true;
   input.disabled = !!options.disabled;
   if (input.type === 'number') input.step = options.step || 'any';
   if (input.type === 'checkbox') input.checked = value; else input.value = value;
@@ -370,7 +372,7 @@ function field(parent, caption, value, setter, options = {}) {
     const next = input.type === 'checkbox' ? input.checked : input.type === 'number' ? Number(input.value) : input.value;
     if (next === committed) return;
     committed = next;
-    edit(() => setter(next));
+    if (options.transient) setter(next); else edit(() => setter(next));
   }
   input.addEventListener('change', commit);
   input.addEventListener('blur', commit);
@@ -422,6 +424,17 @@ function renderInspector() {
     const pair = html('div', undefined, 'field-pair'); root.append(pair);
     field(pair, '页面宽度', doc.page.width, v => { doc.page.width = v; }, { min: 100, max: 4000 });
     field(pair, '页面高度', doc.page.height, v => { doc.page.height = v; }, { min: 100, max: 4000 });
+    root.append(html('div', '页面排版', 'section-label'));
+    const margin = field(root, '适配留白（单位）', pageMargin, v => { pageMargin = v; },
+      { min: 10, max: 500, required: true, transient: true, disabled: pageLayoutBusy });
+    margin.id = 'page-margin';
+    const layout = html('div', undefined, 'button-row'); root.append(layout);
+    const empty = !['nodes', 'edges', 'junctions', 'labels'].some(name => doc[name].length);
+    for (const [action, title] of [['center', '内容居中'], ['fit', '页面适配内容']]) {
+      const button = inspectorButton(layout, title, () => applyPageLayout(action));
+      button.dataset.pageLayout = action; button.disabled = empty || pageLayoutBusy;
+    }
+    root.append(html('p', '作用于整张图纸，包含文字和管路。保持图元大小与连接；适配会调整纸张尺寸，每次排版可一次撤销。“适应页面”只调整视图。', 'muted'));
     root.append(html('p', mode === 'box-select' ? '拖出矩形，完整框住设备、三通或文字。松开后可直接拖动已选对象，按住 Shift 可追加选择。'
       : '选择设备、标签或管路查看属性；使用“框选”或 Shift+拖动空白可多选。坐标单位与 rrplot 画布一致。', 'muted')); return;
   }
@@ -692,6 +705,67 @@ function clipboardReady() {
   }
   return true;
 }
+function showPageLayout() {
+  if (drag || reconnect || pendingPort) return message('请先完成当前连接或拖动，或按 Esc 取消，再进行页面排版。');
+  mode = 'select'; placement = null; ports = []; previewTarget = null; clearSelection(); render();
+  document.body.classList.remove('library-open'); document.body.classList.add('properties-open');
+  document.querySelector('.properties').scrollTop = 0;
+  status('页面排版 · 内容居中或按内容调整页面尺寸');
+}
+function pageContentBoxes(resolved) {
+  const boxes = resolved.nodes.map(n => transformedBox(n.geometry.box, [n.x, n.y], n.rotation));
+  for (const j of doc.junctions) boxes.push([j.x - 4, j.y - 4, 8, 8]);
+  // Measure at the origin and a fixed scale: SVG font hinting can otherwise
+  // change text bounds as fitting changes the canvas zoom or label position.
+  const measurement = shape('svg', { width: 100, height: 100, viewBox: '0 0 100 100',
+    style: 'position:fixed;left:-10000px;top:-10000px;visibility:hidden;pointer-events:none',
+    'aria-hidden': 'true' }, document.body);
+  try {
+    const labels = new Map(resolved.labels.map(label => [label.id, label]));
+    for (const element of svg.querySelectorAll('.diagram-label')) {
+      const label = labels.get(element.dataset.id), [x, y] = label.position;
+      const text = element.querySelector('text').cloneNode(true);
+      text.setAttribute('x', 0); text.setAttribute('y', 0);
+      text.querySelectorAll('tspan').forEach(span => span.setAttribute('x', 0));
+      measurement.append(text);
+      const b = text.getBBox(), pad = label.boxed ? 2 : 0;
+      boxes.push([x + b.x - pad, y + b.y - pad, b.width + pad * 2, b.height + pad * 2]);
+    }
+  } finally { measurement.remove(); }
+  for (const edge of resolved.edges) {
+    const xs = edge.points.map(p => p[0]), ys = edge.points.map(p => p[1]);
+    const x = Math.min(...xs), y = Math.min(...ys), pad = Math.max(edge.width * 100 / 144, edge.head ? 4 : 0);
+    boxes.push([x - pad, y - pad, Math.max(...xs) - x + pad * 2, Math.max(...ys) - y + pad * 2]);
+  }
+  return boxes;
+}
+async function applyPageLayout(action) {
+  if (pageLayoutBusy) return;
+  if (drag || reconnect || pendingPort || placement || mode !== 'select')
+    return message('请先完成当前编辑操作，再进行页面排版。');
+  const input = $('page-margin');
+  if (action === 'fit' && input && !input.checkValidity()) { input.reportValidity(); return; }
+  const version = revision, before = clone(doc), margin = pageMargin;
+  pageLayoutBusy = true; message(''); renderInspector(); status('正在计算整张图纸的内容范围…');
+  try {
+    const resolved = await api('resolve', { document: before });
+    if (version !== revision || drag || reconnect || pendingPort || placement || mode !== 'select') {
+      status('图纸或操作已变化，请重新进行页面排版'); return;
+    }
+    geometries = new Map(resolved.nodes.map(n => [n.id, n.geometry])); fontFamily = resolved.fontFamily; renderCanvas();
+    const boxes = pageContentBoxes(resolved);
+    const next = layoutPage(doc, boxes, action, margin);
+    const changed = JSON.stringify(next) !== JSON.stringify(doc);
+    edit(() => { doc = next; }); fit();
+    status(changed ? (action === 'fit' ? '页面已适配内容' : '内容已在页面中居中') + ' · Ctrl+Z 撤销' : '内容已符合当前排版设置');
+  } catch (error) { message(error.message); status('未应用页面排版'); }
+  finally {
+    pageLayoutBusy = false;
+    const empty = !['nodes', 'edges', 'junctions', 'labels'].some(name => doc[name].length);
+    document.querySelectorAll('[data-page-layout]').forEach(button => { button.disabled = empty; });
+    if ($('page-margin')) $('page-margin').disabled = false;
+  }
+}
 function copyToClipboard() {
   if (!clipboardReady()) return;
   if (!multiSelection.some(ref => ['node', 'label', 'junction'].includes(ref.kind)))
@@ -878,6 +952,7 @@ const actions = {
   'toggle-properties': () => { document.body.classList.toggle('properties-open'); document.body.classList.remove('library-open'); },
   undo: () => history('undo'), redo: () => history('redo'), copy: copySelected, delete: removeSelected,
   'clipboard-copy': copyToClipboard, 'clipboard-paste': pasteClipboard,
+  'page-layout': showPageLayout,
   fit, 'zoom-in': () => zoom(.85), 'zoom-out': () => zoom(1 / .85),
   'align-x': () => alignPorts('x'), 'align-y': () => alignPorts('y'),
   'clear-ports': () => { ports = []; pendingPort = null; previewTarget = null; render(); },
