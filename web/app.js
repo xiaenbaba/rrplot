@@ -21,6 +21,7 @@ let editorClipboard = null, clipboardPastes = 0;
 let pageMargin = 40, pageLayoutBusy = false;
 let styleSession = null;
 let saving = false, pendingDownload = null;
+let exporting = false;
 let revision = 0, request = 0, previewUrl = null, messageTimer = null;
 let view = { x: -40, y: -30, w: 840, h: 640 };
 
@@ -610,6 +611,7 @@ function render() {
   if (!doc) return;
   $('title').value = doc.title;
   renderSaveState();
+  renderExportState();
   $('undo').disabled = !undo.length; $('redo').disabled = !redo.length;
   const clipboardBusy = mode !== 'select' || placement || pendingPort || reconnect || drag;
   $('clipboard-copy').disabled = !!clipboardBusy || !multiSelection.some(ref => ['node', 'label', 'junction'].includes(ref.kind));
@@ -920,6 +922,67 @@ function confirmJSONDownload() {
   renderSaveState();
 }
 
+function exportOptions() {
+  const format = $('export-format').value;
+  if (!['svg', 'png', 'pdf'].includes(format)) throw new Error('请选择 SVG、PNG 或 PDF 格式。');
+  const dpi = format === 'png' ? Number($('export-dpi').value) : 140;
+  if (!Number.isInteger(dpi) || dpi < 72 || dpi > 600) throw new Error('PNG 分辨率须为 72～600 之间的整数。');
+  const width = doc.page.width * dpi / 100, height = doc.page.height * dpi / 100;
+  if (format === 'png' && width * height > 40000000) throw new Error('PNG 超过 4000 万像素，请降低 DPI 或先缩小页面。');
+  return { format, dpi, width: Math.floor(width), height: Math.floor(height) };
+}
+function renderExportState() {
+  $('export-open').disabled = exporting || !doc;
+  $('export-open').textContent = exporting ? '导出中…' : '导出 ↓';
+  $('export-format').disabled = exporting;
+  $('export-dpi').disabled = exporting || $('export-format').value !== 'png';
+  $('export-png').hidden = $('export-format').value !== 'png';
+  $('export-close').textContent = exporting ? '关闭' : '取消';
+  $('export-error').textContent = '';
+  $('export-submit').disabled = exporting || !doc;
+  $('export-submit').textContent = exporting ? '正在生成…' : '导出文件';
+  if (!doc) return;
+  try {
+    const options = exportOptions();
+    $('export-summary').textContent = exporting ? '正在生成点击导出时的图纸，完成后将发起下载；可关闭此窗口继续编辑。'
+      : options.format === 'png' ? `预计尺寸：${options.width} × ${options.height} 像素（${options.dpi} DPI）。`
+      : '矢量格式可缩放，清晰度不受 PNG 分辨率设置影响。';
+  } catch (error) {
+    $('export-summary').textContent = '';
+    $('export-error').textContent = error.message;
+    $('export-submit').disabled = true;
+  }
+}
+function showExportSettings() {
+  if (!doc || exporting || document.querySelector('dialog[open]')) return;
+  if (drag || pageLayoutBusy || placement || pendingPort || reconnect) return message('请先完成当前编辑操作，再导出图纸。');
+  renderExportState(); $('export-dialog').showModal();
+}
+async function exportDiagram() {
+  if (!doc || exporting || !$('export-dialog').open) return;
+  if (drag || pageLayoutBusy || placement || pendingPort || reconnect) return;
+  let options;
+  try { options = exportOptions(); }
+  catch { renderExportState(); return; }
+  const snapshot = clone(doc), version = revision, name = filename(options.format);
+  exporting = true; renderExportState(); status('正在生成导出文件…');
+  try {
+    const blob = await api('export/' + options.format, { document: snapshot, dpi: options.dpi });
+    download(blob, name);
+    if ($('export-dialog').open) $('export-dialog').close();
+    status(version === revision ? options.format.toUpperCase() + ' 下载已发起 · 继续编辑请保存 JSON'
+      : '操作开始时的图纸下载已发起 · 后续修改请重新导出');
+  } catch (error) {
+    exporting = false; renderExportState();
+    $('export-error').textContent = error.message;
+    if (!$('export-dialog').open) message('导出失败：' + error.message);
+    status('导出失败 · 图纸与本机草稿保留');
+    return;
+  } finally {
+    if (exporting) { exporting = false; renderExportState(); }
+  }
+}
+
 function objectName(ref) {
   const item = doc[{ node: 'nodes', edge: 'edges', junction: 'junctions', label: 'labels' }[ref.kind]].find(i => i.id === ref.id);
   if (ref.kind === 'edge') return '管路：' + refName(item.source) + ' → ' + refName(item.target);
@@ -1032,12 +1095,8 @@ const actions = {
   save: saveJSON,
   'confirm-download': confirmJSONDownload,
   'dismiss-download': () => { pendingDownload = null; renderSaveState(); },
-  export: async () => {
-    status('正在生成导出文件…');
-    const format = $('export-format').value;
-    const blob = await api('export/' + format, { document: doc, dpi: 140 });
-    download(blob, filename(format)); status(format.toUpperCase() + ' 已导出');
-  },
+  export: showExportSettings,
+  'close-export': () => $('export-dialog').close(),
   preview: async () => {
     status('正在生成正式预览…');
     const blob = await api('preview', { document: doc });
@@ -1063,6 +1122,10 @@ const actions = {
   },
   'dismiss-draft': () => { $('draft-banner').hidden = true; }
 };
+
+$('export-format').addEventListener('change', renderExportState);
+$('export-dpi').addEventListener('input', renderExportState);
+$('export-form').addEventListener('submit', async event => { event.preventDefault(); await exportDiagram(); });
 
 document.addEventListener('click', async event => {
   const action = event.target.closest('[data-action]')?.dataset.action;
