@@ -22,7 +22,8 @@ let pageMargin = 40, pageLayoutBusy = false;
 let styleSession = null;
 let saving = false, pendingDownload = null;
 let exporting = false;
-let revision = 0, request = 0, previewUrl = null, messageTimer = null;
+let previewSession = null;
+let revision = 0, request = 0, messageTimer = null;
 let view = { x: -40, y: -30, w: 840, h: 640 };
 
 function html(tag, text, className) {
@@ -612,6 +613,7 @@ function render() {
   $('title').value = doc.title;
   renderSaveState();
   renderExportState();
+  renderPreviewState();
   $('undo').disabled = !undo.length; $('redo').disabled = !redo.length;
   const clipboardBusy = mode !== 'select' || placement || pendingPort || reconnect || drag;
   $('clipboard-copy').disabled = !!clipboardBusy || !multiSelection.some(ref => ['node', 'label', 'junction'].includes(ref.kind));
@@ -931,6 +933,88 @@ function exportOptions() {
   if (format === 'png' && width * height > 40000000) throw new Error('PNG 超过 4000 万像素，请降低 DPI 或先缩小页面。');
   return { format, dpi, width: Math.floor(width), height: Math.floor(height) };
 }
+
+function renderPreviewState() {
+  const ready = !!previewSession?.ready;
+  $('preview-open').disabled = !doc || !!previewSession?.loading;
+  $('preview-open').textContent = previewSession?.loading ? '预览中…' : '预览';
+  $('preview-minus').disabled = !ready || previewSession.scale <= .1;
+  $('preview-plus').disabled = !ready || previewSession.scale >= 8;
+  $('preview-fit').disabled = !ready;
+  $('preview-actual').disabled = !ready;
+  $('preview-retry').hidden = !previewSession?.error;
+  $('preview-scale').textContent = ready ? Math.round(previewSession.scale * 100) + '%' : '—';
+}
+function releasePreviewImage(session = previewSession) {
+  if (session?.url) { URL.revokeObjectURL(session.url); session.url = null; }
+  $('preview-image').removeAttribute('src'); $('preview-image').hidden = true;
+}
+function closePreview() {
+  releasePreviewImage(); previewSession = null; renderPreviewState();
+  if ($('preview-dialog').open) $('preview-dialog').close();
+}
+function resizePreviewImage() {
+  const s = previewSession;
+  if (!s?.ready) return;
+  $('preview-image').style.width = s.width * s.scale + 'px';
+  $('preview-image').style.height = s.height * s.scale + 'px';
+  renderPreviewState();
+}
+function fitPreview() {
+  const s = previewSession, viewport = $('preview-viewport');
+  if (!s?.ready) return;
+  s.fit = true;
+  s.scale = Math.min(8, Math.max(1, viewport.clientWidth - 40) / s.width,
+    Math.max(1, viewport.clientHeight - 40) / s.height);
+  resizePreviewImage(); viewport.scrollLeft = 0; viewport.scrollTop = 0;
+}
+function zoomPreview(scale, anchor) {
+  const s = previewSession, viewport = $('preview-viewport'), image = $('preview-image');
+  if (!s?.ready || !Number.isFinite(scale)) return;
+  const bounds = viewport.getBoundingClientRect(), before = image.getBoundingClientRect();
+  const point = anchor || [bounds.left + viewport.clientWidth / 2, bounds.top + viewport.clientHeight / 2];
+  const fraction = [(point[0] - before.left) / before.width, (point[1] - before.top) / before.height]
+    .map(value => Math.max(0, Math.min(1, value)));
+  s.fit = false; s.scale = Math.max(.1, Math.min(8, scale)); resizePreviewImage();
+  const after = image.getBoundingClientRect();
+  viewport.scrollLeft += after.left + fraction[0] * after.width - point[0];
+  viewport.scrollTop += after.top + fraction[1] * after.height - point[1];
+}
+async function showPreview() {
+  if (!doc || previewSession?.loading || previewSession?.ready) return;
+  const dialog = $('preview-dialog');
+  if (document.querySelector('dialog[open]') && !dialog.open) return;
+  if (drag || pageLayoutBusy || placement || pendingPort || reconnect) return message('请先完成当前编辑操作，再预览图纸。');
+  releasePreviewImage();
+  const snapshot = clone(doc), session = { version: revision, loading: true, ready: false, scale: 1 };
+  previewSession = session;
+  $('preview-caption').textContent = snapshot.title + ` · 纸面 ${snapshot.page.width} × ${snapshot.page.height}`;
+  $('preview-message').textContent = '正在生成正式预览…'; $('preview-message').hidden = false;
+  renderPreviewState();
+  if (!dialog.open) dialog.showModal();
+  status('正在生成正式预览…');
+  try {
+    const blob = await api('preview', { document: snapshot });
+    if (session !== previewSession) return;
+    if (session.version !== revision || drag) throw new Error('图纸已变化，请重新生成预览。');
+    session.url = URL.createObjectURL(blob);
+    const image = $('preview-image'); image.src = session.url;
+    await image.decode();
+    if (session !== previewSession) return;
+    if (session.version !== revision || drag) throw new Error('图纸已变化，请重新生成预览。');
+    if (!image.naturalWidth || !image.naturalHeight) throw new Error('预览图片未能正确加载，请重试。');
+    session.width = image.naturalWidth; session.height = image.naturalHeight; session.ready = true;
+    image.hidden = false; $('preview-message').hidden = true;
+    fitPreview(); status('正式预览已生成 · 可缩放或滚动查看');
+  } catch (error) {
+    if (session !== previewSession) return;
+    releasePreviewImage(session); session.error = true;
+    $('preview-message').textContent = '预览失败：' + error.message;
+    status('预览未生成 · 图纸与本机草稿保留');
+  } finally {
+    if (session === previewSession) { session.loading = false; renderPreviewState(); }
+  }
+}
 function renderExportState() {
   $('export-open').disabled = exporting || !doc;
   $('export-open').textContent = exporting ? '导出中…' : '导出 ↓';
@@ -1097,14 +1181,10 @@ const actions = {
   'dismiss-download': () => { pendingDownload = null; renderSaveState(); },
   export: showExportSettings,
   'close-export': () => $('export-dialog').close(),
-  preview: async () => {
-    status('正在生成正式预览…');
-    const blob = await api('preview', { document: doc });
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    previewUrl = URL.createObjectURL(blob); $('preview-image').src = previewUrl;
-    $('preview-dialog').showModal(); status('正式出图预览已生成');
-  },
-  'close-preview': () => $('preview-dialog').close(),
+  preview: showPreview, 'retry-preview': showPreview, 'close-preview': closePreview,
+  'preview-fit': fitPreview, 'preview-actual': () => zoomPreview(1),
+  'preview-minus': () => zoomPreview(previewSession?.scale / 1.25),
+  'preview-plus': () => zoomPreview(previewSession?.scale * 1.25),
   check: runChecks, 'close-checks': () => $('checks-dialog').close(),
   'toggle-library': () => { document.body.classList.toggle('library-open'); document.body.classList.remove('properties-open'); },
   'toggle-properties': () => { document.body.classList.toggle('properties-open'); document.body.classList.remove('library-open'); },
@@ -1126,6 +1206,13 @@ const actions = {
 $('export-format').addEventListener('change', renderExportState);
 $('export-dpi').addEventListener('input', renderExportState);
 $('export-form').addEventListener('submit', async event => { event.preventDefault(); await exportDiagram(); });
+$('preview-dialog').addEventListener('close', () => { if (!$('preview-dialog').open) closePreview(); });
+$('preview-viewport').addEventListener('wheel', event => {
+  if (!event.ctrlKey || !event.deltaY || !previewSession?.ready) return;
+  event.preventDefault();
+  zoomPreview(previewSession.scale * (event.deltaY < 0 ? 1.15 : 1 / 1.15), [event.clientX, event.clientY]);
+}, { passive: false });
+new ResizeObserver(() => { if (previewSession?.fit) fitPreview(); }).observe($('preview-viewport'));
 
 document.addEventListener('click', async event => {
   const action = event.target.closest('[data-action]')?.dataset.action;

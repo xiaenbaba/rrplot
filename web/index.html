@@ -15,7 +15,7 @@
       <button data-action="new">新建</button><button data-action="open">打开</button>
       <button data-action="save" id="save-json">保存 JSON</button><span class="divider"></span>
       <button data-action="undo" id="undo" title="撤销 Ctrl+Z">↶</button><button data-action="redo" id="redo" title="重做 Ctrl+Y">↷</button>
-      <button data-action="check" title="检查连接关系和页面边界">检查</button><button data-action="preview">预览</button>
+      <button data-action="check" title="检查连接关系和页面边界">检查</button><button data-action="preview" id="preview-open">预览</button>
       <button data-action="export" id="export-open" class="primary">导出 ↓</button>
     </div>
   </header>
@@ -109,7 +109,16 @@
     </div>
   </form></dialog>
   <dialog id="checks-dialog" aria-labelledby="checks-heading"><div class="preview-heading"><strong id="checks-heading">图纸检查</strong><button data-action="close-checks">关闭检查</button></div><div class="checks-body"><p class="muted">检查连接关系和页面边界；设备备用端口无需全部接管。检查不包含热力计算和自动避障。</p><p id="checks-summary" role="status"></p><div id="checks-results"></div></div></dialog>
-  <dialog id="preview-dialog"><div class="preview-heading"><strong>正式出图预览</strong><span>与导出使用同一图纸</span><button data-action="close-preview">关闭 ×</button></div><div class="preview-body"><img id="preview-image" alt="rrplot 正式导出预览"></div></dialog>
+  <dialog id="preview-dialog" aria-labelledby="preview-heading">
+    <div class="preview-heading"><strong id="preview-heading">正式出图预览</strong><button data-action="close-preview">关闭 ×</button></div>
+    <div class="preview-tools" role="group" aria-label="预览缩放">
+      <button id="preview-minus" data-action="preview-minus" aria-label="缩小预览" disabled>−</button><output id="preview-scale" aria-label="预览缩放比例">—</output><button id="preview-plus" data-action="preview-plus" aria-label="放大预览" disabled>＋</button>
+      <button id="preview-actual" data-action="preview-actual" title="以 SVG 的原始 CSS 像素尺寸显示" disabled>100%</button><button id="preview-fit" data-action="preview-fit" disabled>适应窗口</button><button id="preview-retry" data-action="retry-preview" hidden>重新生成</button>
+      <span class="muted">滚动查看 · Ctrl+滚轮缩放</span>
+    </div>
+    <p id="preview-caption" class="muted"></p>
+    <div id="preview-viewport" tabindex="0" role="region" aria-label="预览图纸，可滚动查看"><p id="preview-message" role="status"></p><div id="preview-sheet"><img id="preview-image" alt="rrplot 正式导出预览" hidden></div></div>
+  </dialog>
   <dialog id="replace-dialog" aria-labelledby="replace-heading"><form method="dialog"><h2 id="replace-heading">替换当前图纸？</h2><p>当前修改尚未保存为 JSON。替换后，本机草稿也会更新；如需保留，请先继续编辑并保存 JSON。</p><div class="button-row"><button value="cancel" autofocus>继续编辑</button><button value="replace" class="primary">替换图纸</button></div></form></dialog>
   <dialog id="styles-dialog" aria-labelledby="styles-heading"><form id="style-form">
     <div class="preview-heading"><strong id="styles-heading">批量样式</strong><button type="button" data-action="close-styles">取消</button></div>
