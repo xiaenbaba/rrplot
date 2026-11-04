@@ -176,10 +176,30 @@ export function deleteSelection(document, selection, routes = new Map()) {
 
 export function reverseEdge(document, edgeId, points = null) {
   const result = structuredClone(document), edge = result.edges.find(e => e.id === edgeId);
+  reversePipe(result, edge, points);
+  return result;
+}
+
+function reversePipe(document, edge, points) {
   const vertices = points ? points.slice(1, -1).reverse() : [...edge.vertices].reverse();
   if (vertices.length > 100) throw new Error('反向后的管路折点超过 100 个，请先清除部分折点。');
   [edge.source, edge.target] = [edge.target, edge.source]; edge.vertices = vertices;
-  for (const label of result.labels) if (label.edgeId === edgeId) label.at = 1 - label.at;
+  for (const label of document.labels) if (label.edgeId === edge.id) label.at = 1 - label.at;
+}
+
+export function editSelectedEdges(document, selection, action, routes = new Map()) {
+  if (!['reverse', 'clear-vertices'].includes(action)) throw new Error('请选择有效的管路操作。');
+  const ids = new Set(selectedRefs(document, selection).filter(ref => ref.kind === 'edge').map(ref => ref.id));
+  const result = structuredClone(document);
+  for (const edge of result.edges) {
+    if (!ids.has(edge.id)) continue;
+    if (action === 'clear-vertices') { edge.vertices = []; continue; }
+    const points = routes.get(edge.id);
+    if (!Array.isArray(points) || points.length < 2 || points.some(p => !Array.isArray(p)
+      || p.length !== 2 || p.some(v => !Number.isFinite(v) || Math.abs(v) > 100000)))
+      throw new Error('无法计算完整管路走线，请等待图纸更新后重试。');
+    reversePipe(result, edge, points);
+  }
   return result;
 }
 

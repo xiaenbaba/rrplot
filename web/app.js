@@ -1,5 +1,5 @@
 import { rotate, endpoint, route, along, nearestSegment, splitRoute, translateDocument, layoutPage, editableSegments, moveSegment, transformedBox, selectInBox, projectOnRoute } from './geometry.js';
-import { copySelection, captureSelection, pasteFragment, deleteSelection, translateSelection, reverseEdge, splitEdgeLabels, reconnectEdge, nudgeSelection } from './document.js';
+import { copySelection, captureSelection, pasteFragment, deleteSelection, translateSelection, editSelectedEdges, splitEdgeLabels, reconnectEdge, nudgeSelection } from './document.js';
 import { inspectDiagram } from './checks.js';
 import { objectIndex, filterObjects } from './objects.js';
 import { styleTargets, applyStyles } from './styles.js';
@@ -428,6 +428,7 @@ function renderInspector() {
       button.disabled = movable < (action.startsWith('distribute') ? 3 : 2);
     }
     if (movable) root.append(html('div', '批量布局（设备、三通和文字）', 'section-label'), layout);
+    if (pipes) renderPipeActions(root, pipes);
     inspectorButton(root, '批量样式', showBatchStyles);
     inspectorButton(root, '清除多选', () => { clearSelection(); render(); });
     return;
@@ -499,20 +500,40 @@ function renderInspector() {
     field(root, '线型', item.linestyle, v => { item.linestyle = v; }, { options: ['solid', 'dashed'] });
     field(root, '显示流向箭头', item.head, v => { item.head = v; }, { type: 'checkbox' });
     root.append(html('p', `${item.vertices.length} 个手动顶点。拖动线段中间的长条手柄调整走线；双击管线添加折点，Alt+点击方形折点删除。`, 'muted'));
-    const buttons = html('div', undefined, 'button-row'); root.append(buttons);
-    inspectorButton(buttons, '反向', () => {
-      try {
-        const next = reverseEdge(doc, item.id, edgePoints(item));
-        edit(() => { doc = next; });
-      } catch (error) { message(error.message); }
-    });
-    inspectorButton(buttons, '清除折点', () => edit(() => { item.vertices = []; }));
+    renderPipeActions(root, 1);
     inspectorButton(root, '在管路中间插入三通', () => splitEdge(item));
     inspectorButton(root, '添加状态点', () => addStateLabel(item));
     const endpoints = html('div', undefined, 'button-row reconnect-buttons'); root.append(endpoints);
     inspectorButton(endpoints, '重接起点', () => beginReconnect(item, 'source'));
     inspectorButton(endpoints, '重接终点', () => beginReconnect(item, 'target'));
   }
+}
+function pipeActionsBusy() {
+  return mode !== 'select' || placement || pendingPort || reconnect || drag || spaceDown || pageLayoutBusy;
+}
+function renderPipeActions(root, count) {
+  root.append(html('div', `管路操作（已选 ${count} 条）`, 'section-label'));
+  const buttons = html('div', undefined, 'button-row'); root.append(buttons);
+  for (const [action, caption] of [['reverse', '反转流向'], ['clear-vertices', '清除折点']]) {
+    const button = inspectorButton(buttons, caption, () => operateSelectedPipes(action));
+    button.dataset.pipeAction = action;
+    button.disabled = !!pipeActionsBusy() || (action === 'clear-vertices'
+      && !doc.edges.some(edge => selected('edge', edge.id) && edge.vertices.length));
+  }
+  root.append(html('p', '仅处理直接选中的管路。反转保留走线及状态点位置；清除折点恢复自动走线，状态点沿新路径跟随。每次操作可一次撤销。', 'muted'));
+}
+function operateSelectedPipes(action) {
+  if (!doc || pipeActionsBusy() || document.querySelector('dialog[open]')) return;
+  const edges = doc.edges.filter(edge => selected('edge', edge.id));
+  if (!edges.length) return;
+  try {
+    const routes = new Map(action === 'reverse' ? edges.map(edge => [edge.id, edgePoints(edge)]) : []);
+    const next = editSelectedEdges(doc, multiSelection, action, routes);
+    const changed = edges.filter(edge => JSON.stringify(edge) !== JSON.stringify(next.edges.find(e => e.id === edge.id))).length;
+    if (!changed) return status('所选管路无需修改');
+    edit(() => { doc = next; });
+    status(`${action === 'reverse' ? '已反转流向' : '已清除折点'} · ${changed} 条管路 · Ctrl+Z 撤销`);
+  } catch (error) { message(error.message); }
 }
 function coordinateFields(parent, item, prefix = '') {
   const pair = html('div', undefined, 'field-pair'); parent.append(pair);
