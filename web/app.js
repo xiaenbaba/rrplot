@@ -1,4 +1,4 @@
-import { rotate, endpoint, route, along, nearestSegment, splitRoute, translateDocument, layoutPage, editableSegments, moveSegment, transformedBox, selectInBox, projectOnRoute } from './geometry.js';
+import { rotate, endpoint, route, along, nearestSegment, splitRoute, translateDocument, layoutPage, fitViewport, editableSegments, moveSegment, transformedBox, selectInBox, projectOnRoute } from './geometry.js';
 import { copySelection, captureSelection, pasteFragment, deleteSelection, translateSelection, editSelectedEdges, splitEdgeLabels, reconnectEdge, nudgeSelection } from './document.js';
 import { inspectDiagram } from './checks.js';
 import { objectIndex, filterObjects } from './objects.js';
@@ -26,6 +26,7 @@ let saving = false, pendingDownload = null;
 let exporting = false;
 let previewSession = null;
 let documentLoad = null;
+let navigationSession = null, viewRevision = 0;
 let revision = 0, request = 0, messageTimer = null;
 let view = { x: -40, y: -30, w: 840, h: 640 };
 
@@ -333,6 +334,7 @@ function loadTemplate(template) {
 }
 
 function updateView() {
+  ++viewRevision;
   svg.setAttribute('viewBox', `${view.x} ${view.y} ${view.w} ${view.h}`);
   $('zoom').textContent = Math.round((svg.clientWidth / view.w) * 100) + '%';
 }
@@ -349,6 +351,40 @@ function zoom(factor, at) {
   const w = Math.max(100, Math.min(10000, view.w * factor)), k = w / view.w;
   view = { x: center[0] + (view.x - center[0]) * k, y: center[1] + (view.y - center[1]) * k, w, h: view.h * k };
   updateView();
+}
+async function focusDrawing(scope) {
+  if (!doc || document.querySelector('dialog[open]')) return;
+  const busy = () => drag || placement || pendingPort || reconnect || pageLayoutBusy || spaceDown;
+  if (busy()) return message('请先完成当前操作或按 Esc，再定位画布内容。');
+  if (scope === 'selection' && !multiSelection.length) return message('请先选择要定位的设备、管路、三通或文字。');
+  if (!['nodes', 'edges', 'junctions', 'labels'].some(key => doc[key].length)) {
+    fit(); status('图纸为空 · 已适应页面'); return;
+  }
+  const session = { scope, revision, viewRevision, selection: JSON.stringify(multiSelection),
+    width: svg.clientWidth, height: svg.clientHeight };
+  if (JSON.stringify(navigationSession) === JSON.stringify(session)) return;
+  navigationSession = session;
+  const current = () => navigationSession === session && revision === session.revision
+    && viewRevision === session.viewRevision && !busy() && !document.querySelector('dialog[open]')
+    && svg.clientWidth === session.width && svg.clientHeight === session.height
+    && (scope !== 'selection' || JSON.stringify(multiSelection) === session.selection);
+  status(scope === 'selection' ? '正在定位所选内容…' : '正在适应全部内容…');
+  try {
+    const resolved = await api('resolve', { document: clone(doc) });
+    if (!current()) return;
+    let refs = null;
+    if (scope === 'selection') {
+      const targets = styleTargets(doc, multiSelection);
+      refs = new Set([...multiSelection.map(ref => ref.kind + ':' + ref.id),
+        ...targets.edges.map(id => 'edge:' + id), ...targets.labels.map(id => 'label:' + id)]);
+    }
+    const boxes = pageContentBoxes(resolved, refs);
+    if (!current()) return;
+    view = fitViewport(boxes, svg.clientWidth, svg.clientHeight); updateView();
+    status(scope === 'selection' ? '已定位所选内容 · 仅调整视图' : '已适应全部内容 · 仅调整视图');
+  } catch (error) {
+    if (current()) { message(error.message); status('视图定位未完成 · 原视图保留'); }
+  } finally { if (navigationSession === session) navigationSession = null; }
 }
 
 function renderCanvas() {
@@ -867,9 +903,11 @@ function showPageLayout() {
   document.querySelector('.properties').scrollTop = 0;
   status('页面排版 · 内容居中或按内容调整页面尺寸');
 }
-function pageContentBoxes(resolved) {
-  const boxes = resolved.nodes.map(n => transformedBox(n.geometry.box, [n.x, n.y], n.rotation));
-  for (const j of doc.junctions) boxes.push([j.x - 4, j.y - 4, 8, 8]);
+function pageContentBoxes(resolved, refs = null) {
+  const includes = (kind, id) => !refs || refs.has(kind + ':' + id);
+  const boxes = resolved.nodes.filter(n => includes('node', n.id))
+    .map(n => transformedBox(n.geometry.box, [n.x, n.y], n.rotation));
+  for (const j of doc.junctions) if (includes('junction', j.id)) boxes.push([j.x - 4, j.y - 4, 8, 8]);
   // Measure at the origin and a fixed scale: SVG font hinting can otherwise
   // change text bounds as fitting changes the canvas zoom or label position.
   const measurement = shape('svg', { width: 100, height: 100, viewBox: '0 0 100 100',
@@ -878,6 +916,7 @@ function pageContentBoxes(resolved) {
   try {
     const labels = new Map(resolved.labels.map(label => [label.id, label]));
     for (const element of svg.querySelectorAll('.diagram-label')) {
+      if (!includes('label', element.dataset.id)) continue;
       const label = labels.get(element.dataset.id), [x, y] = label.position;
       const text = element.querySelector('text').cloneNode(true);
       text.setAttribute('x', 0); text.setAttribute('y', 0);
@@ -888,6 +927,7 @@ function pageContentBoxes(resolved) {
     }
   } finally { measurement.remove(); }
   for (const edge of resolved.edges) {
+    if (!includes('edge', edge.id)) continue;
     const xs = edge.points.map(p => p[0]), ys = edge.points.map(p => p[1]);
     const x = Math.min(...xs), y = Math.min(...ys), pad = Math.max(edge.width * 100 / 144, edge.head ? 4 : 0);
     boxes.push([x - pad, y - pad, Math.max(...xs) - x + pad * 2, Math.max(...ys) - y + pad * 2]);
@@ -1341,7 +1381,8 @@ const actions = {
   'clipboard-copy': copyToClipboard, 'clipboard-paste': pasteClipboard,
   'page-layout': showPageLayout, 'batch-styles': showBatchStyles,
   'close-styles': () => $('styles-dialog').close(),
-  fit, 'zoom-in': () => zoom(.85), 'zoom-out': () => zoom(1 / .85),
+  fit, 'fit-content': () => focusDrawing('all'), 'fit-selection': () => focusDrawing('selection'),
+  'zoom-in': () => zoom(.85), 'zoom-out': () => zoom(1 / .85),
   'align-x': () => alignPorts('x'), 'align-y': () => alignPorts('y'),
   'clear-ports': () => { ports = []; pendingPort = null; previewTarget = null; render(); },
   restore: showDrafts, drafts: showDrafts,

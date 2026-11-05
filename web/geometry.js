@@ -1,4 +1,19 @@
 /* Diagram units: x right, y down. Keep route() in sync with rrplot.scene. */
+export function fitViewport(boxes, width, height, padding = 32) {
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= padding * 2
+    || height <= padding * 2 || !Number.isFinite(padding) || padding < 0)
+    throw new Error('画布空间不足，请展开绘图区域后重试。');
+  if (!boxes.length || boxes.some(box => !Array.isArray(box) || box.length !== 4
+    || box.some(v => !Number.isFinite(v)) || box[2] < 0 || box[3] < 0))
+    throw new Error('无法确定内容边界，请等待图纸更新后重试。');
+  const left = Math.min(...boxes.map(b => b[0])), top = Math.min(...boxes.map(b => b[1]));
+  const right = Math.max(...boxes.map(b => b[0] + b[2])), bottom = Math.max(...boxes.map(b => b[1] + b[3]));
+  const scale = Math.max((right - left) / (width - padding * 2),
+    (bottom - top) / (height - padding * 2), 100 / width);
+  const w = width * scale, h = height * scale;
+  return { x: (left + right - w) / 2, y: (top + bottom - h) / 2, w, h };
+}
+
 export function translateDocument(document, dx, dy) {
   const moved = structuredClone(document);
   const shift = item => { item.x += dx; item.y += dy; };

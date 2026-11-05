@@ -1,5 +1,4 @@
 """管路状态点的前后端位置、编辑生命周期与导出。"""
-import base64
 import json
 import shutil
 import subprocess
@@ -26,9 +25,9 @@ def run_js(script, payload):
     root = Path(__file__).resolve().parents[1] / "web"
     imports = []
     for name in ("geometry", "document"):
-        uri = "data:text/javascript;base64," + base64.b64encode(
-            (root / (name + ".js")).read_bytes()).decode()
-        imports.append(f"const {name}=await import({json.dumps(uri)});")
+        path = json.dumps(str(root / (name + ".js")))
+        imports.append(f"const {name}=await import('data:text/javascript;base64,'"
+                       f"+fs.readFileSync({path}).toString('base64'));")
     source = ("import fs from 'node:fs';" + "".join(imports)
               + "const input=JSON.parse(fs.readFileSync(0,'utf8'));" + script)
     result = subprocess.run([executable, "--input-type=module", "-e", source],
