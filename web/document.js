@@ -15,6 +15,35 @@ function selectedRefs(document, selection) {
   return [...refs.values()];
 }
 
+export function connectedSelection(document, selection) {
+  const refs = new Map(), links = new Map();
+  for (const kind of ['node', 'junction', 'edge', 'label']) {
+    for (const item of document[collections[kind]]) {
+      const ref = { kind, id: item.id }, id = key(ref);
+      refs.set(id, ref); links.set(id, new Set());
+    }
+  }
+  const connect = (a, b) => {
+    if (!links.has(a) || !links.has(b)) return;
+    links.get(a).add(b); links.get(b).add(a);
+  };
+  for (const edge of document.edges) {
+    for (const endpoint of [edge.source, edge.target]) connect(key({ kind: 'edge', id: edge.id }),
+      key(endpoint.nodeId ? { kind: 'node', id: endpoint.nodeId } : { kind: 'junction', id: endpoint.junctionId }));
+  }
+  for (const label of document.labels) {
+    if (label.nodeId || label.edgeId) connect(key({ kind: 'label', id: label.id }),
+      key(label.nodeId ? { kind: 'node', id: label.nodeId } : { kind: 'edge', id: label.edgeId }));
+  }
+  const chosen = new Set(selection.map(key).filter(id => refs.has(id))), queue = [...chosen];
+  for (let i = 0; i < queue.length; ++i) {
+    for (const id of links.get(queue[i])) if (!chosen.has(id)) { chosen.add(id); queue.push(id); }
+  }
+  // Preserve the original selection order; repeated expansion stays stable.
+  return [...new Set([...selection.map(key).filter(id => refs.has(id)), ...refs.keys()])]
+    .filter(id => chosen.has(id)).map(id => ({ ...refs.get(id) }));
+}
+
 function copyInto(document, selection, newId, offset, destination) {
   const refs = selectedRefs(document, selection).filter(ref => ref.kind !== 'edge');
   const selected = new Set(refs.map(key)), ids = new Map();

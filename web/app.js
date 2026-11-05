@@ -1,5 +1,5 @@
 import { rotate, endpoint, route, along, nearestSegment, splitRoute, translateDocument, layoutPage, fitViewport, editableSegments, moveSegment, transformedBox, selectInBox, projectOnRoute } from './geometry.js';
-import { copySelection, captureSelection, pasteFragment, deleteSelection, translateSelection, moveContents, editSelectedEdges, splitEdgeLabels, reconnectEdge, nudgeSelection } from './document.js';
+import { copySelection, captureSelection, pasteFragment, deleteSelection, translateSelection, moveContents, connectedSelection, editSelectedEdges, splitEdgeLabels, reconnectEdge, nudgeSelection } from './document.js';
 import { inspectDiagram } from './checks.js';
 import { objectIndex, filterObjects } from './objects.js';
 import { styleTargets, applyStyles } from './styles.js';
@@ -91,6 +91,25 @@ function setSelection(kind, id, additive = false) {
   }
 }
 function clearSelection() { selection = null; multiSelection = []; }
+function selectConnected() {
+  if (!doc || document.querySelector('dialog[open]')) return;
+  if (mode !== 'select' || placement || pendingPort || reconnect || drag || spaceDown || pageLayoutBusy)
+    return message('请先完成当前操作或按 Esc，再选择相连对象。');
+  const next = connectedSelection(doc, multiSelection);
+  if (!next.length) return message('请先选择设备、管路、三通或附着标签。');
+  const unchanged = JSON.stringify(next) === JSON.stringify(multiSelection);
+  multiSelection = next;
+  selection = next.find(ref => ref.kind === selection?.kind && ref.id === selection?.id) || next.at(-1);
+  render();
+  const count = kind => next.filter(ref => ref.kind === kind).length;
+  status(`${unchanged ? '相连对象已全部选中' : '已选择相连对象'} · ${count('node')} 个设备 · ${count('edge')} 条管路 · ${count('junction')} 个三通 · ${count('label')} 个文字`);
+}
+function connectedSelectionButton(root) {
+  const button = inspectorButton(root, '选择相连对象', selectConnected);
+  button.title = '沿设备和三通的管路连接扩展选择，包含附着标签；同一设备的所有接管视为相连';
+  button.disabled = mode !== 'select' || !!(placement || pendingPort || reconnect || drag || spaceDown || pageLayoutBusy);
+  root.append(html('p', '按设备级连接扩展，包含所有分支和附着标签；线条交叉不代表相连。', 'muted'));
+}
 function refName(ref) {
   if (ref.junctionId) return '三通 · ' + ref.junctionId.slice(-5);
   const n = doc.nodes.find(n => n.id === ref.nodeId);
@@ -563,6 +582,7 @@ function renderInspector() {
   if (multiSelection.length > 1) {
     $('selection-kind').textContent = 'MULTI';
     root.append(html('h2', `已选择 ${multiSelection.length} 项`, 'object-heading'));
+    connectedSelectionButton(root);
     const movable = layoutRefs().length, pipes = multiSelection.filter(ref => ref.kind === 'edge').length;
     root.append(html('p', `设备、三通和文字 ${movable} 项 · 管路 ${pipes} 条。按住 Shift 点击可添加或取消选择，Shift+拖动空白可追加框选。`, 'muted'));
     root.append(html('p', '可批量修改样式或删除。拖动已选设备、三通或文字可一起移动；管路随端点移动，单选管路后可编辑走线。', 'muted'));
@@ -609,6 +629,7 @@ function renderInspector() {
   }
   const kind = selection.kind;
   root.append(html('h2', kind === 'node' ? item.title : { edge: '管路', label: '文字标签', junction: '分流三通' }[kind], 'object-heading'));
+  if (kind !== 'label' || item.nodeId || item.edgeId) connectedSelectionButton(root);
   if (kind === 'node') {
     field(root, '设备名称', item.title, v => {
       const l = doc.labels.find(l => l.nodeId === item.id && l.text === item.title);
