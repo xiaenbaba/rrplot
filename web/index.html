@@ -18,6 +18,7 @@
       <button data-action="undo" id="undo" title="撤销 Ctrl+Z">↶</button><button data-action="redo" id="redo" title="重做 Ctrl+Y">↷</button>
       <button data-action="check" title="检查连接关系和页面边界">检查</button><button data-action="preview" id="preview-open">预览</button>
       <button data-action="export" id="export-open" class="primary">导出 ↓</button>
+      <button data-action="help" aria-label="帮助与快捷键" aria-controls="help-dialog" aria-haspopup="dialog" title="帮助与快捷键（?）">?</button>
     </div>
   </header>
   <main class="editor">
@@ -55,12 +56,12 @@
       <div class="canvas-toolbar">
         <button data-action="toggle-library" class="mobile-only">图元</button>
         <div class="tool-group" role="group" aria-label="编辑工具">
-          <button data-tool="select" class="active" title="选择与拖动">↖ <span>选择</span></button>
-          <button data-tool="box-select" aria-label="框选" title="完整框住设备、管路或文字；Shift+空白拖动可追加选择">▧ <span>框选</span></button>
-          <button data-tool="move-all" aria-label="整体移动" title="整体移动全部内容 Ctrl+A">✥ <span>整体移动</span></button>
-          <button data-tool="connect" title="依次点击起点和终点端口">⌁ <span>连线</span></button>
-          <button data-tool="junction" title="在画布放置三通，或在选中管路上插入">● <span>三通</span></button>
-          <button data-tool="text" title="在画布放置文字">T <span>文字</span></button>
+          <button data-tool="select" class="active" title="选择与拖动 V">↖ <span>选择</span></button>
+          <button data-tool="box-select" aria-label="框选" title="框选 B；完整框住对象，Shift+空白拖动可追加选择">▧ <span>框选</span></button>
+          <button data-tool="move-all" aria-label="整体移动" title="整体移动全部内容 M / Ctrl+A">✥ <span>整体移动</span></button>
+          <button data-tool="connect" title="连线 C；依次点击起点和终点端口">⌁ <span>连线</span></button>
+          <button data-tool="junction" title="三通 J；在画布放置，或在选中管路上插入">● <span>三通</span></button>
+          <button data-tool="text" title="文字 T；在画布点击放置">T <span>文字</span></button>
         </div>
         <div class="tool-group" role="group" aria-label="复制粘贴">
           <button id="clipboard-copy" data-action="clipboard-copy" title="复制到当前页面的编辑器剪贴板，可跨图纸粘贴 Ctrl+C" disabled>复制</button>
@@ -151,6 +152,52 @@
       <button id="move-apply" type="submit" class="primary" disabled>应用平移</button>
     </div>
   </form></dialog>
+  <dialog id="help-dialog" aria-labelledby="help-heading">
+    <div class="preview-heading"><strong id="help-heading">帮助与快捷键</strong><button data-action="close-help" autofocus>关闭帮助</button></div>
+    <div class="help-body">
+      <p class="muted">点击画布后使用单键快捷键；输入框、输入法组合和弹窗内保留原有按键。进行中的放置、连线、重接或拖动请先完成，或按 Esc 取消。</p>
+      <section><h3>开始绘图</h3><ol>
+        <li>从左侧“模板”载入系统，或新建后在图元库选择设备并点击画布放置。</li>
+        <li>使用“连线”，依次点击设备端口或三通；靠近接点会吸附并显示走线预览。</li>
+        <li>选中对象后在右侧修改参数、文字和样式；Shift+点击可多选，拖动已选设备可整组移动。</li>
+        <li>保存 JSON 以便继续编辑；“预览”和“导出”生成正式图，不包含网格、端口与选中框。</li>
+      </ol></section>
+      <div class="help-columns">
+        <section><h3>工具切换</h3><table><thead><tr><th>按键</th><th>操作</th></tr></thead><tbody>
+          <tr><td><kbd>V</kbd></td><td>选择与拖动</td></tr>
+          <tr><td><kbd>B</kbd></td><td>框选</td></tr>
+          <tr><td><kbd>M</kbd></td><td>整体移动全部内容</td></tr>
+          <tr><td><kbd>C</kbd></td><td>端口连线</td></tr>
+          <tr><td><kbd>J</kbd></td><td>放置三通</td></tr>
+          <tr><td><kbd>T</kbd></td><td>放置文字</td></tr>
+          <tr><td><kbd>?</kbd></td><td>打开本帮助</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>取消当前操作或关闭弹窗</td></tr>
+        </tbody></table></section>
+        <section><h3>编辑快捷键</h3><table><thead><tr><th>按键</th><th>操作</th></tr></thead><tbody>
+          <tr><td><kbd>Ctrl+S</kbd></td><td>保存 JSON</td></tr>
+          <tr><td><kbd>Ctrl+Z</kbd></td><td>撤销</td></tr>
+          <tr><td><kbd>Ctrl+Y</kbd> / <kbd>Ctrl+Shift+Z</kbd></td><td>重做</td></tr>
+          <tr><td><kbd>Ctrl+C</kbd> / <kbd>Ctrl+V</kbd></td><td>编辑器内复制 / 粘贴，可跨图纸</td></tr>
+          <tr><td><kbd>Ctrl+D</kbd></td><td>直接生成所选对象副本</td></tr>
+          <tr><td><kbd>Ctrl+A</kbd></td><td>切换整体移动</td></tr>
+          <tr><td><kbd>方向键</kbd></td><td>微调 1 单位；按住 Shift 为 10 单位</td></tr>
+          <tr><td><kbd>Delete</kbd> / <kbd>Backspace</kbd></td><td>删除所选对象及关联管路</td></tr>
+        </tbody></table></section>
+      </div>
+      <section><h3>鼠标与精确编辑</h3><ul>
+        <li>滚轮缩放；拖动空白平移视图。按住空格拖动或使用中键，可临时平移。</li>
+        <li>框选需完整框住对象；Shift+空白处拖动追加框选，Shift+点击追加或取消选择。</li>
+        <li>单选管路后拖动长条手柄调整线段；双击增加折点，Alt+点击方形折点删除。</li>
+        <li>管路属性可插入三通、重接端点和添加状态点；属性栏“选择相连对象”扩展整个设备组。</li>
+        <li>“精确平移”输入 X/Y 位移；多选属性提供对齐、均匀分布和批量样式。</li>
+      </ul></section>
+      <section><h3>视图、纸张与保存</h3><ul>
+        <li>“适应页面 / 适应内容 / 定位所选”只改变视图；“页面排版”用于移动内容或调整纸张尺寸。</li>
+        <li>“草稿”可恢复当前浏览器与服务地址的本机记录；需要文件备份时请保存 JSON。</li>
+        <li>PNG、SVG 和 PDF 用于出图，不替代可编辑 JSON；导出不会清除未保存标记。</li>
+      </ul></section>
+    </div>
+  </dialog>
   <script type="module" src="/app.js"></script>
 </body>
 </html>

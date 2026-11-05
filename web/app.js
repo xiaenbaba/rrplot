@@ -91,6 +91,23 @@ function setSelection(kind, id, additive = false) {
   }
 }
 function clearSelection() { selection = null; multiSelection = []; }
+function showHelp() {
+  if (document.querySelector('dialog[open]')) return;
+  if (drag || placement || pendingPort || reconnect || pageLayoutBusy || spaceDown)
+    return message('请先完成当前操作或按 Esc，再查看帮助。');
+  $('help-dialog').showModal();
+}
+function handleEditorShortcut(event) {
+  if (!doc && event.key !== '?') return false;
+  if (event.defaultPrevented || event.repeat || event.ctrlKey || event.metaKey || event.altKey
+    || !(event.target === document.body || event.target === svg || svg.contains(event.target))) return false;
+  const tools = { v: 'select', b: 'box-select', m: 'move-all', c: 'connect', j: 'junction', t: 'text' };
+  const help = event.key === '?', tool = !event.shiftKey && tools[event.key.toLowerCase()];
+  if ((!help && (!tool || !doc)) || drag || placement || pendingPort || reconnect || pageLayoutBusy || spaceDown) return false;
+  event.preventDefault();
+  if (help) showHelp(); else setTool(tool);
+  return true;
+}
 function selectConnected() {
   if (!doc || document.querySelector('dialog[open]')) return;
   if (mode !== 'select' || placement || pendingPort || reconnect || drag || spaceDown || pageLayoutBusy)
@@ -1427,6 +1444,7 @@ async function runChecks() {
 }
 
 const actions = {
+  help: showHelp, 'close-help': () => $('help-dialog').close(),
   new: () => loadDocument(() => ({ schemaVersion: 1, title: '未命名图纸', page: { width: 1000, height: 700 }, nodes: [], edges: [], junctions: [], labels: [] }), '新建空白图纸', 'new'),
   open: () => { if (!document.querySelector('dialog[open]')) $('file-input').click(); },
   'cancel-load': cancelDocumentLoad,
@@ -1479,7 +1497,7 @@ $('drafts-dialog').addEventListener('cancel', () => { if (restoringDraft) ++requ
 
 document.addEventListener('click', async event => {
   const action = event.target.closest('[data-action]')?.dataset.action;
-  if (action && doc) try { await actions[action]?.(); } catch (error) { message(error.message); }
+  if (action && (doc || ['help', 'close-help'].includes(action))) try { await actions[action]?.(); } catch (error) { message(error.message); }
   const tool = event.target.closest('[data-tool]')?.dataset.tool;
   if (tool) setTool(tool);
 });
@@ -1792,6 +1810,7 @@ window.addEventListener('keydown', async event => {
   if (event.code === 'Space') { spaceDown = true; event.preventDefault(); }
   if (event.key === 'Escape') { mode = 'select'; placement = null; pendingPort = null; previewTarget = null; ports = []; cancelDrag(); }
   if (drag) return;
+  if (handleEditorShortcut(event)) return;
   if (modifier && event.key.toLowerCase() === 'a') { event.preventDefault(); setTool('move-all'); }
   if (event.key === 'Delete' || event.key === 'Backspace') { event.preventDefault(); removeSelected(); }
   if (modifier && event.key.toLowerCase() === 'z') { event.preventDefault(); history(event.shiftKey ? 'redo' : 'undo'); }

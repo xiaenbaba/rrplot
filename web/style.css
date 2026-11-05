@@ -173,6 +173,19 @@ dialog::backdrop { background: #18322c66; }
 #move-dialog { width: min(480px, 94vw); height: fit-content; max-height: 90vh; overflow-y: auto; }
 #move-error { color: #a34324; font-size: 12px; }
 #move-apply { width: 100%; }
+#help-dialog { width: min(800px, 94vw); height: auto; max-height: 88vh; overflow: hidden; }
+#help-dialog[open] { display: flex; flex-direction: column; }
+#help-dialog > .preview-heading { flex-shrink: 0; }
+.help-body { padding: 4px 20px 18px; overflow-y: auto; min-height: 0; font-size: 12px; line-height: 1.8; }
+.help-body h3 { font-size: 13px; margin: 16px 0 8px; }
+.help-body ol, .help-body ul { padding-left: 22px; margin: 6px 0; }
+.help-body li { margin: 5px 0; }
+.help-columns { display: grid; grid-template-columns: 1fr 1.5fr; gap: 24px; }
+.help-body table { width: 100%; border-collapse: collapse; text-align: left; }
+.help-body th, .help-body td { border-bottom: 1px solid var(--border); padding: 6px 3px; vertical-align: top; }
+.help-body th { font-weight: 600; color: #647e7b; }
+.help-body kbd { font: inherit; font-size: 11px; white-space: nowrap; color: #345d56; }
+@media (max-width: 600px) { .help-columns { grid-template-columns: 1fr; gap: 0; } }
 @media (max-width: 480px) { #style-fields { grid-template-columns: 1fr; gap: 0; } }
 #checks-dialog { width: min(640px, 94vw); height: auto; max-height: 85vh; }
 .checks-body { padding: 8px 20px 20px; overflow-y: auto; max-height: calc(85vh - 65px); }
