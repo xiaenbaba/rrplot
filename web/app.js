@@ -25,6 +25,7 @@ let styleSession = null;
 let saving = false, pendingDownload = null;
 let exporting = false;
 let previewSession = null;
+let documentLoad = null;
 let revision = 0, request = 0, messageTimer = null;
 let view = { x: -40, y: -30, w: 840, h: 640 };
 
@@ -241,6 +242,7 @@ async function refresh() {
 
 function finishEdit(before, { merge = false, deferRefresh = false } = {}) {
   if (JSON.stringify(before) === JSON.stringify(doc)) return render();
+  cancelDocumentLoad();
   if (!merge || !undo.length) { undo.push(before); if (undo.length > 80) undo.shift(); }
   redo = [];
   dirty = true; revision++; saveDraft(); render();
@@ -259,11 +261,12 @@ function clearDraft() {
   renderDraftBanner();
 }
 
-async function replaceDocument(next, preserveDraft = false) {
+async function replaceDocument(next, preserveDraft = false, canApply = () => true) {
+  if (!canApply()) return false;
   const token = ++request, version = revision;
   const result = await api('resolve', { document: next });
+  if (token !== request || version !== revision || !canApply()) return false;
   edgeLabelsSupported = result.features?.includes('edgeLabels') || false;
-  if (token !== request || version !== revision) return false;
   ++revision;
   doc = result.document; geometries = new Map(result.nodes.map(n => [n.id, n.geometry]));
   fontFamily = result.fontFamily; undo = []; redo = []; clearSelection(); ports = [];
@@ -284,6 +287,49 @@ async function confirmReplace() {
     () => resolve(dialog.returnValue === 'replace'), { once: true }));
   dialog.showModal();
   return answer;
+}
+
+function renderDocumentLoad() {
+  $('load-banner').hidden = !documentLoad;
+  $('load-description').textContent = documentLoad ? `正在载入：${documentLoad.label}…` : '';
+}
+function cancelDocumentLoad() {
+  if (!documentLoad) return;
+  documentLoad = null; renderDocumentLoad();
+  status('载入已取消 · 当前图纸保留');
+}
+async function loadDocument(loader, label, key) {
+  if (!doc || document.querySelector('dialog[open]')) return false;
+  if (drag || placement || pendingPort || reconnect || pageLayoutBusy || spaceDown) {
+    message('请先完成当前操作或按 Esc，再载入图纸。'); return false;
+  }
+  if (documentLoad?.key === key) return false;
+  const session = { label, key, version: revision };
+  documentLoad = session; renderDocumentLoad();
+  const current = () => documentLoad === session && revision === session.version
+    && !(drag || placement || pendingPort || reconnect || pageLayoutBusy || spaceDown)
+    && !document.querySelector('dialog[open]');
+  try {
+    if (!await confirmReplace() || !current()) return false;
+    const next = await loader();
+    if (!current()) return false;
+    if (!await replaceDocument(next, false, current)) return false;
+    document.body.classList.remove('library-open');
+    status('已载入：' + label); return true;
+  } catch (error) {
+    if (current()) {
+      message('无法载入图纸：' + error.message);
+      status('载入失败 · 当前图纸与草稿保留');
+    }
+    return false;
+  } finally {
+    if (documentLoad === session) {
+      documentLoad = null; renderDocumentLoad();
+    }
+  }
+}
+function loadTemplate(template) {
+  return loadDocument(() => api('templates/' + template.id), template.title, 'template:' + template.id);
 }
 
 function updateView() {
@@ -917,6 +963,7 @@ function history(direction) {
   if (reconnect) cancelReconnect();
   const from = direction === 'undo' ? undo : redo, to = direction === 'undo' ? redo : undo;
   if (!from.length) return;
+  cancelDocumentLoad();
   to.push(clone(doc)); doc = from.pop(); clearSelection(); ports = []; pendingPort = null; previewTarget = null;
   revision++; dirty = true; saveDraft(); render(); void refresh();
 }
@@ -1275,8 +1322,9 @@ async function runChecks() {
 }
 
 const actions = {
-  new: async () => { if (await confirmReplace()) await replaceDocument({ schemaVersion: 1, title: '未命名图纸', page: { width: 1000, height: 700 }, nodes: [], edges: [], junctions: [], labels: [] }); },
-  open: () => $('file-input').click(),
+  new: () => loadDocument(() => ({ schemaVersion: 1, title: '未命名图纸', page: { width: 1000, height: 700 }, nodes: [], edges: [], junctions: [], labels: [] }), '新建空白图纸', 'new'),
+  open: () => { if (!document.querySelector('dialog[open]')) $('file-input').click(); },
+  'cancel-load': cancelDocumentLoad,
   save: saveJSON,
   'confirm-download': confirmJSONDownload,
   'dismiss-download': () => { pendingDownload = null; renderSaveState(); },
@@ -1499,6 +1547,9 @@ svg.addEventListener('dragover', event => event.preventDefault());
 svg.addEventListener('drop', event => { event.preventDefault(); const type = event.dataTransfer.getData('text/rrplot-part'); if (catalog.some(c => c.type === type)) { reconnect = null; addNode(type, world(event)); } });
 
 $('title').addEventListener('change', event => edit(() => { doc.title = event.target.value; }));
+document.addEventListener('input', event => {
+  if (event.target === $('title') || event.target.closest('#inspector')) cancelDocumentLoad();
+});
  $('grid').addEventListener('change', () => {
   renderCanvas(); status($('grid').checked ? '网格已显示' : '网格已隐藏');
  });
@@ -1507,12 +1558,11 @@ $('title').addEventListener('change', event => edit(() => { doc.title = event.ta
  });
 $('file-input').addEventListener('change', async event => {
   const file = event.target.files[0]; if (!file) return;
-  try {
-    if (file.size > 5000000) throw new Error('图纸文件超过 5 MB');
-    const next = JSON.parse(await file.text());
-    if (await confirmReplace()) await replaceDocument(next);
-  } catch (error) { message('无法打开图纸：' + error.message); }
   event.target.value = '';
+  await loadDocument(async () => {
+    if (file.size > 5000000) throw new Error('图纸文件超过 5 MB');
+    return JSON.parse(await file.text());
+  }, file.name, 'file:' + uid('load'));
 });
 function updateStyleButton() {
   $('batch-styles').disabled = mode !== 'select' || !!(placement || pendingPort || reconnect || drag || pageLayoutBusy)
@@ -1661,7 +1711,7 @@ async function init() {
     }
     for (const template of data[1]) {
       const b = html('button', template.title); b.dataset.template = template.id;
-      b.addEventListener('click', async () => { try { if (await confirmReplace()) { await replaceDocument(await api('templates/' + template.id)); document.body.classList.remove('library-open'); } } catch (error) { message(error.message); } });
+      b.addEventListener('click', () => loadTemplate(template));
       $('templates').append(b);
     }
     filterPalette();

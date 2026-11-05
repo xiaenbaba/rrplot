@@ -123,6 +123,10 @@ input[type=checkbox] { min-height: unset; accent-color: var(--accent); }
 #draft-banner, #download-banner { padding: 8px 14px; color: #4c7569; background: #e8f3ed; font-size: 11px; z-index: 2; }
 #draft-banner button, #download-banner button { font-size: 10px; min-height: 24px; padding: 3px 7px; margin-left: 8px; }
 #download-banner span { display: block; margin-top: 5px; }
+#load-banner { padding: 8px 14px; background: #eaf1f8; color: #365a75; font-size: 11px; z-index: 2; }
+#load-description { overflow-wrap: anywhere; }
+#load-banner button { min-height: 24px; padding: 3px 7px; margin-left: 8px; font-size: 10px; }
+#load-banner .load-note { display: block; margin-top: 4px; }
 #draft-description { overflow-wrap: anywhere; }
 #drafts-dialog { width: min(560px, 94vw); height: fit-content; max-height: 85vh; }
 .drafts-body { padding: 8px 20px 20px; }
