@@ -21,7 +21,7 @@
       <button data-action="help" aria-label="帮助与快捷键" aria-controls="help-dialog" aria-haspopup="dialog" title="帮助与快捷键（?）">?</button>
     </div>
   </header>
-  <main class="editor">
+  <main class="editor" id="editor">
     <aside class="library">
       <div class="panel-heading"><span>图纸资源</span><span class="eyebrow">LIBRARY</span></div>
       <div class="library-switch" role="group" aria-label="左侧面板">
@@ -53,7 +53,7 @@
       <div class="library-footer"><span class="local-dot"></span> 本机运行 · 文件由你保存<br><span class="muted">图元与最终出图来自 rrplot</span></div>
     </aside>
     <section class="workspace" aria-label="绘图工作区">
-      <div class="canvas-toolbar">
+      <div class="canvas-toolbar" id="canvas-toolbar">
         <button data-action="toggle-library" class="mobile-only">图元</button>
         <div class="tool-group" role="group" aria-label="编辑工具">
           <button data-tool="select" class="active" title="选择与拖动 V">↖ <span>选择</span></button>

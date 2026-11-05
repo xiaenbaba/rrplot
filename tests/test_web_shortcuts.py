@@ -17,7 +17,8 @@ def shortcut_scenario(code, **options):
     script = r"""
 import fs from 'node:fs';import vm from 'node:vm';
 const input=JSON.parse(fs.readFileSync(0,'utf8'));
-const elements=new Map(),listeners=new Map(),results=[],messages=[],calls=[];
+const elements=new Map(),listeners=new Map(),resizeObservers=new Map();
+const results=[],messages=[],calls=[];
 const storage=new Map(Object.entries(input.options.storage||{}));
 let failRead=!!input.options.failRead,failWrite=!!input.options.failWrite;
 function element(id){if(!elements.has(id))elements.set(id,{
@@ -33,7 +34,9 @@ const context=vm.createContext({input,structuredClone,results,messages,calls,
   localStorage:{getItem:k=>{if(failRead)throw Error('blocked');return storage.get(k);},
     setItem:(k,v)=>{if(failWrite)throw Error('full');storage.set(k,v);}},
   failStorage:(read,write)=>{failRead=read;failWrite=write;},storage,
-  ResizeObserver:class{observe(){}},element,listeners});
+  ResizeObserver:class{constructor(callback){this.callback=callback;}
+    observe(target){resizeObservers.set(target,this.callback);}},
+  element,listeners,resizeObservers});
 const source=fs.readFileSync(input.path,'utf8').replace(/^import .*;\r?$/gm,'')
   .replace('void init();','');
 vm.runInContext(source,context);
@@ -134,6 +137,26 @@ def test_copy_paste_modifiers_keep_existing_shortcuts(modifier):
     assert output["calls"] == ["copy", "paste"]
     assert output["results"][0] == output["results"][-1]
     assert output["results"][1:3] == [True, True]
+
+
+def test_toolbar_resize_updates_drawer_offset_without_editing_document():
+    output = shortcut_scenario("""
+      $('editor').style={setProperty:(name,value)=>results.push([name,value])};
+      const before=snapshot();
+      for(const height of [46,86,124,46]){
+        $('canvas-toolbar').offsetHeight=height;
+        resizeObservers.get($('canvas-toolbar'))();
+      }
+      results.push(before,snapshot());doc=null;
+      $('canvas-toolbar').offsetHeight=170;
+      resizeObservers.get($('canvas-toolbar'))();
+    """)
+    assert output["results"][:4] == [
+        ["--toolbar-height", f"{height}px"] for height in [46, 86, 124, 46]
+    ]
+    assert output["results"][4] == output["results"][5]
+    assert output["results"][6] == ["--toolbar-height", "170px"]
+    assert output["state"]["doc"] is None
 
 
 def test_question_opens_help_and_close_action_preserves_editor_state():

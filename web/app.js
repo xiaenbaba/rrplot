@@ -1851,6 +1851,9 @@ window.addEventListener('keyup', event => {
 });
 window.addEventListener('blur', () => { spaceDown = false; endNudge(); });
 new ResizeObserver(() => { if (doc) updateView(); }).observe(svg);
+new ResizeObserver(() => {
+  $('editor').style.setProperty('--toolbar-height', `${$('canvas-toolbar').offsetHeight}px`);
+}).observe($('canvas-toolbar'));
 
 async function init() {
   try {
