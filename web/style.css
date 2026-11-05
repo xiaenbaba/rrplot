@@ -214,7 +214,7 @@ dialog::backdrop { background: #18322c66; }
   .mobile-only { display: block; }
   .header-actions { flex-wrap: nowrap; width: 100%; overflow-x: auto; justify-content: flex-start; }
   .header-actions > * { flex-shrink: 0; }
-  .canvas-toolbar { gap: 7px; flex-shrink: 0; }
+  .canvas-toolbar { gap: 7px; flex-shrink: 0; max-height: 50%; overflow-y: auto; }
   .canvas-hint { max-width: 70%; }
   .statusbar { font-size: 9px; }
 }
