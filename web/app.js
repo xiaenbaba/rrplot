@@ -109,6 +109,7 @@ function showHelp() {
   if (drag || placement || pendingPort || reconnect || pageLayoutBusy || spaceDown)
     return message('请先完成当前操作或按 Esc，再查看帮助。');
   renderShortcutPreference(); $('help-dialog').showModal();
+  $('help-body').scrollTop = 0;
 }
 function handleEditorShortcut(event) {
   if (!singleKeyShortcuts) return false;

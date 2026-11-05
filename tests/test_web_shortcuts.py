@@ -147,6 +147,18 @@ def test_question_opens_help_and_close_action_preserves_editor_state():
     assert during == dict(before, helpOpen=True) and after == before
 
 
+def test_help_reopens_at_top_without_resetting_an_open_dialog():
+    output = shortcut_scenario("""
+      const before=snapshot();await click('help');
+      $('help-body').scrollTop=500;await click('help');
+      results.push($('help-body').scrollTop);await click('close-help');
+      await key('?',{shiftKey:true});results.push($('help-body').scrollTop);
+      await click('close-help');results.push(before,snapshot());
+    """)
+    assert output["results"][:2] == [500, 0]
+    assert output["results"][2] == output["results"][3]
+
+
 def test_help_header_works_without_loaded_document_and_tools_require_document():
     output = shortcut_scenario("""
       doc=null;results.push(await key('c'));await click('help');
