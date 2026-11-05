@@ -178,6 +178,8 @@ dialog::backdrop { background: #18322c66; }
 #help-dialog > .preview-heading { flex-shrink: 0; }
 .help-body { padding: 4px 20px 18px; overflow-y: auto; min-height: 0; font-size: 12px; line-height: 1.8; }
 .help-body h3 { font-size: 13px; margin: 16px 0 8px; }
+.shortcut-setting { display: flex; align-items: flex-start; gap: 8px; margin-top: 16px; }
+.shortcut-setting input { flex-shrink: 0; margin-top: 5px; }
 .help-body ol, .help-body ul { padding-left: 22px; margin: 6px 0; }
 .help-body li { margin: 5px 0; }
 .help-columns { display: grid; grid-template-columns: 1fr 1.5fr; gap: 24px; }

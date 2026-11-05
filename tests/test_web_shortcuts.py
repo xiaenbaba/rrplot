@@ -18,8 +18,11 @@ def shortcut_scenario(code, **options):
 import fs from 'node:fs';import vm from 'node:vm';
 const input=JSON.parse(fs.readFileSync(0,'utf8'));
 const elements=new Map(),listeners=new Map(),results=[],messages=[],calls=[];
+const storage=new Map(Object.entries(input.options.storage||{}));
+let failRead=!!input.options.failRead,failWrite=!!input.options.failWrite;
 function element(id){if(!elements.has(id))elements.set(id,{
-  open:false,addEventListener(){},showModal(){this.open=true;},
+  open:false,addEventListener:(n,f)=>listeners.set(id+':'+n,f),
+  showModal(){this.open=true;},
   close(){this.open=false;},contains:t=>!!t?.inCanvas,
   matches:()=>false,classList:{remove(){}}});return elements.get(id);}
 const context=vm.createContext({input,structuredClone,results,messages,calls,
@@ -27,6 +30,9 @@ const context=vm.createContext({input,structuredClone,results,messages,calls,
     querySelector:()=>[...elements.values()].find(e=>e.open)||null,
     addEventListener:(n,f)=>listeners.set('document:'+n,f)},
   window:{addEventListener:(n,f)=>listeners.set('window:'+n,f)},
+  localStorage:{getItem:k=>{if(failRead)throw Error('blocked');return storage.get(k);},
+    setItem:(k,v)=>{if(failWrite)throw Error('full');storage.set(k,v);}},
+  failStorage:(read,write)=>{failRead=read;failWrite=write;},storage,
   ResizeObserver:class{observe(){}},element,listeners});
 const source=fs.readFileSync(input.path,'utf8').replace(/^import .*;\r?$/gm,'')
   .replace('void init();','');
@@ -52,7 +58,10 @@ vm.runInContext(`doc=structuredClone(input.document);render=()=>{};
   globalThis.click=action=>listeners.get('document:click')({target:{
     closest:s=>s==='[data-action]'?{dataset:{action}}:null}});`,context);
 await vm.runInContext('(async()=>{'+input.code+'})()',context);
-console.log(JSON.stringify({results,messages,calls,
+console.log(JSON.stringify({results,messages,calls,stored:Object.fromEntries(storage),
+  enabled:vm.runInContext('singleKeyShortcuts',context),
+  checked:element('single-key-shortcuts').checked,
+  note:element('shortcut-preference-status').textContent,
   state:vm.runInContext('snapshot()',context)}));
 """
     output = subprocess.run(
@@ -157,3 +166,68 @@ def test_repeated_help_and_busy_header_do_not_interrupt_work():
     assert not output["results"][0]
     assert output["results"][1] == output["results"][2]
     assert "先完成当前操作" in output["messages"][-1]
+
+
+def test_disable_single_keys_keeps_header_help_and_modifier_shortcuts():
+    output = shortcut_scenario("""
+      results.push(snapshot());await click('help');
+      $('single-key-shortcuts').checked=false;
+      listeners.get('single-key-shortcuts:change')();await click('close-help');
+      for(const k of ['v','b','m','c','j','t','?'])results.push(await key(k));
+      results.push(snapshot());await key('c',{ctrlKey:true});
+      await key('v',{ctrlKey:true});await click('help');results.push(snapshot());
+    """)
+    assert output["results"][1:8] == [False] * 7
+    assert output["results"][0] == output["results"][8]
+    assert output["results"][9]["helpOpen"]
+    assert output["calls"] == ["copy", "paste"]
+    assert not output["enabled"] and not output["checked"]
+    assert output["stored"]["rrplot-web-v1-single-key-shortcuts"] == "false"
+
+
+@pytest.mark.parametrize("stored,enabled", [
+    ("false", False), ("true", True), ("invalid", True), (None, True),
+])
+def test_preference_restores_on_page_load(stored, enabled):
+    storage = {} if stored is None else {"rrplot-web-v1-single-key-shortcuts": stored}
+    output = shortcut_scenario("results.push(await key('c'));", storage=storage)
+    assert output["enabled"] is enabled
+    assert output["results"] == [enabled]
+    assert output["state"]["mode"] == ("connect" if enabled else "select")
+
+
+def test_reenable_and_cross_tab_changes_preserve_document_and_history():
+    output = shortcut_scenario("""
+      results.push(snapshot());await click('help');
+      $('single-key-shortcuts').checked=true;
+      listeners.get('single-key-shortcuts:change')();await click('close-help');
+      results.push(await key('c'));mode='select';
+      storage.set(SHORTCUTS,'false');listeners.get('window:storage')({key:SHORTCUTS});
+      results.push(await key('t'));storage.delete(SHORTCUTS);
+      listeners.get('window:storage')({key:SHORTCUTS});results.push(await key('j'));
+      mode='select';results.push(snapshot());
+    """, storage={"rrplot-web-v1-single-key-shortcuts": "false"})
+    assert output["results"][1:4] == [True, False, True]
+    assert output["results"][0] == output["results"][4]
+    assert output["enabled"] and output["checked"]
+
+
+def test_storage_failures_keep_preference_working_for_current_page():
+    output = shortcut_scenario("""
+      results.push(await key('c'));mode='select';await click('help');
+      $('single-key-shortcuts').checked=false;
+      listeners.get('single-key-shortcuts:change')();await click('close-help');
+      results.push(await key('t'));results.push(snapshot());await click('help');
+    """, failRead=True, failWrite=True)
+    assert output["results"][:2] == [True, False]
+    assert not output["enabled"] and output["stored"] == {}
+    assert "当前页面生效" in output["note"]
+
+
+def test_unrelated_storage_change_does_not_change_shortcuts():
+    output = shortcut_scenario("""
+      storage.set(SHORTCUTS,'false');
+      listeners.get('window:storage')({key:'unrelated'});
+      results.push(await key('c'));
+    """)
+    assert output["enabled"] and output["results"] == [True]

@@ -11,6 +11,9 @@ const clone = value => structuredClone(value);
 const uid = prefix => prefix + '-' + crypto.randomUUID().slice(0, 8);
 const DRAFT = 'rrplot-web-v1-draft';
 const DRAFT_HISTORY = 'rrplot-web-v1-draft-history';
+const SHORTCUTS = 'rrplot-web-v1-single-key-shortcuts';
+let singleKeyShortcuts = readShortcutPreference();
+let shortcutPreferenceSaved = true;
 let ownedDraft = null, draftError = false, draftBannerDismissed = false, restoringDraft = false;
 let doc = null, catalog = [], geometries = new Map(), fontFamily = 'Times New Roman, SimSun, serif';
 let selection = null, multiSelection = [], mode = 'select', placement = null, ports = [], pendingPort = null;
@@ -91,13 +94,24 @@ function setSelection(kind, id, additive = false) {
   }
 }
 function clearSelection() { selection = null; multiSelection = []; }
+function readShortcutPreference() {
+  try { return localStorage.getItem(SHORTCUTS) !== 'false'; }
+  catch { return true; }
+}
+function renderShortcutPreference() {
+  $('single-key-shortcuts').checked = singleKeyShortcuts;
+  $('shortcut-preference-status').textContent = shortcutPreferenceSaved
+    ? '此设置仅保存在当前浏览器与服务地址；不影响 Ctrl+S、撤销等组合键。'
+    : '设置已在当前页面生效，但浏览器未能记住设置；刷新后请重新检查。';
+}
 function showHelp() {
   if (document.querySelector('dialog[open]')) return;
   if (drag || placement || pendingPort || reconnect || pageLayoutBusy || spaceDown)
     return message('请先完成当前操作或按 Esc，再查看帮助。');
-  $('help-dialog').showModal();
+  renderShortcutPreference(); $('help-dialog').showModal();
 }
 function handleEditorShortcut(event) {
+  if (!singleKeyShortcuts) return false;
   if (!doc && event.key !== '?') return false;
   if (event.defaultPrevented || event.repeat || event.ctrlKey || event.metaKey || event.altKey
     || !(event.target === document.body || event.target === svg || svg.contains(event.target))) return false;
@@ -1489,9 +1503,19 @@ $('preview-viewport').addEventListener('wheel', event => {
 }, { passive: false });
 new ResizeObserver(() => { if (previewSession?.fit) fitPreview(); }).observe($('preview-viewport'));
 window.addEventListener('storage', event => {
+  if (event.key === SHORTCUTS || event.key === null) {
+    singleKeyShortcuts = readShortcutPreference(); shortcutPreferenceSaved = true; renderShortcutPreference();
+    if (event.key === SHORTCUTS) return;
+  }
   if (event.key !== null && ![DRAFT, DRAFT_HISTORY].includes(event.key)) return;
   renderDraftBanner();
   if ($('drafts-dialog').open && !restoringDraft) renderDraftList();
+});
+$('single-key-shortcuts').addEventListener('change', () => {
+  singleKeyShortcuts = $('single-key-shortcuts').checked;
+  shortcutPreferenceSaved = true;
+  try { localStorage.setItem(SHORTCUTS, String(singleKeyShortcuts)); } catch { shortcutPreferenceSaved = false; }
+  renderShortcutPreference();
 });
 $('drafts-dialog').addEventListener('cancel', () => { if (restoringDraft) ++request; });
 
