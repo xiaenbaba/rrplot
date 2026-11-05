@@ -119,6 +119,26 @@ export function translateSelection(document, selection, offset) {
   return result;
 }
 
+export function moveContents(document, selection, scope, offset) {
+  if (!['selection', 'all'].includes(scope)) throw new Error('请选择当前选择或整张图纸。');
+  if (!Array.isArray(offset) || offset.length !== 2 || offset.some(v => typeof v !== 'number'
+    || !Number.isFinite(v) || Math.abs(v) > 100000))
+    throw new Error('X、Y 位移必须为 -100000～100000 的数字。');
+  const refs = scope === 'all' ? ['node', 'junction', 'label'].flatMap(kind =>
+    document[collections[kind]].map(item => ({ kind, id: item.id })))
+    : selectedRefs(document, selection).filter(ref => ref.kind !== 'edge');
+  if (scope === 'selection' && !refs.length) throw new Error('请先选择设备、三通或文字；管路按端点跟随。');
+  const result = translateSelection(document, refs, offset);
+  for (const name of Object.values(collections)) {
+    for (const item of result[name]) {
+      const values = name === 'edges' ? item.vertices.flat() : [item.x, item.y];
+      if (values.some(v => !Number.isFinite(v) || Math.abs(v) > 100000))
+        throw new Error('平移后坐标超出允许范围，请减少位移。');
+    }
+  }
+  return result;
+}
+
 export function nudgeSelection(document, selection, direction, accelerated = false) {
   const directions = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
   const delta = directions[direction];

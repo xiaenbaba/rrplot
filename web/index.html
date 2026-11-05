@@ -136,6 +136,21 @@
     </div>
     <div class="styles-footer"><span class="muted">应用后可用 Ctrl+Z 一次撤销</span><button id="style-apply" type="submit" class="primary" disabled>应用样式</button></div>
   </form></dialog>
+  <dialog id="move-dialog" aria-labelledby="move-heading"><form id="move-form">
+    <div class="preview-heading"><strong id="move-heading">精确平移</strong><button type="button" data-action="close-move">取消</button></div>
+    <div class="export-body">
+      <label class="field"><span>平移范围</span><select id="move-scope"><option value="selection">当前选择</option><option value="all">整张图纸</option></select></label>
+      <p id="move-summary" class="muted" role="status"></p>
+      <div class="field-pair">
+        <label class="field"><span>X 位移（向右为正）</span><input id="move-x" type="number" value="0" min="-100000" max="100000" step="any" required autofocus></label>
+        <label class="field"><span>Y 位移（向下为正）</span><input id="move-y" type="number" value="0" min="-100000" max="100000" step="any" required></label>
+      </div>
+      <p class="muted">使用图纸坐标单位，支持小数，不受网格吸附影响。设备附着标签和组内管路随组移动；跨组管路按端点跟随。单独选择管路不会平移走线。</p>
+      <p class="muted">保持纸张和视图位置。应用后可用 Ctrl+Z 一次撤销。</p>
+      <p id="move-error" role="alert"></p>
+      <button id="move-apply" type="submit" class="primary" disabled>应用平移</button>
+    </div>
+  </form></dialog>
   <script type="module" src="/app.js"></script>
 </body>
 </html>

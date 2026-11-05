@@ -1,5 +1,5 @@
 import { rotate, endpoint, route, along, nearestSegment, splitRoute, translateDocument, layoutPage, fitViewport, editableSegments, moveSegment, transformedBox, selectInBox, projectOnRoute } from './geometry.js';
-import { copySelection, captureSelection, pasteFragment, deleteSelection, translateSelection, editSelectedEdges, splitEdgeLabels, reconnectEdge, nudgeSelection } from './document.js';
+import { copySelection, captureSelection, pasteFragment, deleteSelection, translateSelection, moveContents, editSelectedEdges, splitEdgeLabels, reconnectEdge, nudgeSelection } from './document.js';
 import { inspectDiagram } from './checks.js';
 import { objectIndex, filterObjects } from './objects.js';
 import { styleTargets, applyStyles } from './styles.js';
@@ -27,6 +27,7 @@ let exporting = false;
 let previewSession = null;
 let documentLoad = null;
 let navigationSession = null, viewRevision = 0;
+let moveSession = null;
 let revision = 0, request = 0, messageTimer = null;
 let view = { x: -40, y: -30, w: 840, h: 640 };
 
@@ -556,6 +557,7 @@ function renderInspector() {
     root.append(html('h2', '整体移动', 'object-heading'));
     root.append(html('p', '在画布中按住左键拖动，整体移动全部设备、三通、管路折点和文字。页面位置保持不变，附着标签随设备移动。', 'muted'));
     root.append(html('p', '每次拖动可用 Ctrl+Z 撤销；拖动中按 Esc 取消本次移动，松开后按 Esc 退出。', 'muted'));
+    inspectorButton(root, '精确平移全部', () => showMoveDialog('all'));
     return;
   }
   if (multiSelection.length > 1) {
@@ -577,6 +579,7 @@ function renderInspector() {
     }
     if (movable) root.append(html('div', '批量布局（设备、三通和文字）', 'section-label'), layout);
     if (pipes) renderPipeActions(root, pipes);
+    if (movable) inspectorButton(root, '精确平移所选', () => showMoveDialog('selection'));
     inspectorButton(root, '批量样式', showBatchStyles);
     inspectorButton(root, '清除多选', () => { clearSelection(); render(); });
     return;
@@ -590,6 +593,7 @@ function renderInspector() {
     field(pair, '页面宽度', doc.page.width, v => { doc.page.width = v; }, { min: 100, max: 4000 });
     field(pair, '页面高度', doc.page.height, v => { doc.page.height = v; }, { min: 100, max: 4000 });
     root.append(html('div', '页面排版', 'section-label'));
+    inspectorButton(root, '精确平移全部', () => showMoveDialog('all'));
     const margin = field(root, '适配留白（单位）', pageMargin, v => { pageMargin = v; },
       { min: 10, max: 500, required: true, transient: true, disabled: pageLayoutBusy });
     margin.id = 'page-margin';
@@ -655,6 +659,46 @@ function renderInspector() {
     inspectorButton(endpoints, '重接起点', () => beginReconnect(item, 'source'));
     inspectorButton(endpoints, '重接终点', () => beginReconnect(item, 'target'));
   }
+  if (['node', 'junction', 'label'].includes(kind))
+    inspectorButton(root, '精确平移所选', () => showMoveDialog('selection'));
+}
+function moveBusy() {
+  return !['select', 'move-all'].includes(mode) || placement || pendingPort || reconnect || drag || spaceDown || pageLayoutBusy;
+}
+function showMoveDialog(scope) {
+  if (!doc || moveBusy() || document.querySelector('dialog[open]')) return;
+  moveSession = { revision, selection: clone(multiSelection) };
+  $('move-scope').value = scope;
+  $('move-x').value = '0'; $('move-y').value = '0';
+  renderMoveState(); $('move-dialog').showModal();
+}
+function renderMoveState() {
+  if (!moveSession) return;
+  const scope = $('move-scope').value;
+  const refs = scope === 'all' ? ['nodes', 'junctions', 'labels'].flatMap(name => doc[name])
+    : moveSession.selection.filter(ref => ['node', 'junction', 'label'].includes(ref.kind));
+  const valid = ['move-x', 'move-y'].every(id => $(id).value.trim() !== ''
+    && Number.isFinite(Number($(id).value)) && Math.abs(Number($(id).value)) <= 100000);
+  const changed = ['move-x', 'move-y'].some(id => Number($(id).value) !== 0);
+  $('move-summary').textContent = scope === 'all' ? `整张图纸 · ${doc.nodes.length} 个设备 · ${doc.junctions.length} 个三通 · ${doc.labels.length} 个文字`
+    : `已选可移动对象 ${refs.length} 项 · 管路按端点跟随`;
+  $('move-error').textContent = revision !== moveSession.revision ? '图纸已变化，请关闭后重新打开精确平移。'
+    : !refs.length ? '没有可移动对象，请选择设备、三通或文字，或切换到整张图纸。'
+    : !valid ? 'X、Y 位移必须为 -100000～100000 的数字。' : '';
+  $('move-apply').disabled = !refs.length || !valid || !changed || revision !== moveSession.revision || !!moveBusy();
+}
+function applyMove(event) {
+  event.preventDefault();
+  renderMoveState();
+  if (!moveSession || !$('move-dialog').open || $('move-apply').disabled) return;
+  try {
+    const next = moveContents(doc, moveSession.selection, $('move-scope').value,
+      [Number($('move-x').value), Number($('move-y').value)]);
+    if (JSON.stringify(next) === JSON.stringify(doc)) return;
+    edit(() => { doc = next; });
+    $('move-dialog').close();
+    status('已精确平移 · Ctrl+Z 可一次撤销');
+  } catch (error) { $('move-error').textContent = error.message; }
 }
 function pipeActionsBusy() {
   return mode !== 'select' || placement || pendingPort || reconnect || drag || spaceDown || pageLayoutBusy;
@@ -1381,6 +1425,7 @@ const actions = {
   'clipboard-copy': copyToClipboard, 'clipboard-paste': pasteClipboard,
   'page-layout': showPageLayout, 'batch-styles': showBatchStyles,
   'close-styles': () => $('styles-dialog').close(),
+  'close-move': () => $('move-dialog').close(),
   fit, 'fit-content': () => focusDrawing('all'), 'fit-selection': () => focusDrawing('selection'),
   'zoom-in': () => zoom(.85), 'zoom-out': () => zoom(1 / .85),
   'align-x': () => alignPorts('x'), 'align-y': () => alignPorts('y'),
@@ -1390,6 +1435,10 @@ const actions = {
   'dismiss-draft': () => { draftBannerDismissed = true; $('draft-banner').hidden = true; }
 };
 
+$('move-scope').addEventListener('change', renderMoveState);
+for (const id of ['move-x', 'move-y']) $(id).addEventListener('input', renderMoveState);
+$('move-form').addEventListener('submit', applyMove);
+$('move-dialog').addEventListener('close', () => { if (!$('move-dialog').open) moveSession = null; });
 $('export-format').addEventListener('change', renderExportState);
 $('export-dpi').addEventListener('input', renderExportState);
 $('export-form').addEventListener('submit', async event => { event.preventDefault(); await exportDiagram(); });
