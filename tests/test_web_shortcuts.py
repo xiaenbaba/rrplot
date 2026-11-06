@@ -266,3 +266,59 @@ def test_unrelated_storage_change_does_not_change_shortcuts():
       results.push(await key('c'));
     """)
     assert output["enabled"] and output["results"] == [True]
+
+
+@pytest.mark.parametrize("grid,snap", [(True, True), (False, True),
+                                       (True, False), (False, False)])
+def test_canvas_preferences_restore_independently(grid, snap):
+    output = shortcut_scenario("""
+      results.push($('grid').checked,$('snap').checked,snapped(13.25));
+    """, storage={
+        "rrplot-web-v1-grid": str(grid).lower(),
+        "rrplot-web-v1-snap": str(snap).lower(),
+    })
+    assert output["results"] == [grid, snap, 10 if snap else 13.25]
+
+
+@pytest.mark.parametrize("control", ["grid", "snap"])
+def test_canvas_change_persists_without_editing_document(control):
+    output = shortcut_scenario("""
+      renderCanvas=()=>calls.push('canvas');results.push(snapshot());
+      $('""" + control + """').checked=false;
+      listeners.get('""" + control + """:change')();
+      results.push(snapshot(),$('grid').checked,$('snap').checked);
+    """)
+    assert output["results"][0] == output["results"][1]
+    assert output["results"][2:] == [control != "grid", control != "snap"]
+    assert output["stored"] == {f"rrplot-web-v1-{control}": "false"}
+    assert output["calls"] == (["canvas"] if control == "grid" else [])
+
+
+def test_canvas_storage_failure_keeps_current_page_settings_and_defaults():
+    output = shortcut_scenario("""
+      renderCanvas=()=>calls.push('canvas');results.push(snapshot());
+      results.push($('grid').checked,$('snap').checked);
+      for(const id of ['grid','snap']){
+        $(id).checked=false;listeners.get(id+':change')();
+      }
+      results.push(snapshot(),$('grid').checked,$('snap').checked,snapped(13.25));
+    """, failRead=True, failWrite=True)
+    assert output["results"][0] == output["results"][3]
+    assert output["results"][1:3] == [True, True]
+    assert output["results"][4:] == [False, False, 13.25]
+    assert output["stored"] == {}
+    assert len(output["messages"]) == 2
+    assert all("当前页面生效" in m for m in output["messages"])
+
+
+def test_canvas_defaults_invalid_storage_and_toggle_without_document():
+    output = shortcut_scenario("""
+      results.push($('grid').checked,$('snap').checked);doc=null;
+      renderCanvas=()=>{throw Error('no document');};
+      $('grid').checked=false;listeners.get('grid:change')();
+      $('grid').checked=true;listeners.get('grid:change')();
+      results.push($('grid').checked,$('snap').checked);
+    """, storage={"rrplot-web-v1-grid": "invalid"})
+    assert output["results"] == [True, True, True, True]
+    assert output["stored"]["rrplot-web-v1-grid"] == "true"
+    assert output["state"]["doc"] is None

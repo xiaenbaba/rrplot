@@ -12,6 +12,7 @@ const uid = prefix => prefix + '-' + crypto.randomUUID().slice(0, 8);
 const DRAFT = 'rrplot-web-v1-draft';
 const DRAFT_HISTORY = 'rrplot-web-v1-draft-history';
 const SHORTCUTS = 'rrplot-web-v1-single-key-shortcuts';
+const CANVAS_PREFERENCES = { grid: 'rrplot-web-v1-grid', snap: 'rrplot-web-v1-snap' };
 let singleKeyShortcuts = readShortcutPreference();
 let shortcutPreferenceSaved = true;
 let ownedDraft = null, draftError = false, draftBannerDismissed = false, restoringDraft = false;
@@ -97,6 +98,16 @@ function clearSelection() { selection = null; multiSelection = []; }
 function readShortcutPreference() {
   try { return localStorage.getItem(SHORTCUTS) !== 'false'; }
   catch { return true; }
+}
+function restoreCanvasPreferences() {
+  for (const [id, key] of Object.entries(CANVAS_PREFERENCES)) {
+    try { $(id).checked = localStorage.getItem(key) !== 'false'; }
+    catch { $(id).checked = true; }
+  }
+}
+function saveCanvasPreference(id) {
+  try { localStorage.setItem(CANVAS_PREFERENCES[id], String($(id).checked)); }
+  catch { message('设置已在当前页面生效，但浏览器未能记住设置；刷新后请重新检查。'); }
 }
 function renderShortcutPreference() {
   $('single-key-shortcuts').checked = singleKeyShortcuts;
@@ -1704,12 +1715,16 @@ $('title').addEventListener('change', event => edit(() => { doc.title = event.ta
 document.addEventListener('input', event => {
   if (event.target === $('title') || event.target.closest('#inspector')) cancelDocumentLoad();
 });
- $('grid').addEventListener('change', () => {
-  renderCanvas(); status($('grid').checked ? '网格已显示' : '网格已隐藏');
- });
- $('snap').addEventListener('change', () => {
+restoreCanvasPreferences();
+$('grid').addEventListener('change', () => {
+  saveCanvasPreference('grid');
+  if (doc) renderCanvas();
+  status($('grid').checked ? '网格已显示' : '网格已隐藏');
+});
+$('snap').addEventListener('change', () => {
+  saveCanvasPreference('snap');
   status($('snap').checked ? '网格吸附已开启' : '网格吸附已关闭');
- });
+});
 $('file-input').addEventListener('change', async event => {
   const file = event.target.files[0]; if (!file) return;
   event.target.value = '';

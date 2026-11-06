@@ -202,7 +202,7 @@ dialog::backdrop { background: #18322c66; }
 #replace-dialog h2 { margin: 0 0 12px; font-size: 17px; }
 #replace-dialog p { color: #75818b; line-height: 1.8; margin-bottom: 22px; }
 @media (max-width: 1200px) { .topbar { gap: 10px; padding: 10px 12px; } .brand { min-width: 120px; font-size: 18px; } .brand small { font-size: 9px; letter-spacing: 0; } .document-title { min-width: 110px; } .header-actions { gap: 4px; } .header-actions button { padding: 5px 7px; } .editor { grid-template-columns: 155px minmax(270px, 1fr) 225px; } .canvas-toolbar { gap: 5px; padding: 8px; } .tool-group button { padding: 5px; } .canvas-hint { max-width: 55%; line-height: 1.8; } }
-@media (max-width: 900px) { .brand small, .brand-mark, #save-state, .canvas-toolbar .check, .statusbar > span:last-child { display: none; } .brand { min-width: 65px; } .topbar { flex-wrap: wrap; } .header-actions { flex-wrap: wrap; } .document-title { max-width: none; } .editor { grid-template-columns: 120px minmax(260px, 1fr) 200px; } .tool-group span { display: none; } .properties { padding: 14px 10px; } .part-button { padding: 5px; gap: 5px; } .part-icon { display: none; } }
+@media (max-width: 900px) { .brand small, .brand-mark, #save-state, .statusbar > span:last-child { display: none; } .brand { min-width: 65px; } .topbar { flex-wrap: wrap; } .header-actions { flex-wrap: wrap; } .document-title { max-width: none; } .editor { grid-template-columns: 120px minmax(260px, 1fr) 200px; } .tool-group span { display: none; } .properties { padding: 14px 10px; } .part-button { padding: 5px; gap: 5px; } .part-icon { display: none; } }
 @media (max-width: 900px) {
   .editor { display: block; }
   .workspace { width: 100%; height: 100%; }
