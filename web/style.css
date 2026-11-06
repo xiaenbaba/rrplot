@@ -77,6 +77,12 @@ input[type=checkbox] { min-height: unset; accent-color: var(--accent); }
 .port.chosen { fill: #c5e5da; stroke-width: 2; }
 .edge { cursor: pointer; }
 .connection-preview { fill: none; stroke: var(--accent); stroke-width: 1.8; stroke-dasharray: 6 4; stroke-linecap: round; opacity: .8; pointer-events: none; }
+.connection-preview.invalid { stroke: #b83d36; }
+.connection-target { fill: #17796718; stroke: var(--accent); stroke-width: 2; pointer-events: none; }
+.connection-target.invalid { fill: #b83d3618; stroke: #b83d36; }
+.canvas-hint.connection-valid-hint, .canvas-hint.connection-invalid-hint { background: #fffffff2; padding: 5px 7px; border-radius: 4px; overflow-wrap: anywhere; }
+.canvas-hint.connection-valid-hint { color: var(--accent); }
+.canvas-hint.connection-invalid-hint { color: #b83d36; }
 .edge-hit { fill: none; stroke: transparent; stroke-width: 13; }
 .edge.selected .edge-visible { stroke: #208b7a; }
 .edge.reconnecting-edge { opacity: .25; pointer-events: none; }

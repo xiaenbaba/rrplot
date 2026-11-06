@@ -220,9 +220,38 @@ function edgePoints(edge) {
 
 function connectionTarget(event, point) {
   const hit = event.target.closest('[data-kind="port"], [data-kind="junction"]');
-  if (hit?.dataset.kind === 'port') return endpoint(JSON.parse(hit.dataset.ref), currentNodes(), doc.junctions);
-  if (hit?.dataset.kind === 'junction') return endpoint({ junctionId: hit.dataset.id }, currentNodes(), doc.junctions);
+  const ref = hit?.dataset.kind === 'port' ? JSON.parse(hit.dataset.ref)
+    : hit?.dataset.kind === 'junction' ? { junctionId: hit.dataset.id } : null;
+  if (ref) {
+    const target = { ...endpoint(ref, currentNodes(), doc.junctions), ref, version: revision };
+    const sameRef = previewTarget?.ref && ['nodeId', 'portId', 'junctionId'].every(key => previewTarget.ref[key] === ref[key]);
+    target.error = sameRef && previewTarget.version === revision ? previewTarget.error : connectionError(ref);
+    return target;
+  }
   return { point, direction: [0, 0] };
+}
+function connectionError(ref) {
+  try {
+    if (mode === 'connect' && pendingPort)
+      checkConnection({ id: null, source: pendingPort, target: ref, vertices: [] });
+    else if (mode === 'reconnect' && reconnect) {
+      const edge = doc.edges.find(item => item.id === reconnect.edgeId);
+      const previous = edge[reconnect.side];
+      if (['nodeId', 'portId', 'junctionId'].some(key => previous[key] !== ref[key]))
+        checkConnection({ ...edge, [reconnect.side]: ref }, edge.id);
+    }
+    return '';
+  } catch (error) { return error.message; }
+}
+function renderConnectionFeedback() {
+  const active = (mode === 'connect' && pendingPort) || reconnect;
+  const target = active && previewTarget?.ref ? previewTarget : null;
+  const hint = document.querySelector('.canvas-hint');
+  hint.classList.toggle('connection-valid-hint', !!target && !target.error);
+  hint.classList.toggle('connection-invalid-hint', !!target?.error);
+  if (target) hint.textContent = (target.error ? '不可连接：' : '点击连接：') + refName(target.ref)
+    + (target.error ? ' · ' + target.error : ' · Esc 取消');
+  return target;
 }
 
 function parseDraft(raw) {
@@ -452,6 +481,9 @@ async function focusDrawing(scope) {
 
 function renderCanvas() {
   if (!doc) return;
+  renderHint();
+  const connection = renderConnectionFeedback();
+  const previewClass = 'connection-preview' + (connection?.error ? ' invalid' : '');
   svg.replaceChildren();
   svg.classList.toggle('connecting', mode === 'connect' || mode === 'reconnect');
   svg.classList.toggle('moving-all', mode === 'move-all');
@@ -487,7 +519,7 @@ function renderCanvas() {
     try {
       const start = endpoint(pendingPort, nodes, doc.junctions);
       const points = route(start, previewTarget, []);
-      shape('polyline', { points: points.map(p => p.join(',')).join(' '), class: 'connection-preview' });
+      shape('polyline', { points: points.map(p => p.join(',')).join(' '), class: previewClass });
     } catch { /* The source may have been removed while connecting. */ }
   }
   if (mode === 'reconnect' && reconnect && previewTarget) {
@@ -496,7 +528,7 @@ function renderCanvas() {
       const source = reconnect.side === 'source' ? previewTarget : endpoint(edge.source, nodes, doc.junctions);
       const target = reconnect.side === 'target' ? previewTarget : endpoint(edge.target, nodes, doc.junctions);
       const points = route(source, target, edge.vertices);
-      shape('polyline', { points: points.map(p => p.join(',')).join(' '), class: 'connection-preview' });
+      shape('polyline', { points: points.map(p => p.join(',')).join(' '), class: previewClass });
     } catch { /* Geometry may still be loading. */ }
   }
   for (const n of nodes) {
@@ -541,6 +573,8 @@ function renderCanvas() {
       g.insertBefore(bg, text);
     }
   }
+  if (connection) shape('circle', { cx: connection.point[0], cy: connection.point[1], r: 9,
+    class: 'connection-target' + (connection.error ? ' invalid' : ''), 'vector-effect': 'non-scaling-stroke' });
   renderVertices();
   if (drag?.kind === 'box' && drag.moved) {
     const [x, y] = drag.start, [ex, ey] = drag.point;
@@ -857,9 +891,14 @@ function renderHint() {
     ? '拖动任意位置整体移动全部内容 · Ctrl+Z 撤销 · Esc 退出'
     : mode === 'box-select' ? '拖出矩形完整框住对象 · Shift 追加选择 · Esc 取消'
     : mode === 'reconnect' ? '点击设备端口或三通完成重接 · 空格拖动平移 · Esc 取消'
+    : mode === 'connect' ? (pendingPort ? '起点已选 · 悬停端口或三通查看连接提示 · Esc 取消' : '点击起点端口或三通 · 再点击终点完成连线 · Esc 退出')
+    : placement ? '点击画布放置设备 · Esc 取消'
+    : mode === 'junction' ? '点击画布空白放置三通 · Esc 取消'
+    : mode === 'text' ? '点击画布空白放置文字 · Esc 取消'
     : mode === 'select' && !placement && multiSelection.some(ref => ['node', 'junction', 'label'].includes(ref.kind)) ? '方向键微调 1 单位 · Shift+方向键 10 单位 · Ctrl+Z 撤销'
     : mode === 'select' && multiSelection.some(ref => ref.kind === 'edge') ? 'Shift+点击追加管路 · 批量样式统一外观 · 单选管路调整走线'
     : '滚轮缩放 · 空白拖动平移 · Shift+空白拖动框选 · 双击管线加折点';
+  renderConnectionFeedback();
 }
 function render() {
   if (!doc) return;
@@ -1646,7 +1685,9 @@ svg.addEventListener('pointermove', event => {
     if ((mode === 'connect' && pendingPort) || reconnect) {
       const next = connectionTarget(event, world(event));
       const changed = !previewTarget || next.point.some((value, index) => value !== previewTarget.point[index])
-        || next.direction.some((value, index) => value !== previewTarget.direction[index]);
+        || next.direction.some((value, index) => value !== previewTarget.direction[index])
+        || JSON.stringify(next.ref) !== JSON.stringify(previewTarget.ref) || next.error !== previewTarget.error
+        || next.version !== previewTarget.version;
       if (changed) { previewTarget = next; renderCanvas(); }
     }
     return;
