@@ -89,6 +89,8 @@ input[type=checkbox] { min-height: unset; accent-color: var(--accent); }
 .reconnect-buttons { margin-top: 12px; }
 .edge:hover .edge-hit { stroke: #26897611; }
 .vertex { fill: #fff; stroke: var(--accent); stroke-width: 1.5; cursor: move; }
+.endpoint-handle { fill: #fff; stroke: var(--accent); stroke-width: 2; cursor: crosshair; }
+.endpoint-handle:hover { fill: #c5e5da; stroke-width: 3; }
 .segment-handle { fill: #d6eee4; stroke: var(--accent); stroke-width: 1.5; }
 .segment-handle:hover { fill: #a9d8c8; }
 .segment-handle.horizontal { cursor: ns-resize; }

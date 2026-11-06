@@ -617,7 +617,7 @@ function renderCanvas() {
 }
 
 function renderVertices() {
-  svg.querySelectorAll('[data-kind="vertex"], [data-kind="segment"]').forEach(element => element.remove());
+  svg.querySelectorAll('[data-kind="vertex"], [data-kind="segment"], [data-kind="endpoint"]').forEach(element => element.remove());
   if (mode === 'reconnect' || multiSelection.length > 1) return;
   const e = selection?.kind === 'edge' && findSelected();
   if (e && mode === 'select') {
@@ -636,6 +636,16 @@ function renderVertices() {
       class: 'vertex', 'data-kind': 'vertex', 'data-id': e.id, 'data-index': i });
     shape('title', {}, c).textContent = '拖动折点；Alt+点击删除';
   });
+  if (e && mode === 'select' && !placement) {
+    const nodes = currentNodes();
+    for (const side of ['source', 'target']) {
+      const { point: [x, y] } = endpoint(e[side], nodes, doc.junctions);
+      const handle = shape('circle', { cx: x, cy: y, r: 7, class: 'endpoint-handle',
+        'data-kind': 'endpoint', 'data-id': e.id, 'data-side': side,
+        'vector-effect': 'non-scaling-stroke' });
+      shape('title', {}, handle).textContent = (side === 'source' ? '重接起点' : '重接终点') + '：点击后选择新端口或三通';
+    }
+  }
 }
 
 function field(parent, caption, value, setter, options = {}) {
@@ -1642,6 +1652,14 @@ svg.addEventListener('pointerdown', event => {
   svg.focus({ preventScroll: true });
   const p = world(event), hit = event.target.closest('[data-kind]');
   if (event.button === 1 || spaceDown) return startPan(event);
+  if (mode === 'select' && !placement && hit?.dataset.kind === 'endpoint') {
+    const edge = doc.edges.find(item => item.id === hit.dataset.id);
+    if (multiSelection.length === 1 && selected('edge', edge?.id)
+      && ['source', 'target'].includes(hit.dataset.side)) {
+      event.preventDefault(); beginReconnect(edge, hit.dataset.side);
+    }
+    return;
+  }
   if (mode === 'connect' || mode === 'reconnect') {
     const ref = connectionRef(event, p);
     if (ref) { event.preventDefault(); onPort(ref); return; }

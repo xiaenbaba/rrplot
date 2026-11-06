@@ -637,3 +637,103 @@ def test_view_change_without_preview_does_not_redraw_or_clear_selection():
     assert renders == 0
     assert {k: v for k, v in after.items() if k != "view"} == {
         k: v for k, v in before.items() if k != "view"}
+
+
+@pytest.mark.parametrize("name", list(TEMPLATES))
+@pytest.mark.parametrize("side", ["source", "target"])
+def test_canvas_endpoint_handles_start_reconnect_at_transformed_port(name, side):
+    output = connection_scenario("""
+      const shapes=[];svg.querySelectorAll=()=>[];
+      shape=(tag,attrs={},parent)=>{
+        const item={tag,...attrs};shapes.push(item);
+        if(tag==='title')return {set textContent(value){parent.title=value;}};
+        return item;
+      };
+      const edge=doc.edges[0],side='""" + side + """';
+      setSelection('edge',edge.id);results.push(snapshot());renderVertices();
+      const handles=shapes.filter(item=>item['data-kind']==='endpoint');
+      results.push(handles,endpoint(edge[side],currentNodes(),doc.junctions).point);
+      const handle=handles.find(item=>item['data-side']===side);
+      const hit={dataset:{kind:'endpoint',id:handle['data-id'],side}};
+      listeners.get('diagram:pointerdown')({button:0,pointerId:1,
+        target:{closest:()=>hit},preventDefault(){}});
+      results.push(snapshot(),drag);
+    """, load_template(name))
+    before, handles, point, after, drag = output["results"]
+    assert len(handles) == 2
+    handle = next(item for item in handles if item["data-side"] == side)
+    assert [handle["cx"], handle["cy"]] == point
+    assert "点击后选择新端口或三通" in handle["title"]
+    assert after["reconnect"] == {"edgeId": before["selection"]["id"], "side": side}
+    assert after["mode"] == "reconnect" and drag is None
+    for key in ["doc", "undo", "redo", "dirty", "revision", "ownedDraft",
+                "selection", "multiSelection"]:
+        assert after[key] == before[key]
+    assert output["saves"] == output["refreshes"] == 0
+
+
+@pytest.mark.parametrize("side", ["source", "target"])
+def test_canvas_handle_reconnect_preserves_pipe_and_supports_undo_redo(side):
+    output = connection_scenario("""
+      const edge=doc.edges[0],side='""" + side + """';
+      doc.junctions.push({id:'new-end',x:1500,y:1200});
+      doc.labels.push({id:'handle-state',edgeId:edge.id,at:.4,x:4,y:8,text:'P'});
+      setSelection('edge',edge.id);results.push(snapshot());
+      const hit={dataset:{kind:'endpoint',id:edge.id,side}};
+      listeners.get('diagram:pointerdown')({button:0,pointerId:1,
+        target:{closest:()=>hit},preventDefault(){}});
+      click({junctionId:'new-end'});results.push(snapshot());
+      history('undo');results.push(snapshot());
+      history('redo');results.push(snapshot());
+    """)
+    before, after, undone, redone = output["results"]
+    original = before["doc"]["edges"][0]
+    expected = {**original, side: {"junctionId": "new-end"}}
+    assert after["doc"]["edges"][0] == expected
+    assert after["doc"]["labels"] == before["doc"]["labels"]
+    assert len(after["undo"]) == 1 and after["reconnect"] is None
+    assert undone["doc"] == before["doc"] and redone["doc"] == after["doc"]
+    assert output["saves"] == output["refreshes"] == 3
+    validate_scene(after["doc"])
+
+
+def test_endpoint_handles_removed_outside_single_pipe_selection():
+    output = connection_scenario("""
+      const shapes=[],removed=[];let queried='';
+      svg.querySelectorAll=selector=>{
+        queried=selector;return [{remove(){removed.push(true);}}];};
+      shape=(tag,attrs={})=>{shapes.push({tag,...attrs});return {};};
+      const edge=doc.edges[0];
+      const cases=[()=>clearSelection(),()=>setSelection('node',doc.nodes[0].id),
+        ()=>setSelection('edge',doc.edges[1].id,true),
+        ()=>{mode='connect';},()=>{mode='reconnect';},()=>{placement='compressor';}];
+      for(const setup of cases){
+        mode='select';placement=null;setSelection('edge',edge.id);setup();
+        shapes.length=0;renderVertices();
+        results.push(shapes.filter(s=>s['data-kind']==='endpoint').length);
+      }
+      results.push(queried,removed.length);
+    """)
+    assert output["results"][:6] == [0] * 6
+    assert '[data-kind="endpoint"]' in output["results"][6]
+    assert output["results"][7] == 6
+
+
+@pytest.mark.parametrize("guard", ["middle", "space", "stale", "unselected", "multi"])
+def test_endpoint_handle_keeps_pan_priority_and_ignores_stale_selection(guard):
+    output = connection_scenario("""
+      const edge=doc.edges[0],guard='""" + guard + """';
+      setSelection('edge',edge.id);
+      if(guard==='multi')setSelection('edge',doc.edges[1].id,true);
+      if(guard==='unselected')setSelection('node',doc.nodes[0].id);
+      spaceDown=guard==='space';results.push(snapshot());
+      const hit={dataset:{kind:'endpoint',
+        id:guard==='stale'?'missing':edge.id,side:'source'}};
+      listeners.get('diagram:pointerdown')({button:guard==='middle'?1:0,
+        pointerId:1,clientX:100,clientY:100,target:{closest:()=>hit},preventDefault(){}});
+      results.push(snapshot(),drag?.kind||null);
+    """)
+    before, after, drag = output["results"]
+    assert before == after
+    assert drag == ("pan" if guard in {"middle", "space"} else None)
+    assert output["saves"] == output["refreshes"] == 0
