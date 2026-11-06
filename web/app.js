@@ -269,12 +269,12 @@ function connectionError(ref) {
   } catch (error) { return error.message; }
 }
 function renderConnectionFeedback() {
-  const active = (mode === 'connect' && pendingPort) || reconnect;
+  const active = mode === 'connect' || reconnect;
   const target = active && previewTarget?.ref ? previewTarget : null;
   const hint = document.querySelector('.canvas-hint');
   hint.classList.toggle('connection-valid-hint', !!target && !target.error);
   hint.classList.toggle('connection-invalid-hint', !!target?.error);
-  if (target) hint.textContent = (target.error ? '不可连接：' : '点击连接：') + refName(target.ref)
+  if (target) hint.textContent = (target.error ? '不可连接：' : mode === 'connect' && !pendingPort ? '点击起点：' : '点击连接：') + refName(target.ref)
     + (target.error ? ' · ' + target.error : ' · Esc 取消');
   return target;
 }
@@ -1709,12 +1709,13 @@ function startPan(event) {
 }
 svg.addEventListener('pointermove', event => {
   if (!drag) {
-    if ((mode === 'connect' && pendingPort) || reconnect) {
-      const next = connectionTarget(event, world(event));
-      const changed = !previewTarget || next.point.some((value, index) => value !== previewTarget.point[index])
+    if (mode === 'connect' || reconnect) {
+      let next = connectionTarget(event, world(event));
+      if (mode === 'connect' && !pendingPort && !next.ref) next = null;
+      const changed = !!next !== !!previewTarget || (next && (next.point.some((value, index) => value !== previewTarget.point[index])
         || next.direction.some((value, index) => value !== previewTarget.direction[index])
         || JSON.stringify(next.ref) !== JSON.stringify(previewTarget.ref) || next.error !== previewTarget.error
-        || next.version !== previewTarget.version;
+        || next.version !== previewTarget.version));
       if (changed) { previewTarget = next; renderCanvas(); }
     }
     return;
@@ -1760,7 +1761,7 @@ svg.addEventListener('pointermove', event => {
   renderCanvas();
 });
 svg.addEventListener('pointerleave', () => {
-  if (!drag && ((mode === 'connect' && pendingPort) || reconnect) && previewTarget) { previewTarget = null; renderCanvas(); }
+  if (!drag && (mode === 'connect' || reconnect) && previewTarget) { previewTarget = null; renderCanvas(); }
 });
 function endDrag(event) {
   if (!drag) return;

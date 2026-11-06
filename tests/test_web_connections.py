@@ -435,3 +435,67 @@ def test_nearby_target_is_not_used_in_selection_mode_or_without_screen_matrix():
     """)
     assert output["results"][0] is None and output["results"][1] == "pan"
     assert output["state"]["pendingPort"] is None and output["saves"] == 0
+
+
+@pytest.mark.parametrize("name", list(TEMPLATES))
+def test_start_hover_names_port_without_edit_and_checks_after_first_click(name):
+    output = connection_scenario("""
+      const edge=doc.edges[0];edge.vertices=[];mode='connect';
+      results.push(snapshot());
+      let checks=0;const check=checkConnection;
+      checkConnection=(...args)=>{checks++;return check(...args);};
+      hover(edge.target);results.push(feedback(),snapshot(),checks);
+      click(edge.target);hover(edge.target);results.push(feedback(),checks);
+    """, load_template(name))
+    before, start, after, initial_checks, same, checks = output["results"]
+    assert start["text"].startswith("点击起点：")
+    assert start["target"]["ref"] == before["doc"]["edges"][0]["target"]
+    assert start["classes"]["connection-valid-hint"]
+    assert not start["classes"]["connection-invalid-hint"]
+    assert initial_checks == 0 and checks == 1
+    assert "同一位置" in same["text"]
+    assert {k: v for k, v in after.items() if k != "previewTarget"} == {
+        k: v for k, v in before.items() if k != "previewTarget"}
+    assert output["saves"] == output["refreshes"] == 0
+
+
+@pytest.mark.parametrize("scale", [.2, .5, 1, 3])
+def test_start_hover_near_junction_clears_on_blank_leave_and_tool_change(scale):
+    output = connection_scenario("""
+      const scale=""" + str(scale) + """;
+      svg.getScreenCTM=()=>({a:scale,b:0,c:0,d:scale});
+      doc.junctions.push({id:'start-hover',x:2000,y:2000});
+      mode='connect';let renders=0;
+      renderCanvas=()=>{renders++;renderHint();};
+      hover(null,[2000+11/scale,2000]);results.push(feedback());
+      hover(null,[3000,3000]);results.push(feedback(),renders);
+      hover(null,[3010,3000]);results.push(renders);
+      hover(null,[2000,2000]);listeners.get('diagram:pointerleave')();
+      results.push(feedback());
+      hover(null,[2000,2000]);setTool('select');renderHint();
+      hover(null,[2000,2000]);results.push(feedback());
+    """)
+    start, blank, renders, repeated, left, selected = output["results"]
+    assert start["target"]["ref"] == {"junctionId": "start-hover"}
+    assert start["text"].startswith("点击起点：三通")
+    assert renders == repeated == 2
+    for cleared in [blank, left, selected]:
+        assert cleared["target"] is None
+        assert not any(cleared["classes"].values())
+    assert output["saves"] == output["refreshes"] == 0
+
+
+def test_start_marker_has_no_preview_pipe_and_clears_after_tool_change():
+    output = connection_scenario("""
+      doc.labels=[];mode='connect';hover(doc.edges[0].source);
+      const shapes=[];
+      shape=(tag,attrs={})=>{shapes.push({tag,...attrs});return {textContent:'' };};
+      svg.replaceChildren=()=>{shapes.length=0;};
+      renderVertices=()=>{};updateView=()=>{};
+      actualRenderCanvas();results.push(structuredClone(shapes));
+      setTool('select');actualRenderCanvas();results.push(structuredClone(shapes));
+    """)
+    active, cleared = output["results"]
+    assert sum(s.get("class") == "connection-target" for s in active) == 1
+    assert not any(s.get("class", "").startswith("connection-preview") for s in active)
+    assert not any(s.get("class", "").startswith("connection-") for s in cleared)
