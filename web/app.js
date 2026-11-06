@@ -218,10 +218,35 @@ function edgePoints(edge) {
   return route(endpoint(edge.source, nodes, doc.junctions), endpoint(edge.target, nodes, doc.junctions), edge.vertices);
 }
 
-function connectionTarget(event, point) {
+function connectionRef(event, point) {
   const hit = event.target.closest('[data-kind="port"], [data-kind="junction"]');
   const ref = hit?.dataset.kind === 'port' ? JSON.parse(hit.dataset.ref)
     : hit?.dataset.kind === 'junction' ? { junctionId: hit.dataset.id } : null;
+  if (ref) return ref;
+  const matrix = svg.getScreenCTM?.();
+  if (!matrix || ![matrix.a, matrix.b, matrix.c, matrix.d].every(Number.isFinite)
+    || Math.abs(matrix.a * matrix.d - matrix.b * matrix.c) < 1e-12) return null;
+  const nodes = currentNodes();
+  let nearest = null, distance = 12;
+  const consider = candidate => {
+    const target = endpoint(candidate, nodes, doc.junctions).point;
+    const [dx, dy] = target.map((value, index) => value - point[index]);
+    const pixels = Math.hypot(matrix.a * dx + matrix.c * dy, matrix.b * dx + matrix.d * dy);
+    if (pixels <= 12 && (!nearest || pixels < distance - 1e-6)) { nearest = candidate; distance = pixels; }
+  };
+  for (const node of nodes) {
+    const seen = new Set();
+    for (const [id, port] of Object.entries(node.geometry.ports)) {
+      const key = port.point.join(',');
+      if (seen.has(key)) continue;
+      seen.add(key); consider({ nodeId: node.id, portId: id });
+    }
+  }
+  for (const junction of doc.junctions) consider({ junctionId: junction.id });
+  return nearest;
+}
+function connectionTarget(event, point) {
+  const ref = connectionRef(event, point);
   if (ref) {
     const target = { ...endpoint(ref, currentNodes(), doc.junctions), ref, version: revision };
     const sameRef = previewTarget?.ref && ['nodeId', 'portId', 'junctionId'].every(key => previewTarget.ref[key] === ref[key]);
@@ -1610,11 +1635,13 @@ svg.addEventListener('pointerdown', event => {
   svg.focus({ preventScroll: true });
   const p = world(event), hit = event.target.closest('[data-kind]');
   if (event.button === 1 || spaceDown) return startPan(event);
+  if (mode === 'connect' || mode === 'reconnect') {
+    const ref = connectionRef(event, p);
+    if (ref) { event.preventDefault(); onPort(ref); return; }
+  }
   if (mode === 'reconnect') {
     event.preventDefault();
-    if (hit?.dataset.kind === 'port') onPort(JSON.parse(hit.dataset.ref));
-    else if (hit?.dataset.kind === 'junction') onPort({ junctionId: hit.dataset.id });
-    else status('请点击设备端口或三通 · 空格拖动平移 · Esc 取消');
+    status('请点击设备端口或三通 · 空格拖动平移 · Esc 取消');
     return;
   }
   if (mode === 'box-select' || (mode === 'select' && !placement && event.shiftKey && !hit)) {

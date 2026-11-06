@@ -32,7 +32,7 @@ const elements=new Map(),listeners=new Map(),messages=[],statuses=[],results=[];
 let uuid=0,saves=0,refreshes=0;
 function element(id){if(!elements.has(id))elements.set(id,{
   addEventListener:(name,handler)=>listeners.set(id+':'+name,handler),
-  focus(){},classes:{},classList:{remove(){},
+  focus(){},setPointerCapture(){},classes:{},classList:{remove(){},add(){},
     toggle(name,on){element(id).classes[name]=on;}},hasPointerCapture:()=>false});
   return elements.get(id);}
 const context=vm.createContext({...geometry,...edits,...checks,input,
@@ -315,3 +315,123 @@ def test_duplicate_reconnect_hover_keeps_document_and_history(side):
     assert {k: v for k, v in after.items() if k != "previewTarget"} == {
         k: v for k, v in before.items() if k != "previewTarget"}
     assert output["saves"] == output["refreshes"] == 0
+
+
+@pytest.mark.parametrize("scale", [.2, .5, 1, 3])
+@pytest.mark.parametrize("kind", ["port", "junction"])
+def test_screen_distance_snaps_hover_and_click_to_same_endpoint(scale, kind):
+    output = connection_scenario("""
+      const scale=""" + str(scale) + """,kind='""" + kind + """';
+      svg.getScreenCTM=()=>({a:scale,b:0,c:0,d:scale});
+      const edge=doc.edges.shift();
+      const p=endpoint(edge.target,currentNodes(),doc.junctions).point;
+      const far=[p[0]+1000,p[1]+1000];
+      doc.junctions.push({id:'snap-source',x:far[0],y:far[1]});
+      if(kind==='junction'){
+        doc.nodes=[];doc.edges=[];doc.labels=[];
+        doc.junctions.push({id:'snap-target',x:p[0],y:p[1]});
+      }
+      const target=kind==='port'?edge.target:{junctionId:'snap-target'};
+      const near=[p[0]+11/scale,p[1]];
+      mode='connect';click({junctionId:'snap-source'});results.push(snapshot());
+      hover(null,near);results.push(feedback());
+      listeners.get('diagram:pointerdown')({button:0,pointerId:1,point:near,
+        target:{closest:()=>null},preventDefault(){}});
+      results.push(target,snapshot());
+    """)
+    before, feedback, ref, after = output["results"]
+    assert feedback["target"]["ref"] == ref
+    assert feedback["classes"]["connection-valid-hint"]
+    assert after["doc"]["edges"][-1]["target"] == ref
+    assert len(after["doc"]["edges"]) == len(before["doc"]["edges"]) + 1
+    assert output["saves"] == output["refreshes"] == 1
+    validate_scene(after["doc"])
+
+
+@pytest.mark.parametrize("mode", ["connect", "reconnect"])
+def test_near_click_selects_start_or_reconnects_without_direct_hit(mode):
+    output = connection_scenario("""
+      svg.getScreenCTM=()=>({a:.5,b:0,c:0,d:.5});
+      doc.junctions.push({id:'near',x:2000,y:2000});
+      const edge=doc.edges[0];
+    """ + ("mode='connect';" if mode == "connect" else
+               "beginReconnect(edge,'target');") + """
+      results.push(snapshot());
+      listeners.get('diagram:pointerdown')({button:0,pointerId:1,point:[2020,2000],
+        target:{closest:()=>null},preventDefault(){}});
+      results.push(snapshot());
+    """)
+    before, after = output["results"]
+    if mode == "connect":
+        assert after["pendingPort"] == {"junctionId": "near"}
+        assert after["doc"] == before["doc"] and not after["undo"]
+        assert output["saves"] == 0
+    else:
+        assert after["reconnect"] is None
+        assert after["doc"]["edges"][0]["target"] == {"junctionId": "near"}
+        assert len(after["undo"]) == output["saves"] == 1
+
+
+@pytest.mark.parametrize("matrix,point,expected", [
+    (dict(a=.5, b=0, c=0, d=.5), [24, 0], True),
+    (dict(a=.5, b=0, c=0, d=.5), [24.01, 0], False),
+    (dict(a=0, b=2, c=-2, d=0), [0, 5], True),
+    (dict(a=3, b=0, c=0, d=.5), [0, 20], True),
+    (dict(a=3, b=0, c=0, d=.5), [5, 0], False),
+    (dict(a=0, b=0, c=0, d=0), [0, 0], False),
+])
+def test_snap_uses_full_screen_transform_and_radius_boundary(matrix, point, expected):
+    output = connection_scenario("""
+      doc.nodes=[];doc.edges=[];doc.labels=[];doc.junctions=[{id:'j',x:0,y:0}];
+      svg.getScreenCTM=()=> (""" + json.dumps(matrix) + """);
+      results.push(connectionRef({target:{closest:()=>null}},
+    """ + json.dumps(point) + """));
+    """)
+    assert output["results"] == ([dict(junctionId="j")] if expected else [None])
+
+
+def test_nearest_target_ties_direct_hit_and_rotated_alias_ports():
+    output = connection_scenario("""
+      svg.getScreenCTM=()=>({a:1,b:0,c:0,d:1});
+      doc.nodes=[];doc.edges=[];doc.labels=[];
+      doc.junctions=[{id:'a',x:0,y:0},{id:'b',x:10,y:0}];
+      const blank={target:{closest:()=>null}};
+      results.push(connectionRef(blank,[8,0]),connectionRef(blank,[5,0]));
+      const direct={dataset:{kind:'junction',id:'a'}};
+      results.push(connectionRef({target:{closest:()=>direct}},[9,0]));
+      doc.junctions=[];doc.nodes=[{id:'rotated',x:20,y:30,rotation:90}];
+      geometries.set('rotated',{ports:{first:{point:[10,0],direction:[1,0]},
+        alias:{point:[10,0],direction:[1,0]}}});
+      results.push(connectionRef(blank,[22,40]));
+    """)
+    assert output["results"] == [dict(junctionId="b"), dict(junctionId="a"),
+                                    dict(junctionId="a"),
+                                    dict(nodeId="rotated", portId="first")]
+
+
+@pytest.mark.parametrize("middle,space", [(True, False), (False, True)])
+def test_snapping_preserves_temporary_panning(middle, space):
+    output = connection_scenario("""
+      svg.getScreenCTM=()=>({a:1,b:0,c:0,d:1});
+      mode='connect';spaceDown=""" + str(space).lower() + """;
+      doc.junctions.push({id:'near',x:2000,y:2000});results.push(snapshot());
+      listeners.get('diagram:pointerdown')({button:""" + ("1" if middle else "0")
+                                 + """,pointerId:1,point:[2001,2000],
+        clientX:2001,clientY:2000,target:{closest:()=>null},preventDefault(){}});
+      results.push(drag.kind,snapshot());
+    """)
+    before, drag, after = output["results"]
+    assert drag == "pan" and before == after and output["saves"] == 0
+
+
+def test_nearby_target_is_not_used_in_selection_mode_or_without_screen_matrix():
+    output = connection_scenario("""
+      doc.junctions.push({id:'near',x:2000,y:2000});
+      results.push(connectionRef({target:{closest:()=>null}},[2001,2000]));
+      svg.getScreenCTM=()=>({a:1,b:0,c:0,d:1});mode='select';
+      listeners.get('diagram:pointerdown')({button:0,pointerId:1,point:[2001,2000],
+        clientX:2001,clientY:2000,target:{closest:()=>null},preventDefault(){}});
+      results.push(drag.kind,snapshot());
+    """)
+    assert output["results"][0] is None and output["results"][1] == "pan"
+    assert output["state"]["pendingPort"] is None and output["saves"] == 0
