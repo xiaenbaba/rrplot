@@ -29,6 +29,7 @@ const geometry=await import(input.modules.geometry);
 const edits=await import(input.modules.document);
 const checks=await import(input.modules.checks);
 const elements=new Map(),listeners=new Map(),messages=[],statuses=[],results=[];
+const observers=[];
 let uuid=0,saves=0,refreshes=0;
 function element(id){if(!elements.has(id))elements.set(id,{
   addEventListener:(name,handler)=>listeners.set(id+':'+name,handler),
@@ -42,7 +43,8 @@ const context=vm.createContext({...geometry,...edits,...checks,input,
       ?element('canvas-hint'):null,
     addEventListener:(name,handler)=>listeners.set('document:'+name,handler)},
   window:{addEventListener:(name,handler)=>listeners.set('window:'+name,handler)},
-  ResizeObserver:class{observe(){}},
+  ResizeObserver:class{constructor(callback){this.callback=callback;}
+    observe(target){observers.push({target,callback:this.callback});}},observers,
   save:()=>saves++,recordRefresh:()=>refreshes++,recordStatus:m=>statuses.push(m)});
 const source=fs.readFileSync(input.path,'utf8').split(String.fromCharCode(10))
   .filter(line=>!line.startsWith('import ')).join(String.fromCharCode(10))
@@ -541,8 +543,9 @@ def test_connect_blank_pan_keeps_selection_start_and_document(pending):
     """)
     before, drag, after = output["results"]
     assert drag == "pan" and before["view"] != after["view"]
-    assert {k: v for k, v in after.items() if k != "view"} == {
-        k: v for k, v in before.items() if k != "view"}
+    assert after["previewTarget"] is None
+    assert {k: v for k, v in after.items() if k not in {"view", "previewTarget"}} == {
+        k: v for k, v in before.items() if k not in {"view", "previewTarget"}}
     assert output["saves"] == output["refreshes"] == 0
 
 
@@ -571,3 +574,66 @@ def test_selection_mode_still_allows_manual_vertex_edit():
     assert before["doc"] != after["doc"]
     assert [300, 300] in after["doc"]["edges"][0]["vertices"]
     assert len(after["undo"]) == output["saves"] == output["refreshes"] == 1
+
+
+@pytest.mark.parametrize("phase", ["start", "connect", "reconnect"])
+@pytest.mark.parametrize("action", ["zoom", "fit", "pan", "resize"])
+def test_view_change_clears_stale_connection_preview_but_keeps_session(phase, action):
+    actions = {
+        "zoom": "zoom(.85);",
+        "fit": "fit();",
+        "pan": """startPan({pointerId:1,clientX:100,clientY:100,preventDefault(){}});
+          listeners.get('diagram:pointermove')({clientX:140,clientY:120});
+          listeners.get('diagram:pointerup')({pointerId:1});""",
+        "resize": "observers.find(item=>item.target===svg).callback();",
+    }
+    setup = {
+        "start": "mode='connect';",
+        "connect": "mode='connect';click(edge.source);",
+        "reconnect": "beginReconnect(edge,'target');",
+    }
+    output = connection_scenario("""
+      const edge=doc.edges[0];edge.vertices=[];
+      svg.clientWidth=1000;svg.clientHeight=800;updateView=()=>{};
+      ownedDraft='existing-draft';redo=[{future:true}];
+    """ + setup[phase] + """
+      hover(edge.target);results.push(snapshot(),feedback());
+    """ + actions[action] + """
+      results.push(snapshot(),feedback());
+      hover(edge.target);results.push(feedback());
+    """)
+    before, active, after, cleared, resumed = output["results"]
+    assert active["target"] is not None
+    assert cleared["target"] is None and not any(cleared["classes"].values())
+    assert {k: v for k, v in after.items() if k not in {"view", "previewTarget"}} == {
+        k: v for k, v in before.items() if k not in {"view", "previewTarget"}}
+    assert resumed == active
+    assert output["saves"] == output["refreshes"] == 0
+
+
+def test_view_change_discards_validation_cache_before_resuming():
+    output = connection_scenario("""
+      const edge=doc.edges[0];edge.vertices=[];mode='connect';click(edge.source);
+      let checks=0;const check=checkConnection;
+      checkConnection=(...args)=>{checks++;return check(...args);};
+      hover(edge.target);results.push(checks);
+      updateView=()=>{};zoom(.85);
+      hover(edge.target);hover(edge.target);results.push(checks,feedback());
+    """)
+    assert output["results"][0:2] == [1, 2]
+    assert "相同走线" in output["results"][2]["text"]
+    assert output["saves"] == 0
+
+
+def test_view_change_without_preview_does_not_redraw_or_clear_selection():
+    output = connection_scenario("""
+      mode='select';setSelection('node',doc.nodes[0].id);results.push(snapshot());
+      let renders=0;renderCanvas=()=>{renders++;};updateView=()=>{};
+      svg.clientWidth=1000;svg.clientHeight=800;
+      zoom(.85);fit();observers.find(item=>item.target===svg).callback();
+      results.push(snapshot(),renders);
+    """)
+    before, after, renders = output["results"]
+    assert renders == 0
+    assert {k: v for k, v in after.items() if k != "view"} == {
+        k: v for k, v in before.items() if k != "view"}

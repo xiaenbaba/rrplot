@@ -278,6 +278,11 @@ function renderConnectionFeedback() {
     + (target.error ? ' · ' + target.error : ' · Esc 取消');
   return target;
 }
+function clearConnectionPreview() {
+  if (!previewTarget || (mode !== 'connect' && !reconnect)) return;
+  previewTarget = null;
+  renderCanvas();
+}
 
 function parseDraft(raw) {
   try {
@@ -457,6 +462,7 @@ function updateView() {
 }
 function fit() {
   if (!doc) return;
+  clearConnectionPreview();
   const ratio = svg.clientWidth / svg.clientHeight;
   const width = doc.page.width + 80, height = doc.page.height + 80;
   view.w = Math.max(width, height * ratio); view.h = view.w / ratio;
@@ -464,6 +470,7 @@ function fit() {
   updateView();
 }
 function zoom(factor, at) {
+  clearConnectionPreview();
   const center = at || [view.x + view.w / 2, view.y + view.h / 2];
   const w = Math.max(100, Math.min(10000, view.w * factor)), k = w / view.w;
   view = { x: center[0] + (view.x - center[0]) * k, y: center[1] + (view.y - center[1]) * k, w, h: view.h * k };
@@ -1710,6 +1717,7 @@ svg.addEventListener('pointerdown', event => {
   render();
 });
 function startPan(event) {
+  clearConnectionPreview();
   drag = { kind: 'pan', client: [event.clientX, event.clientY], origin: { ...view }, pointerId: event.pointerId };
   svg.setPointerCapture(event.pointerId); svg.classList.add('panning'); event.preventDefault();
 }
@@ -1961,7 +1969,7 @@ window.addEventListener('keyup', event => {
   if (event.code === 'Space') spaceDown = false;
 });
 window.addEventListener('blur', () => { spaceDown = false; endNudge(); });
-new ResizeObserver(() => { if (doc) updateView(); }).observe(svg);
+new ResizeObserver(() => { if (doc) { clearConnectionPreview(); updateView(); } }).observe(svg);
 new ResizeObserver(() => {
   $('editor').style.setProperty('--toolbar-height', `${$('canvas-toolbar').offsetHeight}px`);
 }).observe($('canvas-toolbar'));
