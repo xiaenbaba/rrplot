@@ -1644,6 +1644,12 @@ svg.addEventListener('pointerdown', event => {
     status('请点击设备端口或三通 · 空格拖动平移 · Esc 取消');
     return;
   }
+  if (mode === 'connect') {
+    event.preventDefault();
+    if (!hit) return startPan(event);
+    status('请点击端口或三通连接 · 切换“选择”工具后可移动设备或编辑管路 · Esc 取消');
+    return;
+  }
   if (mode === 'box-select' || (mode === 'select' && !placement && event.shiftKey && !hit)) {
     drag = { kind: 'box', start: p, point: p, candidates: selectionCandidates(),
       beforeSelection: clone(multiSelection), additive: event.shiftKey, moved: false, pointerId: event.pointerId };
@@ -1790,7 +1796,7 @@ function cancelDrag() {
 }
 svg.addEventListener('pointercancel', cancelDrag);
 svg.addEventListener('dblclick', event => {
-  if (event.shiftKey || mode === 'move-all' || mode === 'box-select' || reconnect) return;
+  if (event.shiftKey || mode !== 'select' || placement || reconnect) return;
   if (event.target.closest('[data-kind="segment"]')) return;
   const hit = event.target.closest('[data-kind="edge"]'); if (!hit) return;
   const edge = doc.edges.find(e => e.id === hit.dataset.id), points = edgePoints(edge), p = world(event);

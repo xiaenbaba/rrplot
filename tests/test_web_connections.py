@@ -499,3 +499,75 @@ def test_start_marker_has_no_preview_pipe_and_clears_after_tool_change():
     assert sum(s.get("class") == "connection-target" for s in active) == 1
     assert not any(s.get("class", "").startswith("connection-preview") for s in active)
     assert not any(s.get("class", "").startswith("connection-") for s in cleared)
+
+
+@pytest.mark.parametrize("kind", ["node", "label", "edge"])
+@pytest.mark.parametrize("pending", [False, True])
+def test_connect_miss_cannot_select_or_drag_existing_object(kind, pending):
+    output = connection_scenario("""
+      const kind='""" + kind + """';
+      const item=doc[{node:'nodes',label:'labels',edge:'edges'}[kind]][0];
+      setSelection('node',doc.nodes[1].id);mode='connect';
+    """ + ("click(doc.edges[0].source);" if pending else "") + """
+      ownedDraft='saved-draft';redo=[{future:true}];results.push(snapshot());
+      const hit={dataset:{kind,id:item.id}};
+      const target={closest:selector=>selector==='[data-kind]'?hit:null};
+      listeners.get('diagram:pointerdown')({button:0,pointerId:1,point:[2500,2500],
+        target,preventDefault(){}});
+      results.push(drag?.kind||null);
+      listeners.get('diagram:pointermove')({point:[2600,2600],target});
+      listeners.get('diagram:pointerup')({pointerId:1});results.push(snapshot());
+    """)
+    before, drag, after = output["results"]
+    assert drag is None
+    assert {k: v for k, v in after.items() if k != "previewTarget"} == {
+        k: v for k, v in before.items() if k != "previewTarget"}
+    assert output["saves"] == output["refreshes"] == 0
+    assert "端口或三通" in output["statuses"][-1]
+
+
+@pytest.mark.parametrize("pending", [False, True])
+def test_connect_blank_pan_keeps_selection_start_and_document(pending):
+    output = connection_scenario("""
+      setSelection('node',doc.nodes[0].id);mode='connect';
+    """ + ("click(doc.edges[0].source);" if pending else "") + """
+      results.push(snapshot());
+      svg.clientWidth=1000;svg.clientHeight=800;updateView=()=>{};
+      listeners.get('diagram:pointerdown')({button:0,pointerId:1,point:[2000,2000],
+        clientX:100,clientY:100,target:{closest:()=>null},preventDefault(){}});
+      results.push(drag.kind);
+      listeners.get('diagram:pointermove')({clientX:150,clientY:140});
+      listeners.get('diagram:pointerup')({pointerId:1});results.push(snapshot());
+    """)
+    before, drag, after = output["results"]
+    assert drag == "pan" and before["view"] != after["view"]
+    assert {k: v for k, v in after.items() if k != "view"} == {
+        k: v for k, v in before.items() if k != "view"}
+    assert output["saves"] == output["refreshes"] == 0
+
+
+@pytest.mark.parametrize("pending", [False, True])
+def test_connect_double_click_cannot_add_manual_vertex(pending):
+    output = connection_scenario("""
+      const edge=doc.edges[0];mode='connect';
+    """ + ("click(edge.source);" if pending else "") + """
+      results.push(snapshot());
+      listeners.get('diagram:dblclick')({point:[300,300],target:{closest:selector=>
+        selector==='[data-kind="edge"]'?{dataset:{id:edge.id}}:null}});
+      results.push(snapshot());
+    """)
+    assert output["results"][0] == output["results"][1]
+    assert output["saves"] == output["refreshes"] == 0
+
+
+def test_selection_mode_still_allows_manual_vertex_edit():
+    output = connection_scenario("""
+      const edge=doc.edges[0];results.push(snapshot());
+      listeners.get('diagram:dblclick')({point:[300,300],target:{closest:selector=>
+        selector==='[data-kind="edge"]'?{dataset:{id:edge.id}}:null}});
+      results.push(snapshot());
+    """)
+    before, after = output["results"]
+    assert before["doc"] != after["doc"]
+    assert [300, 300] in after["doc"]["edges"][0]["vertices"]
+    assert len(after["undo"]) == output["saves"] == output["refreshes"] == 1
