@@ -906,14 +906,29 @@ function cancelReconnect() {
   message('');
   reconnect = null; previewTarget = null; mode = 'select'; render(); status('已取消重接，管路保持原连接');
 }
+function checkConnection(edge, excludeId = null) {
+  const nodes = currentNodes();
+  const [a, b] = [edge.source, edge.target].map(ref => endpoint(ref, nodes, doc.junctions));
+  if (a.point.every((v, i) => Math.abs(v - b.point[i]) < 1e-6))
+    throw new Error('管路两端不能连接到同一位置，请选择其他端口或三通。');
+  const edges = doc.edges.filter(item => item.id !== excludeId);
+  const routes = new Map();
+  for (const item of edges) {
+    try { routes.set(item.id, edgePoints(item)); } catch { /* Unresolved unrelated geometry is checked after refresh. */ }
+  }
+  routes.set(edge.id, route(a, b, edge.vertices));
+  const duplicate = inspectDiagram({ ...doc, edges: [...edges, edge] }, { nodes, routes })
+    .some(issue => issue.code === 'duplicate-edge' && issue.ref.id === edge.id);
+  if (duplicate) throw new Error('这两个接点之间已有相同走线的管路，请选择其他接点，或先调整已有管路的走线。');
+}
 function onPort(ref) {
   if (mode === 'reconnect' && reconnect) {
     try {
       const edge = doc.edges.find(e => e.id === reconnect.edgeId);
-      const other = edge[reconnect.side === 'source' ? 'target' : 'source'];
-      const a = endpoint(ref, currentNodes(), doc.junctions), b = endpoint(other, currentNodes(), doc.junctions);
-      if (a.point.every((v, i) => v === b.point[i])) throw new Error('管路两端不能连接到同一位置，请选择其他端口或三通。');
       const next = reconnectEdge(doc, edge.id, reconnect.side, ref);
+      const previous = edge[reconnect.side];
+      if (['nodeId', 'portId', 'junctionId'].some(key => previous[key] !== ref[key]))
+        checkConnection(next.edges.find(item => item.id === edge.id), edge.id);
       message('');
       reconnect = null; previewTarget = null; mode = 'select';
       edit(() => { doc = next; });
@@ -926,10 +941,16 @@ function onPort(ref) {
       previewTarget = endpoint(ref, currentNodes(), doc.junctions);
       status('已选择起点，请点击终点端口或三通');
     }
-    else if (!eqRef(pendingPort, ref)) edit(() => {
-      const id = uid('edge'); doc.edges.push({ id, source: pendingPort, target: ref, vertices: [], head: true, headAt: [.55], color: '#111111', width: 1.8, linestyle: 'solid' });
-      setSelection('edge', id); pendingPort = null; previewTarget = null;
-    });
+    else {
+      try {
+        const id = uid('edge'), edge = { id, source: pendingPort, target: ref, vertices: [], head: true, headAt: [.55], color: '#111111', width: 1.8, linestyle: 'solid' };
+        checkConnection(edge);
+        message('');
+        edit(() => {
+          doc.edges.push(edge); setSelection('edge', id); pendingPort = null; previewTarget = null;
+        });
+      } catch (error) { message(error.message); }
+    }
     render(); return;
   }
   ports = ports.filter(p => !eqRef(p, ref));
