@@ -67,6 +67,9 @@ vm.runInContext(`doc=structuredClone(input.resolved.document);
     ?{kind:'junction',id:ref.junctionId}
     :{kind:'port',ref:JSON.stringify(ref)}};
     listeners.get('diagram:pointermove')({point,target:{closest:()=>hit}});};
+  globalThis.hoverPipe=(edge,point,kind='edge')=>{
+    const hit=edge?{dataset:{kind,id:edge.id}}:null;
+    listeners.get('diagram:pointermove')({point,target:{closest:()=>hit}});};
   globalThis.feedback=()=>structuredClone({target:previewTarget,
     text:$('canvas-hint').textContent,classes:$('canvas-hint').classes});`,context);
 await vm.runInContext('(async()=>{'+input.code+'})()',context);
@@ -842,3 +845,123 @@ def test_junction_tool_blank_placement_and_sidebar_midpoint_still_work():
     junction = split["doc"]["junctions"][-1]
     assert [junction["x"], junction["y"]] == midpoint
     assert len(split["undo"]) == output["saves"] == 2
+
+
+@pytest.mark.parametrize("name", list(TEMPLATES))
+def test_junction_hover_preview_matches_inserted_point_without_edit(name):
+    output = connection_scenario("""
+      const edge=doc.edges[0],location=along(edgePoints(edge),.27);
+      const point=location.point.map((v,i)=>v+location.direction[1-i]*(i?-2:2));
+      mode='junction';setSelection('node',doc.nodes[0].id);results.push(snapshot());
+      hoverPipe(edge,point);results.push(structuredClone(junctionPreview),feedback());
+      results.push(snapshot());
+      const hit={dataset:{kind:'edge',id:edge.id}};
+      listeners.get('diagram:pointerdown')({button:0,pointerId:1,point,
+        target:{closest:()=>hit},preventDefault(){}});
+      results.push(snapshot(),junctionPreview);
+    """, load_template(name))
+    before, preview, hint, hovered, after, cleared = output["results"]
+    assert before == hovered and preview["error"] == ""
+    assert hint["classes"]["junction-valid-hint"]
+    assert "点击插入三通" in hint["text"]
+    assert hint["target"] is None  # Does not activate pipe connection preview.
+    junction = after["doc"]["junctions"][-1]
+    assert [junction["x"], junction["y"]] == preview["point"]
+    assert cleared is None
+    assert len(after["undo"]) == output["saves"] == output["refreshes"] == 1
+
+
+@pytest.mark.parametrize("failure", ["endpoint", "zero", "limit"])
+def test_junction_hover_rejects_invalid_split_before_click(failure):
+    output = connection_scenario("""
+      const edge=doc.edges[0],failure='""" + failure + """';
+      if(failure==='zero')edgePoints=()=>[[30,30],[30,30]];
+      if(failure==='limit')edgePoints=()=>Array.from({length:205},(_,i)=>[i,0]);
+      const points=edgePoints(edge);
+      const point=failure==='endpoint'?points[0]:along(points,.01).point;
+      mode='junction';results.push(snapshot());hoverPipe(edge,point);
+      results.push(structuredClone(junctionPreview),feedback(),snapshot());
+      const hit={dataset:{kind:'edge',id:edge.id}};
+      listeners.get('diagram:pointerdown')({button:0,pointerId:1,point,
+        target:{closest:()=>hit},preventDefault(){}});
+      results.push(structuredClone(junctionPreview),snapshot());
+    """)
+    before, preview, hint, hovered, clicked, after = output["results"]
+    assert preview["error"] and clicked == preview
+    assert hint["text"] == "不可插入：" + preview["error"]
+    assert hint["classes"]["junction-invalid-hint"]
+    assert not hint["classes"]["junction-valid-hint"]
+    assert before == hovered == after
+    assert output["messages"] == [preview["error"]]
+    assert output["saves"] == output["refreshes"] == 0
+
+
+@pytest.mark.parametrize("action", ["blank", "node", "leave", "tool", "zoom",
+                                    "fit", "resize", "pan", "revision"])
+def test_junction_preview_clears_when_target_or_view_changes(action):
+    actions = {
+        "blank": "hoverPipe(null,[999,999]);",
+        "node": "hoverPipe(doc.nodes[0],[999,999],'node');",
+        "leave": "listeners.get('diagram:pointerleave')();",
+        "tool": "setTool('select');renderHint();",
+        "zoom": "zoom(.85);",
+        "fit": "fit();",
+        "resize": "observers.find(item=>item.target===svg).callback();",
+        "pan": """startPan({pointerId:1,clientX:100,clientY:100,preventDefault(){}});
+          listeners.get('diagram:pointerup')({pointerId:1});""",
+        "revision": "revision++;renderHint();",
+    }
+    output = connection_scenario("""
+      const edge=doc.edges[0],point=along(edgePoints(edge),.3).point;
+      mode='junction';svg.clientWidth=1000;svg.clientHeight=800;updateView=()=>{};
+      results.push(snapshot());hoverPipe(edge,point);
+      results.push(structuredClone(junctionPreview));
+    """ + actions[action] + """
+      results.push(junctionPreview,feedback(),snapshot());
+    """)
+    before, preview, cleared, hint, after = output["results"]
+    assert preview is not None and cleared is None
+    assert not any(hint["classes"].values())
+    for key in ["doc", "selection", "multiSelection", "undo", "redo", "dirty",
+                "ownedDraft", "pendingPort", "reconnect"]:
+        assert after[key] == before[key]
+    assert output["saves"] == output["refreshes"] == 0
+
+
+def test_junction_hover_redraws_only_for_changed_preview_and_never_while_panning():
+    output = connection_scenario("""
+      const edge=doc.edges[0],point=along(edgePoints(edge),.3).point;
+      mode='junction';let renders=0;
+      renderCanvas=()=>{renders++;renderHint();};
+      hoverPipe(null,[999,999]);hoverPipe(null,[888,888]);results.push(renders);
+      hoverPipe(edge,point);hoverPipe(edge,point);results.push(renders);
+      spaceDown=true;hoverPipe(edge,point);results.push(junctionPreview,renders);
+      spaceDown=false;mode='select';hoverPipe(edge,point);
+      results.push(junctionPreview,renders);
+    """)
+    assert output["results"] == [0, 1, None, 2, None, 2]
+    assert output["saves"] == 0
+
+
+@pytest.mark.parametrize("invalid", [False, True])
+def test_junction_candidate_and_marker_render_with_matching_feedback(invalid):
+    output = connection_scenario("""
+      doc.labels=[];const edge=doc.edges[0],points=edgePoints(edge);
+      mode='junction';hoverPipe(edge,""" + (
+        "points[0]" if invalid else "along(points,.27).point") + """);
+      const shapes=[];shape=(tag,attrs={})=>{shapes.push({tag,...attrs});return {};};
+      svg.replaceChildren=()=>{shapes.length=0;};renderVertices=()=>{};updateView=()=>{};
+      actualRenderCanvas();results.push(structuredClone(shapes),junctionPreview);
+      setTool('select');actualRenderCanvas();results.push(structuredClone(shapes));
+    """)
+    active, preview, cleared = output["results"]
+    suffix = " invalid" if invalid else ""
+    candidate = next(shape for shape in active if shape.get("class") ==
+                     "edge junction-candidate" + suffix)
+    assert candidate["data-id"] == preview["edgeId"]
+    marker = next(shape for shape in active if shape.get("class") ==
+                  "junction-preview" + suffix)
+    assert [marker["cx"], marker["cy"]] == preview["point"]
+    assert marker["pointer-events"] == "none"
+    assert not any("junction-preview" in shape.get("class", "") or
+                   "junction-candidate" in shape.get("class", "") for shape in cleared)

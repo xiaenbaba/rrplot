@@ -83,6 +83,15 @@ input[type=checkbox] { min-height: unset; accent-color: var(--accent); }
 .canvas-hint.connection-valid-hint, .canvas-hint.connection-invalid-hint { background: #fffffff2; padding: 5px 7px; border-radius: 4px; overflow-wrap: anywhere; }
 .canvas-hint.connection-valid-hint { color: var(--accent); }
 .canvas-hint.connection-invalid-hint { color: #b83d36; }
+.junction-preview { fill: #17796718; stroke: var(--accent); stroke-width: 2; }
+.junction-preview.invalid { fill: #b83d3618; stroke: #b83d36; }
+.junction-preview-dot { fill: var(--accent); }
+.junction-preview-dot.invalid { fill: #b83d36; }
+.edge.junction-candidate .edge-visible { stroke: var(--accent); }
+.edge.junction-candidate.invalid .edge-visible { stroke: #b83d36; }
+.canvas-hint.junction-valid-hint, .canvas-hint.junction-invalid-hint { background: #fffffff2; padding: 5px 7px; border-radius: 4px; overflow-wrap: anywhere; }
+.canvas-hint.junction-valid-hint { color: var(--accent); }
+.canvas-hint.junction-invalid-hint { color: #b83d36; }
 .edge-hit { fill: none; stroke: transparent; stroke-width: 13; }
 .edge.selected .edge-visible { stroke: #208b7a; }
 .edge.reconnecting-edge { opacity: .25; pointer-events: none; }

@@ -19,6 +19,7 @@ let ownedDraft = null, draftError = false, draftBannerDismissed = false, restori
 let doc = null, catalog = [], geometries = new Map(), fontFamily = 'Times New Roman, SimSun, serif';
 let selection = null, multiSelection = [], mode = 'select', placement = null, ports = [], pendingPort = null;
 let previewTarget = null;
+let junctionPreview = null;
 let reconnect = null;
 let edgeLabelsSupported = false;
 let undo = [], redo = [], drag = null, dirty = false, spaceDown = false;
@@ -279,9 +280,35 @@ function renderConnectionFeedback() {
   return target;
 }
 function clearConnectionPreview() {
-  if (!previewTarget || (mode !== 'connect' && !reconnect)) return;
-  previewTarget = null;
+  const connection = previewTarget && (mode === 'connect' || reconnect);
+  if (!connection && !junctionPreview) return;
+  if (connection) previewTarget = null;
+  junctionPreview = null;
   renderCanvas();
+}
+function junctionTarget(event, point) {
+  const hit = event.target.closest('[data-kind]');
+  if (!hit || !['edge', 'vertex', 'segment', 'endpoint'].includes(hit.dataset.kind)) return null;
+  const edge = doc.edges.find(item => item.id === hit.dataset.id);
+  if (!edge) return null;
+  let points;
+  try { points = edgePoints(edge); } catch { return null; }
+  const projected = projectOnRoute(points, point);
+  const target = { edgeId: edge.id, point: projected.point, fraction: projected.at, version: revision, error: '' };
+  try { junctionSplit(edge, target.fraction, points); }
+  catch (error) { target.error = error.message; }
+  return target;
+}
+function renderJunctionFeedback() {
+  if (junctionPreview && (mode !== 'junction' || placement || drag || junctionPreview.version !== revision))
+    junctionPreview = null;
+  const target = junctionPreview;
+  const hint = document.querySelector('.canvas-hint');
+  hint.classList.toggle('junction-valid-hint', !!target && !target.error);
+  hint.classList.toggle('junction-invalid-hint', !!target?.error);
+  if (target) hint.textContent = target.error ? '不可插入：' + target.error
+    : '点击插入三通 · X ' + target.point[0].toFixed(2) + ' / Y ' + target.point[1].toFixed(2) + ' · Esc 取消';
+  return target;
 }
 
 function parseDraft(raw) {
@@ -351,6 +378,7 @@ async function refresh() {
     const result = await api('resolve', { document: doc });
     if (token !== request || version !== revision) return;
     geometries = new Map(result.nodes.map(n => [n.id, n.geometry]));
+    junctionPreview = null;
     fontFamily = result.fontFamily;
     if (dirty) saveDraft();
     renderSaveState();
@@ -393,7 +421,7 @@ async function replaceDocument(next, preserveDraft = false, canApply = () => tru
   ++revision;
   doc = result.document; geometries = new Map(result.nodes.map(n => [n.id, n.geometry]));
   fontFamily = result.fontFamily; undo = []; redo = []; clearSelection(); ports = [];
-  pendingPort = null; previewTarget = null; reconnect = null; mode = 'select'; placement = null; dirty = false;
+  pendingPort = null; previewTarget = null; junctionPreview = null; reconnect = null; mode = 'select'; placement = null; dirty = false;
   clipboardPastes = 0;
   $('object-search').value = ''; $('object-kind').value = '';
   if (!preserveDraft) clearDraft();
@@ -515,6 +543,7 @@ function renderCanvas() {
   if (!doc) return;
   renderHint();
   const connection = renderConnectionFeedback();
+  const junction = renderJunctionFeedback();
   const previewClass = 'connection-preview' + (connection?.error ? ' invalid' : '');
   svg.replaceChildren();
   svg.classList.toggle('connecting', mode === 'connect' || mode === 'reconnect');
@@ -531,6 +560,7 @@ function renderCanvas() {
     let points;
     try { points = edgePoints(edge); } catch { continue; }
     const g = shape('g', { class: 'edge' + (selected('edge', edge.id) ? ' selected' : '')
+      + (junction?.edgeId === edge.id ? ' junction-candidate' + (junction.error ? ' invalid' : '') : '')
       + (reconnect?.edgeId === edge.id ? ' reconnecting-edge' : ''), 'data-kind': 'edge', 'data-id': edge.id });
     const p = points.map(p => p.join(',')).join(' ');
     shape('polyline', { points: p, class: 'edge-hit' }, g);
@@ -608,6 +638,12 @@ function renderCanvas() {
   if (connection) shape('circle', { cx: connection.point[0], cy: connection.point[1], r: 9,
     class: 'connection-target' + (connection.error ? ' invalid' : ''), 'vector-effect': 'non-scaling-stroke' });
   renderVertices();
+  if (junction) {
+    const attrs = { cx: junction.point[0], cy: junction.point[1], 'pointer-events': 'none' };
+    shape('circle', { ...attrs, r: 9, class: 'junction-preview' + (junction.error ? ' invalid' : ''),
+      'vector-effect': 'non-scaling-stroke' });
+    shape('circle', { ...attrs, r: 3, class: 'junction-preview-dot' + (junction.error ? ' invalid' : '') });
+  }
   if (drag?.kind === 'box' && drag.moved) {
     const [x, y] = drag.start, [ex, ey] = drag.point;
     shape('rect', { x: Math.min(x, ex), y: Math.min(y, ey), width: Math.abs(ex - x),
@@ -941,6 +977,7 @@ function renderHint() {
     : mode === 'select' && multiSelection.some(ref => ref.kind === 'edge') ? 'Shift+点击追加管路 · 批量样式统一外观 · 单选管路调整走线'
     : '滚轮缩放 · 空白拖动平移 · Shift+空白拖动框选 · 双击管线加折点';
   renderConnectionFeedback();
+  renderJunctionFeedback();
 }
 function render() {
   if (!doc) return;
@@ -1050,14 +1087,21 @@ function alignPorts(axis) {
   });
 }
 
-function splitEdge(edge, fraction = .5) {
+function junctionSplit(edge, fraction, points = edgePoints(edge)) {
   if (!Number.isFinite(fraction) || fraction <= 1e-6 || fraction >= 1 - 1e-6)
-    return message('请在管路内部插入三通，端点处请直接使用已有端口或三通。');
-  const points = edgePoints(edge), split = splitRoute(points, fraction), { point: p, prefix, suffix } = split;
+    throw new Error('请在管路内部插入三通，端点处请直接使用已有端口或三通。');
+  const split = splitRoute(points, fraction), { point: p, prefix, suffix } = split;
   if (prefix.length > 100 || suffix.length > 100)
-    return message('分段后的管路折点超过上限，请先减少折点。');
+    throw new Error('分段后的管路折点超过上限，请先减少折点。');
   if (points.every(point => point.every((v, i) => Math.abs(v - p[i]) < 1e-6)))
-    return message('管路长度为零，无法插入三通。');
+    throw new Error('管路长度为零，无法插入三通。');
+  return split;
+}
+function splitEdge(edge, fraction = .5) {
+  let split;
+  try { split = junctionSplit(edge, fraction); }
+  catch (error) { return message(error.message); }
+  const { point: p, prefix, suffix } = split;
   const id = uid('junction');
   message('');
   edit(() => {
@@ -1070,7 +1114,7 @@ function splitEdge(edge, fraction = .5) {
     edge.target = { junctionId: id }; edge.vertices = prefix;
     doc.edges.push(other); setSelection('junction', id);
     doc.labels = splitEdgeLabels(doc.labels, edge.id, other.id, fraction);
-    mode = 'select'; ports = [];
+    mode = 'select'; ports = []; junctionPreview = null;
   });
 }
 
@@ -1649,6 +1693,7 @@ document.addEventListener('click', async event => {
 });
 
 function setTool(tool) {
+  junctionPreview = null;
   mode = tool; placement = null; pendingPort = null; previewTarget = null; reconnect = null;
   if (tool === 'move-all') { clearSelection(); ports = []; }
   render();
@@ -1686,10 +1731,11 @@ svg.addEventListener('pointerdown', event => {
   if (mode === 'junction' && !placement) {
     event.preventDefault();
     if (hit && ['edge', 'vertex', 'segment', 'endpoint'].includes(hit.dataset.kind)) {
-      const edge = doc.edges.find(item => item.id === hit.dataset.id);
-      if (edge) {
-        try { splitEdge(edge, projectOnRoute(edgePoints(edge), p).at); }
-        catch (error) { message(error.message); }
+      const target = junctionTarget(event, p);
+      if (target) {
+        junctionPreview = target;
+        if (target.error) { message(target.error); renderCanvas(); }
+        else splitEdge(doc.edges.find(item => item.id === target.edgeId), target.fraction);
       }
     } else if (!hit) {
       message('');
@@ -1760,6 +1806,13 @@ function startPan(event) {
 }
 svg.addEventListener('pointermove', event => {
   if (!drag) {
+    if (mode === 'junction' && !placement) {
+      const next = spaceDown ? null : junctionTarget(event, world(event));
+      if (JSON.stringify(next) !== JSON.stringify(junctionPreview)) {
+        junctionPreview = next; renderCanvas();
+      }
+      return;
+    }
     if (mode === 'connect' || reconnect) {
       let next = connectionTarget(event, world(event));
       if (mode === 'connect' && !pendingPort && !next.ref) next = null;
@@ -1812,7 +1865,7 @@ svg.addEventListener('pointermove', event => {
   renderCanvas();
 });
 svg.addEventListener('pointerleave', () => {
-  if (!drag && (mode === 'connect' || reconnect) && previewTarget) { previewTarget = null; renderCanvas(); }
+  if (!drag) clearConnectionPreview();
 });
 function endDrag(event) {
   if (!drag) return;
@@ -1989,7 +2042,7 @@ window.addEventListener('keydown', async event => {
   if (event.key === 'Escape' && reconnect) { event.preventDefault(); cancelReconnect(); return; }
   const modifier = event.ctrlKey || event.metaKey;
   if (event.code === 'Space') { spaceDown = true; event.preventDefault(); }
-  if (event.key === 'Escape') { mode = 'select'; placement = null; pendingPort = null; previewTarget = null; ports = []; cancelDrag(); }
+  if (event.key === 'Escape') { mode = 'select'; placement = null; pendingPort = null; previewTarget = null; junctionPreview = null; ports = []; cancelDrag(); }
   if (drag) return;
   if (handleEditorShortcut(event)) return;
   if (modifier && event.key.toLowerCase() === 'a') { event.preventDefault(); setTool('move-all'); }
