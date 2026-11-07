@@ -201,8 +201,9 @@ export function moveSegment(source, target, vertices, index, offset) {
 // explicit endpoints keep the two rendered edges anchored to the junction
 // even when the original route contains corners or port lead-ins.
 export function splitRoute(points, fraction = .5) {
-  const { point } = along(points, fraction);
-  const index = nearestSegment(points, point);
+  const { point, start } = along(points, fraction);
+  // Use the travelled segment, including when the route crosses itself.
+  const index = points.indexOf(start);
   return {
     point,
     index,

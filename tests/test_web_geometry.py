@@ -35,6 +35,17 @@ def run_geometry(cases):
     return run_geometry_script(script, cases)
 
 
+@pytest.mark.parametrize("fraction,index", [(0.1, 0), (.55, 2), (.875, 3)])
+def test_split_self_crossing_route_uses_travelled_segment(fraction, index):
+    points = [[0, 0], [100, 0], [100, 100], [50, 100], [50, -50]]
+    split = run_geometry_script(
+        "console.log(JSON.stringify(geometry.splitRoute(cases.points,cases.at)));",
+        dict(points=points, at=fraction))
+    assert split["index"] == index
+    assert split["prefix"] == [*points[1:index + 1], split["point"]]
+    assert split["suffix"] == [split["point"], *points[index + 1:-1]]
+
+
 def check_moves(cases, results):
     for (source, target, vertices), result in zip(cases, results):
         assert result["original"] == vertices

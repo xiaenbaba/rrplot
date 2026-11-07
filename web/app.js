@@ -935,7 +935,7 @@ function renderHint() {
     : mode === 'reconnect' ? '点击设备端口或三通完成重接 · 空格拖动平移 · Esc 取消'
     : mode === 'connect' ? (pendingPort ? '起点已选 · 悬停端口或三通查看连接提示 · Esc 取消' : '点击起点端口或三通 · 再点击终点完成连线 · Esc 退出')
     : placement ? '点击画布放置设备 · Esc 取消'
-    : mode === 'junction' ? '点击画布空白放置三通 · Esc 取消'
+    : mode === 'junction' ? '点击管路按位置插入三通 · 点击空白独立放置 · Esc 取消'
     : mode === 'text' ? '点击画布空白放置文字 · Esc 取消'
     : mode === 'select' && !placement && multiSelection.some(ref => ['node', 'junction', 'label'].includes(ref.kind)) ? '方向键微调 1 单位 · Shift+方向键 10 单位 · Ctrl+Z 撤销'
     : mode === 'select' && multiSelection.some(ref => ref.kind === 'edge') ? 'Shift+点击追加管路 · 批量样式统一外观 · 单选管路调整走线'
@@ -1050,9 +1050,16 @@ function alignPorts(axis) {
   });
 }
 
-function splitEdge(edge) {
-  const points = edgePoints(edge), split = splitRoute(points), { point: p, prefix, suffix } = split;
+function splitEdge(edge, fraction = .5) {
+  if (!Number.isFinite(fraction) || fraction <= 1e-6 || fraction >= 1 - 1e-6)
+    return message('请在管路内部插入三通，端点处请直接使用已有端口或三通。');
+  const points = edgePoints(edge), split = splitRoute(points, fraction), { point: p, prefix, suffix } = split;
+  if (prefix.length > 100 || suffix.length > 100)
+    return message('分段后的管路折点超过上限，请先减少折点。');
+  if (points.every(point => point.every((v, i) => Math.abs(v - p[i]) < 1e-6)))
+    return message('管路长度为零，无法插入三通。');
   const id = uid('junction');
+  message('');
   edit(() => {
     doc.junctions.push({ id, x: p[0], y: p[1] });
     // Keep the split point in both routes explicitly.  The junction endpoint
@@ -1062,7 +1069,8 @@ function splitEdge(edge) {
     const other = { ...clone(edge), id: uid('edge'), source: { junctionId: id }, vertices: suffix };
     edge.target = { junctionId: id }; edge.vertices = prefix;
     doc.edges.push(other); setSelection('junction', id);
-    doc.labels = splitEdgeLabels(doc.labels, edge.id, other.id);
+    doc.labels = splitEdgeLabels(doc.labels, edge.id, other.id, fraction);
+    mode = 'select'; ports = [];
   });
 }
 
@@ -1644,7 +1652,7 @@ function setTool(tool) {
   mode = tool; placement = null; pendingPort = null; previewTarget = null; reconnect = null;
   if (tool === 'move-all') { clearSelection(); ports = []; }
   render();
-  status('工具：' + { select: '选择', 'box-select': '框选：拖出矩形完整框住对象，Shift 可追加', 'move-all': '整体移动：按住左键拖动全部内容', connect: '连线：点击起点和终点端口，鼠标靠近时自动吸附', junction: '在空白处放三通，或选中管路后在属性中插入', text: '在画布点击放置文字' }[tool]);
+  status('工具：' + { select: '选择', 'box-select': '框选：拖出矩形完整框住对象，Shift 可追加', 'move-all': '整体移动：按住左键拖动全部内容', connect: '连线：点击起点和终点端口，鼠标靠近时自动吸附', junction: '点击管路按位置插入三通，或点击空白独立放置', text: '在画布点击放置文字' }[tool]);
 }
 
 svg.addEventListener('pointerdown', event => {
@@ -1675,6 +1683,20 @@ svg.addEventListener('pointerdown', event => {
     status('请点击端口或三通连接 · 切换“选择”工具后可移动设备或编辑管路 · Esc 取消');
     return;
   }
+  if (mode === 'junction' && !placement) {
+    event.preventDefault();
+    if (hit && ['edge', 'vertex', 'segment', 'endpoint'].includes(hit.dataset.kind)) {
+      const edge = doc.edges.find(item => item.id === hit.dataset.id);
+      if (edge) {
+        try { splitEdge(edge, projectOnRoute(edgePoints(edge), p).at); }
+        catch (error) { message(error.message); }
+      }
+    } else if (!hit) {
+      message('');
+      edit(() => { const id = uid('junction'); doc.junctions.push({ id, x: snapped(p[0]), y: snapped(p[1]) }); setSelection('junction', id); mode = 'select'; });
+    } else status('请点击管路内部插入三通，或点击空白独立放置 · Esc 取消');
+    return;
+  }
   if (mode === 'box-select' || (mode === 'select' && !placement && event.shiftKey && !hit)) {
     drag = { kind: 'box', start: p, point: p, candidates: selectionCandidates(),
       beforeSelection: clone(multiSelection), additive: event.shiftKey, moved: false, pointerId: event.pointerId };
@@ -1688,9 +1710,6 @@ svg.addEventListener('pointerdown', event => {
   if (hit?.dataset.kind === 'port') { event.preventDefault(); onPort(JSON.parse(hit.dataset.ref)); return; }
   if (hit?.dataset.kind === 'junction' && mode === 'connect') { onPort({ junctionId: hit.dataset.id }); return; }
   if (placement) { addNode(placement, p); return; }
-  if (mode === 'junction' && !hit) {
-    edit(() => { const id = uid('junction'); doc.junctions.push({ id, x: snapped(p[0]), y: snapped(p[1]) }); setSelection('junction', id); mode = 'select'; }); return;
-  }
   if (mode === 'text' && !hit) {
     edit(() => { const id = uid('label'); doc.labels.push({ id, text: '文字', x: snapped(p[0]), y: snapped(p[1]), size: 15, ha: 'center', color: '#111111', boxed: false }); setSelection('label', id); mode = 'select'; }); return;
   }

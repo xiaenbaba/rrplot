@@ -737,3 +737,108 @@ def test_endpoint_handle_keeps_pan_priority_and_ignores_stale_selection(guard):
     assert before == after
     assert drag == ("pan" if guard in {"middle", "space"} else None)
     assert output["saves"] == output["refreshes"] == 0
+
+
+@pytest.mark.parametrize("name", list(TEMPLATES))
+@pytest.mark.parametrize("fraction", [.23, .77])
+def test_click_pipe_inserts_junction_at_projection_and_preserves_labels(name, fraction):
+    output = connection_scenario("""
+      const edge=doc.edges[0],points=edgePoints(edge);
+      edge.color='#336699';edge.linestyle='dashed';
+      for(const at of [.1,.5,.9])doc.labels.push({id:'split-'+at,
+        edgeId:edge.id,at,text:'P',x:7,y:-12});
+      const position=along(points,""" + str(fraction) + """);
+      const p=position.point.map((v,i)=>v+position.direction[1-i]*(i?-2:2));
+      const projected=projectOnRoute(points,p);
+      mode='junction';setSelection('node',doc.nodes[0].id);results.push(snapshot());
+      const hit={dataset:{kind:'edge',id:edge.id}};
+      listeners.get('diagram:pointerdown')({button:0,pointerId:1,point:p,
+        target:{closest:()=>hit},preventDefault(){}});
+      results.push(snapshot(),projected,drag);
+      history('undo');results.push(snapshot());history('redo');results.push(snapshot());
+    """, load_template(name))
+    before, after, projected, drag, undone, redone = output["results"]
+    assert drag is None and after["mode"] == "select"
+    junction = after["doc"]["junctions"][-1]
+    assert [junction["x"], junction["y"]] == pytest.approx(projected["point"])
+    assert projected["at"] == pytest.approx(fraction)
+    assert len(after["doc"]["edges"]) == len(before["doc"]["edges"]) + 1
+    assert len(after["undo"]) == 1
+    assert after["selection"] == {"kind": "junction", "id": junction["id"]}
+    first, second = after["doc"]["edges"][0], after["doc"]["edges"][-1]
+    old = before["doc"]["edges"][0]
+    assert first["target"] == second["source"] == {"junctionId": junction["id"]}
+    assert first["source"] == old["source"] and second["target"] == old["target"]
+    for key in ["color", "linestyle", "head", "headAt", "width"]:
+        assert first[key] == second[key] == old[key]
+    validate_scene(after["doc"])
+    original_scene, split_scene = [resolve_scene(state["doc"])
+                                   for state in (before, after)]
+    def length(points):
+        return sum(abs(a[0] - b[0]) + abs(a[1] - b[1])
+                   for a, b in zip(points, points[1:]))
+
+    original_length = length(original_scene["edges"][0]["points"])
+    assert length(split_scene["edges"][0]["points"]) == pytest.approx(
+        original_length * fraction)
+    assert length(split_scene["edges"][-1]["points"]) == pytest.approx(
+        original_length * (1 - fraction))
+    positions = {label["id"]: label["position"] for label in original_scene["labels"]}
+    for label in split_scene["labels"]:
+        assert label["position"] == pytest.approx(positions[label["id"]])
+    assert undone["doc"] == before["doc"] and redone["doc"] == after["doc"]
+    assert output["saves"] == output["refreshes"] == 3
+
+
+@pytest.mark.parametrize("hit_kind", ["port", "node", "junction", "label"])
+def test_junction_tool_does_not_drag_or_select_existing_non_pipe(hit_kind):
+    output = connection_scenario("""
+      mode='junction';results.push(snapshot());
+      const hit={dataset:{kind:'""" + hit_kind + """',id:doc.nodes[0].id}};
+      listeners.get('diagram:pointerdown')({button:0,pointerId:1,
+        point:[100,100],target:{closest:()=>hit},preventDefault(){}});
+      results.push(snapshot(),drag);
+    """)
+    before, after, drag = output["results"]
+    assert before == after and drag is None
+    assert output["saves"] == 0 and "管路内部" in output["statuses"][-1]
+
+
+@pytest.mark.parametrize("action", ["endpoint", "middle", "space", "zero", "limit"])
+def test_invalid_junction_insertion_and_pan_leave_document_untouched(action):
+    output = connection_scenario("""
+      const action='""" + action + """',edge=doc.edges[0];
+      if(action==='zero')edgePoints=()=>[[30,30],[30,30]];
+      if(action==='limit')edgePoints=()=>Array.from({length:205},(_,i)=>[i,0]);
+      const points=edgePoints(edge);
+      const point=action==='endpoint'?points[0]:along(points,.01).point;
+      mode='junction';spaceDown=action==='space';results.push(snapshot());
+      const hit={dataset:{kind:'edge',id:edge.id}};
+      listeners.get('diagram:pointerdown')({button:action==='middle'?1:0,pointerId:1,
+        point,clientX:100,clientY:100,target:{closest:()=>hit},preventDefault(){}});
+      results.push(snapshot(),drag?.kind||null);
+    """)
+    before, after, drag = output["results"]
+    assert before == after
+    assert drag == ("pan" if action in {"middle", "space"} else None)
+    assert output["saves"] == output["refreshes"] == 0
+
+
+def test_junction_tool_blank_placement_and_sidebar_midpoint_still_work():
+    output = connection_scenario("""
+      mode='junction';$('snap').checked=true;results.push(snapshot());
+      listeners.get('diagram:pointerdown')({button:0,pointerId:1,
+        point:[53,77],target:{closest:()=>null},preventDefault(){}});
+      results.push(snapshot());
+      const edge=doc.edges[0],midpoint=along(edgePoints(edge),.5).point;
+      splitEdge(edge);results.push(snapshot(),midpoint);
+    """)
+    before, placed, split, midpoint = output["results"]
+    assert placed["mode"] == split["mode"] == "select"
+    assert len(placed["doc"]["edges"]) == len(before["doc"]["edges"])
+    assert len(placed["doc"]["junctions"]) == len(before["doc"]["junctions"]) + 1
+    assert placed["doc"]["junctions"][-1] == {
+        "id": placed["selection"]["id"], "x": 50, "y": 80}
+    junction = split["doc"]["junctions"][-1]
+    assert [junction["x"], junction["y"]] == midpoint
+    assert len(split["undo"]) == output["saves"] == 2
