@@ -45,6 +45,11 @@ export function inspectDiagram(document, { nodes = [], routes = new Map(), bound
       else seen.set(key, edge.id);
     }
   }
+  for (const node of document.nodes) if (node.mount) {
+    const edge = document.edges.find(e => e.id === node.mount.edgeId);
+    if (edge) degrees.get(JSON.stringify(['node', node.id]))?.add(edge.id);
+    else add('invalid-mount', { kind: 'node', id: node.id }, '挂接管路不存在', '请重新选择挂接管路或解除挂接。');
+  }
   for (const [id, connected] of degrees) {
     const ref = owners.get(id);
     if (ref.kind === 'node' && !connected.size)

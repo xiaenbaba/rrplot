@@ -30,7 +30,7 @@
         <button id="show-objects" aria-label="图纸对象" aria-pressed="false" aria-controls="objects-panel">对象</button>
       </div>
       <div id="library-parts">
-      <p class="muted panel-note">选择图元，再点击画布放置</p>
+      <p class="muted panel-note">选择图元，再点击画布放置；阀件可拖到管路挂接</p>
       <label class="field"><span>搜索图元</span><input id="part-search" type="search" placeholder="名称或英文类型" autocomplete="off"></label>
       <p id="part-count" class="muted" role="status"></p>
       <div id="palette" class="palette"></div>
@@ -246,6 +246,8 @@
         <li>滚轮缩放；拖动空白平移视图。按住空格拖动或使用中键，可临时平移。</li>
         <li>框选需完整框住对象；Shift+空白处拖动追加框选，Shift+点击追加或取消选择。</li>
         <li>单选管路后，点击两端圆圈再点新端口或三通可重接，也可 Shift+点击其他管路，自动插入三通并重接；拖动长条手柄调整线段，双击增加折点，Alt+点击方形折点删除。</li>
+        <li>膨胀阀、截止阀、电磁阀、单向阀、过滤器、毛细管和消音器可拖到管路附近挂接（18 屏幕像素）；绿色圆环提示吸附，挂接不拆分管路。移动端点或改线时阀件随管移动和转向。</li>
+        <li>挂接阀件属性可更换所属管路、调整百分比位置及反向；拖离或点击“解除挂接”恢复独立设备，删除阀件保留管路。已接独立管路的阀件须先调整连线才能挂接。保存、撤销和正式导出均保留挂接。</li>
         <li>使用“三通”工具悬停管路，可预览插入圆环与坐标；绿色可插入，红色显示原因，点击完成插入。空白处可独立放置。管路属性可在中间插入三通、重接端点和添加状态点；属性栏“选择相连对象”扩展整个设备组。</li>
         <li>三通工具下 Shift+点击管路，可插入三通并立即选为支路起点，再点击终点即可。属性栏也有“插入三通并接出支路”和“从此三通接出支路”。Esc 取消连线时保留三通；插入和接管分别可撤销。</li>
         <li>连线起点已选或正在重接端点时，按住 Shift 悬停目标管路可预览接入位置，Shift+点击会插入三通并接好，整次操作可一次撤销。附近已有端口或三通时优先复用；普通点击管路不接入，不能重接到自身。</li>

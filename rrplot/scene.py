@@ -10,6 +10,8 @@ from .core import _orthogonalize, _polyline_point
 from .registry import describe, normalize_params
 
 SCHEMA_VERSION = 1
+MOUNT_TYPES = {"expansion_valve", "globe_valve", "solenoid_valve",
+               "check_valve", "filter", "capillary", "muffler"}
 TEMPLATES = {
     "evi_ftvi": "EVI 过冷器喷气增焓",
     "ftvi": "FTVI 闪蒸罐喷气增焓",
@@ -104,6 +106,8 @@ def validate_scene(document):
                 if ref["junctionId"] not in junctions:
                     raise ValueError("管路引用了不存在的三通")
             elif set(ref) == {"nodeId", "portId"} and ref["nodeId"] in nodes:
+                if nodes[ref["nodeId"]].get("mount") is not None:
+                    raise ValueError("挂接阀件属于管路附件，不能同时作为独立管路端点")
                 if ref["portId"] not in descriptions[ref["nodeId"]]["ports"]:
                     raise ValueError("管路引用了不存在的端口")
             else:
@@ -127,6 +131,26 @@ def validate_scene(document):
             raise ValueError("箭头位置必须为数组，最多 10 项")
         for head in heads:
             finite(head, "箭头位置", 0, 1)
+    mounted = [n for n in d["nodes"] if "mount" in n]
+    for node in mounted:
+        mount = node["mount"]
+        if (node["type"] not in MOUNT_TYPES or not isinstance(mount, dict)
+                or set(mount) - {"edgeId", "at", "reverse"}):
+            raise ValueError("无效的阀件挂接配置")
+        if not isinstance(mount.get("edgeId"), str) or mount["edgeId"] not in edge_ids:
+            raise ValueError("挂接管路不存在")
+        finite(mount.setdefault("at", 0.5), "挂接位置", 0, 1)
+        if not isinstance(mount.setdefault("reverse", False), bool):
+            raise ValueError("挂接反向必须为布尔值")
+    if mounted:
+        geometry_nodes = {key: dict(n, geometry=descriptions[key])
+                          for key, n in nodes.items()}
+        paths = {e["id"]: route(endpoint(e["source"], geometry_nodes, junctions),
+                                  endpoint(e["target"], geometry_nodes, junctions),
+                                  e["vertices"]) for e in d["edges"]}
+        for node in mounted:
+            node.update(mount_pose(node, descriptions[node["id"]],
+                                   paths[node["mount"]["edgeId"]]))
     for label in d["labels"]:
         if not isinstance(label.get("text"), str) or len(label["text"]) > 1000:
             raise ValueError("标签内容必须为不超过 1000 字的文字")
@@ -155,6 +179,20 @@ def rotate(point, angle):
     s = round(math.sin(math.radians(angle)), 12)
     x, y = point
     return [round(c * x - s * y, 8), round(s * x + c * y, 8)]
+
+
+def mount_pose(node, geometry, points):
+    """附件按管路弧长定位，in→out 跟随管路方向；不拆分父管路。"""
+    if not any(a != b for a, b in zip(points, points[1:])):
+        raise ValueError("管路长度为零，无法挂接阀件")
+    point, direction = _polyline_point(points, node["mount"]["at"])[0:2]
+    a, b = (geometry["ports"][p]["point"] for p in ("in", "out"))
+    native = math.degrees(math.atan2(b[1] - a[1], b[0] - a[0]))
+    tangent = math.degrees(math.atan2(direction[1], direction[0]))
+    angle = round((tangent - native) / 90) * 90
+    if node["mount"]["reverse"]:
+        angle += 180
+    return dict(x=point[0], y=point[1], rotation=angle % 360)
 
 
 def endpoint(ref, nodes, junctions):

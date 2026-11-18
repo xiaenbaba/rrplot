@@ -1,4 +1,4 @@
-import { rotate, endpoint, route, along, nearestSegment, splitRoute, translateDocument, layoutPage, fitViewport, editableSegments, moveSegment, transformedBox, selectInBox, projectOnRoute } from './geometry.js';
+import { rotate, endpoint, route, along, nearestSegment, splitRoute, translateDocument, layoutPage, fitViewport, editableSegments, moveSegment, transformedBox, selectInBox, projectOnRoute, MOUNT_TYPES, canMount, mountNode, detachNode, mountedNodes, nearestMount, splitMounts } from './geometry.js';
 import { copySelection, captureSelection, pasteFragment, deleteSelection, translateSelection, moveContents, connectedSelection, editSelectedEdges, splitEdgeLabels, reconnectEdge, nudgeSelection } from './document.js';
 import { inspectDiagram } from './checks.js';
 import { objectIndex, filterObjects } from './objects.js';
@@ -24,6 +24,9 @@ let connectionCoordinates = null;
 let junctionPreview = null;
 let reconnect = null;
 let edgeLabelsSupported = false;
+let pipeMountsSupported = false, mountPreview = null;
+let draggingPart = null;
+let paletteDrag = null, suppressedPaletteClick = null;
 let undo = [], redo = [], drag = null, dirty = false, spaceDown = false;
 let nudge = null;
 let editorClipboard = null, clipboardPastes = 0;
@@ -61,6 +64,8 @@ function message(text) {
 }
 
 async function api(path, body) {
+  if (body?.document?.nodes?.some(node => node.mount) && !pipeMountsSupported)
+    throw new Error('阀件挂接需要新版服务，请保存图纸后重启服务，再刷新页面。');
   if (body?.document?.labels?.some(label => label.edgeId) && !edgeLabelsSupported)
     throw new Error('管路状态点需要新版服务，请保存当前图纸后重启 start-web.cmd，再刷新页面。');
   const response = await fetch('/api/' + path, body === undefined ? {} : {
@@ -74,7 +79,35 @@ async function api(path, body) {
 }
 
 function currentNodes() {
-  return doc.nodes.map(n => ({ ...n, geometry: geometries.get(n.id) })).filter(n => n.geometry);
+  const nodes = doc.nodes.map(n => ({ ...n, geometry: geometries.get(n.id) })).filter(n => n.geometry);
+  return nodes.some(n => n.mount) ? mountedNodes(doc, nodes) : nodes;
+}
+function syncMounts() {
+  if (!doc?.nodes.some(n => n.mount)) return;
+  for (const n of currentNodes()) if (n.mount) {
+    const item = doc.nodes.find(item => item.id === n.id);
+    Object.assign(item, { x: n.x, y: n.y, rotation: n.rotation });
+  }
+}
+function renderMountFields(root, item) {
+  const supported = pipeMountsSupported && canMount(doc, item);
+  field(root, '挂接管路', item.mount?.edgeId || '', value => {
+    if (!value) { detachNode(item, currentNodes().find(n => n.id === item.id)); return; }
+    const pose = currentNodes().find(n => n.id === item.id);
+    const points = edgePoints(doc.edges.find(e => e.id === value));
+    if (along(points, .5).length < 1) return message('管路长度为零，无法挂接。');
+    mountNode(doc, item.id, value, projectOnRoute(points, [pose.x, pose.y]).at, item.mount?.reverse);
+    ports = [];
+  }, { options: [{ value: '', label: '未挂接' }, ...doc.edges.map(e => ({ value: e.id,
+    label: refName(e.source) + ' → ' + refName(e.target) }))], disabled: !supported });
+  if (item.mount) {
+    field(root, '挂接位置（%）', item.mount.at * 100, v => { item.mount.at = v / 100; }, { min: 0, max: 100 });
+    field(root, '挂接反向', item.mount.reverse, v => { item.mount.reverse = v; }, { type: 'checkbox' });
+    inspectorButton(root, '解除挂接', () => edit(() => detachNode(item, currentNodes().find(n => n.id === item.id))));
+  }
+  root.append(html('p', !pipeMountsSupported ? '阀件挂接需要重启服务并刷新页面。'
+    : !canMount(doc, item) ? '该阀件已作为管路端点；调整其相连管路后才能挂接。'
+      : '拖到管路附近松开即可挂接，拖离可解除；父管路保持完整，移动和改线时自动跟随。', 'muted'));
 }
 function findSelected() {
   if (!selection) return null;
@@ -174,7 +207,7 @@ function labelPosition(label) {
     return along(edgePoints(edge), label.at).point.map((v, i) => v + [label.x, label.y][i]);
   }
   if (!label.nodeId) return [label.x, label.y];
-  const n = doc.nodes.find(n => n.id === label.nodeId);
+  const n = currentNodes().find(n => n.id === label.nodeId) || doc.nodes.find(n => n.id === label.nodeId);
   const p = rotate([label.x, label.y], n.rotation);
   return [n.x + p[0], n.y + p[1]];
 }
@@ -242,6 +275,7 @@ function connectionRef(event, point) {
     if (pixels <= 12 && (!nearest || pixels < distance - 1e-6)) { nearest = candidate; distance = pixels; }
   };
   for (const node of nodes) {
+    if (node.mount) continue;
     const seen = new Set();
     for (const [id, port] of Object.entries(node.geometry.ports)) {
       const key = port.point.join(',');
@@ -437,6 +471,7 @@ async function refresh() {
     const result = await api('resolve', { document: doc });
     if (token !== request || version !== revision) return;
     geometries = new Map(result.nodes.map(n => [n.id, n.geometry]));
+    syncMounts();
     junctionPreview = null;
     fontFamily = result.fontFamily;
     if (dirty) saveDraft();
@@ -451,6 +486,7 @@ async function refresh() {
 }
 
 function finishEdit(before, { merge = false, deferRefresh = false } = {}) {
+  syncMounts();
   if (JSON.stringify(before) === JSON.stringify(doc)) return render();
   cancelDocumentLoad();
   if (!merge || !undo.length) { undo.push(before); if (undo.length > 80) undo.shift(); }
@@ -477,6 +513,7 @@ async function replaceDocument(next, preserveDraft = false, canApply = () => tru
   const result = await api('resolve', { document: next });
   if (token !== request || version !== revision || !canApply()) return false;
   edgeLabelsSupported = result.features?.includes('edgeLabels') || false;
+  pipeMountsSupported = result.features?.includes('pipeMounts') || false;
   ++revision;
   doc = result.document; geometries = new Map(result.nodes.map(n => [n.id, n.geometry]));
   fontFamily = result.fontFamily; undo = []; redo = []; clearSelection(); ports = [];
@@ -598,6 +635,50 @@ async function focusDrawing(scope) {
   } finally { if (navigationSession === session) navigationSession = null; }
 }
 
+function renderMountPreview() {
+  let marker = svg.querySelector('.mount-target');
+  if (!mountPreview) { marker?.setAttribute('visibility', 'hidden'); return; }
+  if (!marker) marker = shape('circle', { r: 11, class: 'mount-target',
+    'pointer-events': 'none', 'vector-effect': 'non-scaling-stroke' });
+  marker.setAttribute('cx', mountPreview.point[0]);
+  marker.setAttribute('cy', mountPreview.point[1]);
+  marker.setAttribute('visibility', 'visible');
+}
+function beginPaletteDrag(event, type, button) {
+  if (!doc || event.button !== 0 || drag || paletteDrag || pageLayoutBusy) return;
+  suppressedPaletteClick = null;
+  paletteDrag = { type, button, pointerId: event.pointerId,
+    start: [event.clientX, event.clientY], moved: false };
+  button.focus({ preventScroll: true });
+  button.setPointerCapture(event.pointerId);
+  event.preventDefault();
+}
+function paletteInside(event) {
+  const box = svg.getBoundingClientRect();
+  return event.clientX >= box.left && event.clientX < box.right
+    && event.clientY >= box.top && event.clientY < box.bottom;
+}
+function movePaletteDrag(event) {
+  if (!paletteDrag || event.pointerId !== paletteDrag.pointerId) return;
+  if (!paletteDrag.moved && Math.hypot(event.clientX - paletteDrag.start[0],
+    event.clientY - paletteDrag.start[1]) < 4) return;
+  paletteDrag.moved = true;
+  mountPreview = paletteInside(event) && pipeMountsSupported && MOUNT_TYPES.includes(paletteDrag.type)
+    ? nearestMount(doc, { id: '__palette__', type: paletteDrag.type }, currentNodes(), world(event), screenMatrix()) : null;
+  renderMountPreview();
+  status(mountPreview ? '松开挂接到管路 · Esc 取消' : '拖到画布松开放置 · Esc 取消');
+}
+function endPaletteDrag(event, cancelled = false) {
+  if (!paletteDrag || event.pointerId !== paletteDrag.pointerId) return;
+  const current = paletteDrag; paletteDrag = null;
+  if (current.moved || cancelled) suppressedPaletteClick = current.button;
+  if (current.button.hasPointerCapture(current.pointerId)) current.button.releasePointerCapture(current.pointerId);
+  mountPreview = null; renderMountPreview();
+  if (!cancelled && current.moved && paletteInside(event)) {
+    reconnect = null; document.body.classList.remove('library-open');
+    addNode(current.type, world(event));
+  }
+}
 function renderCanvas() {
   if (!doc) return;
   renderHint();
@@ -658,9 +739,12 @@ function renderCanvas() {
       'data-kind': 'node', 'data-id': n.id, transform: `translate(${n.x} ${n.y}) rotate(${n.rotation})` });
     const [x, y, w, h] = n.geometry.box;
     shape('title', {}, g).textContent = n.title;
+    if (n.mount) shape('rect', { x: -(n.params.w || 2*n.params.r)/2, y: -(n.params.h || 2*n.params.r)/2,
+      width: n.params.w || 2*n.params.r, height: n.params.h || 2*n.params.r, fill: '#fff', 'pointer-events': 'none' }, g);
     shape('image', { x, y, width: w, height: h, href: n.geometry.image, class: 'node-image' }, g);
     shape('rect', { x: x - 3, y: y - 3, width: w + 6, height: h + 6, rx: 2, class: 'node-hit' }, g);
     const seen = new Set();
+    if (n.mount) continue;
     for (const [id, p] of Object.entries(n.geometry.ports)) {
       const key = p.point.join(','); if (seen.has(key)) continue; seen.add(key);
       const ref = { nodeId: n.id, portId: id };
@@ -672,6 +756,7 @@ function renderCanvas() {
       shape('title', {}, circle).textContent = id;
     }
   }
+  if (mountPreview) renderMountPreview();
   for (const j of doc.junctions) {
     const g = shape('g', { class: 'junction' + (selected('junction', j.id) ? ' selected' : ''),
       'data-kind': 'junction', 'data-id': j.id });
@@ -859,8 +944,11 @@ function renderInspector() {
       const l = doc.labels.find(l => l.nodeId === item.id && l.text === item.title);
       if (l) l.text = v; item.title = v;
     });
-    coordinateFields(root, item);
-    field(root, '旋转角度', item.rotation, v => { item.rotation = Number(v); }, { options: [0, 90, 180, 270] });
+    if (!item.mount) {
+      coordinateFields(root, item);
+      field(root, '旋转角度', item.rotation, v => { item.rotation = Number(v); }, { options: [0, 90, 180, 270] });
+    }
+    if (MOUNT_TYPES.includes(item.type)) renderMountFields(root, item);
     root.append(html('div', '图元参数', 'section-label'));
     const entry = catalog.find(c => c.type === item.type);
     for (const [key, f] of Object.entries(entry.fields)) field(root, f.label, item.params[key], v => { item.params[key] = v; }, f);
@@ -998,6 +1086,7 @@ function layoutBox(entry) {
 }
 function moveLayoutRef(entry, x, y) {
   const { ref, item } = entry;
+  if (ref.kind === 'node' && item.mount) detachNode(item, currentNodes().find(n => n.id === item.id));
   if (ref.kind === 'node' || ref.kind === 'junction') { item.x = +x.toFixed(4); item.y = +y.toFixed(4); return; }
   if (item.nodeId) {
     const node = doc.nodes.find(candidate => candidate.id === item.nodeId);
@@ -1077,10 +1166,16 @@ function render() {
 }
 
 function addNode(type, position) {
+  mountPreview = null;
   const entry = catalog.find(c => c.type === type), id = uid('node');
   edit(() => {
     const params = Object.fromEntries(Object.entries(entry.fields).map(([k, v]) => [k, v.default]));
     doc.nodes.push({ id, type, title: entry.label, x: snapped(position[0]), y: snapped(position[1]), params, rotation: 0 });
+    const node = doc.nodes.at(-1);
+    if (pipeMountsSupported && MOUNT_TYPES.includes(type)) {
+      const target = nearestMount(doc, node, currentNodes(), position, screenMatrix());
+      if (target) { mountNode(doc, id, target.edgeId, target.at); ports = []; }
+    }
     doc.labels.push({ id: uid('label'), nodeId: id, x: 0, y: (params.h || 2 * params.r) / 2 + 24 + (type === 'four_way_valve' && params.mark ? 30 : 0),
       text: entry.label, size: 15, ha: 'center', color: '#111111', boxed: false });
     setSelection('node', id); placement = null; mode = 'select';
@@ -1099,6 +1194,8 @@ function cancelReconnect() {
   reconnect = null; previewTarget = null; mode = 'select'; render(); status('已取消重接，管路保持原连接');
 }
 function checkConnection(edge, excludeId = null, document = doc) {
+  if ([edge.source, edge.target].some(ref => document.nodes.find(n => n.id === ref.nodeId)?.mount))
+    throw new Error('挂接阀件属于管路附件，请连接原管路或先解除挂接。');
   if (!excludeId && document.edges.length >= 2000)
     throw new Error('管路数量将超过 2000 项，请先减少对象。');
   const nodes = currentNodes();
@@ -1118,6 +1215,7 @@ function checkConnection(edge, excludeId = null, document = doc) {
   if (duplicate) throw new Error('这两个接点之间已有相同走线的管路，请选择其他接点，或先调整已有管路的走线。');
 }
 function onPort(ref) {
+  if (doc.nodes.find(n => n.id === ref.nodeId)?.mount) return message('请先解除阀件挂接，再连接其端口。');
   if (mode === 'reconnect' && reconnect) {
     try {
       const edge = doc.edges.find(e => e.id === reconnect.edgeId);
@@ -1635,6 +1733,7 @@ function applyJunctionSplit(document, edgeId, split, fraction, id, otherId) {
   edge.target = { junctionId: id }; edge.vertices = prefix;
   document.edges.push(other);
   document.labels = splitEdgeLabels(document.labels, edge.id, other.id, fraction);
+  if (document.nodes.some(n => n.mount?.edgeId === edge.id)) splitMounts(document, edge.id, other.id, fraction);
 }
 function preparePipeConnection(target, createId = null) {
   const rejoining = mode === 'reconnect' && reconnect;
@@ -1754,11 +1853,11 @@ function copySelected() {
   if (!multiSelection.some(ref => ['node', 'label', 'junction'].includes(ref.kind))) return;
   try {
     const result = copySelection(doc, multiSelection, uid);
-    const originalNodes = multiSelection.filter(ref => ref.kind === 'node');
-    result.selection.filter(ref => ref.kind === 'node').forEach((ref, index) => {
-      const geometry = geometries.get(originalNodes[index].id);
-      if (geometry) geometries.set(ref.id, geometry);
-    });
+    for (const copy of result.document.nodes.slice(doc.nodes.length)) {
+      const original = doc.nodes.find(n => n.type === copy.type && JSON.stringify(n.params) === JSON.stringify(copy.params));
+      const geometry = original && geometries.get(original.id);
+      if (geometry) geometries.set(copy.id, geometry);
+    }
     edit(() => {
       doc = result.document; multiSelection = result.selection; selection = multiSelection.at(-1) || null;
       pendingPort = null; connectionVertices = []; previewTarget = null; mode = 'select'; placement = null;
@@ -2332,6 +2431,7 @@ document.addEventListener('click', async event => {
 });
 
 function setTool(tool) {
+  mountPreview = null;
   if (drag?.kind === 'connection-vertex') cancelDrag();
   junctionPreview = null;
   mode = tool; placement = null; pendingPort = null; connectionVertices = []; previewTarget = null; reconnect = null;
@@ -2454,7 +2554,8 @@ svg.addEventListener('pointerdown', event => {
     if (multiSelection.length > 1 && multiSelection.some(ref => ref.kind === selectedKind && ref.id === id)) {
       drag = { kind: 'multi', start: p, before: clone(doc), pointerId: event.pointerId, moved: false };
     } else {
-      drag = { kind, id, start: p, before: clone(doc), origin: kind === 'vertex' ? [...item.vertices[Number(hit.dataset.index)]] : [item.x, item.y],
+      const pose = kind === 'node' && item.mount ? currentNodes().find(n => n.id === id) : item;
+      drag = { kind, id, start: p, before: clone(doc), origin: kind === 'vertex' ? [...item.vertices[Number(hit.dataset.index)]] : [pose.x, pose.y],
         index: Number(hit.dataset.index), pointerId: event.pointerId, moved: false };
     }
     svg.setPointerCapture(event.pointerId); event.preventDefault();
@@ -2469,6 +2570,11 @@ function startPan(event) {
 }
 svg.addEventListener('pointermove', event => {
   if (!drag) {
+    if (placement && pipeMountsSupported && MOUNT_TYPES.includes(placement)) {
+      const candidate = { id: '__placement__', type: placement };
+      mountPreview = nearestMount(doc, candidate, currentNodes(), world(event), screenMatrix());
+      renderMountPreview(); return;
+    }
     if (mode === 'junction' && !placement) {
       const next = spaceDown ? null : junctionTarget(event, world(event));
       if (JSON.stringify(next) !== JSON.stringify(junctionPreview)) {
@@ -2532,20 +2638,33 @@ svg.addEventListener('pointermove', event => {
     renderCanvas(); return;
   }
   const item = findSelected();
+  if (drag.kind === 'node' && item.mount) {
+    const pose = currentNodes().find(n => n.id === item.id); detachNode(item, pose);
+  }
   if (drag.kind === 'label' && item.nodeId) {
-    const n = doc.nodes.find(n => n.id === item.nodeId), local = rotate(delta, -n.rotation);
+    const n = currentNodes().find(n => n.id === item.nodeId), local = rotate(delta, -n.rotation);
     [item.x, item.y] = drag.origin.map((v, i) => snapped(v + local[i]));
   } else if (drag.kind === 'vertex') item.vertices[drag.index] = drag.origin.map((v, i) => snapped(v + delta[i]));
   else [item.x, item.y] = drag.origin.map((v, i) => snapped(v + delta[i]));
+  mountPreview = drag.kind === 'node' && pipeMountsSupported && canMount(doc, item)
+    ? nearestMount(doc, item, currentNodes(), [item.x, item.y], screenMatrix()) : null;
+  if (mountPreview) status('松开挂接到管路 · 拖离管路可解除 · Esc 取消');
   renderCanvas();
 });
 svg.addEventListener('pointerleave', () => {
+  if (!drag && mountPreview) { mountPreview = null; renderMountPreview(); }
   if (!drag) clearConnectionPreview();
 });
 function endDrag(event) {
   if (!drag) return;
   if (drag.kind === 'connection-vertex' && event.pointerId !== drag.pointerId) return;
   const current = drag; drag = null; svg.classList.remove('panning');
+  if (current.kind === 'node' && current.moved && pipeMountsSupported) {
+    const node = doc.nodes.find(n => n.id === current.id);
+    const target = nearestMount(doc, node, currentNodes(), [node.x, node.y], screenMatrix());
+    if (target) mountNode(doc, node.id, target.edgeId, target.at, current.before.nodes.find(n => n.id === node.id)?.mount?.reverse);
+  }
+  mountPreview = null;
   renderConnectionTools();
   if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
   if (current.kind === 'connection-vertex') {
@@ -2564,6 +2683,7 @@ function endDrag(event) {
 }
 svg.addEventListener('pointerup', endDrag);
 function cancelDrag() {
+  mountPreview = null;
   const current = drag;
   if (current?.kind === 'connection-vertex') {
     connectionVertices = current.beforeVertices; resetConnectionVertexPreview();
@@ -2588,8 +2708,27 @@ svg.addEventListener('dblclick', event => {
   edit(() => { const vertices = points.slice(1, -1); vertices.splice(index, 0, p.map(snapped)); edge.vertices = vertices; setSelection('edge', edge.id); });
 });
 svg.addEventListener('wheel', event => { event.preventDefault(); if (doc) zoom(event.deltaY > 0 ? 1.1 : 1 / 1.1, world(event)); }, { passive: false });
-svg.addEventListener('dragover', event => event.preventDefault());
-svg.addEventListener('drop', event => { event.preventDefault(); const type = event.dataTransfer.getData('text/rrplot-part'); if (catalog.some(c => c.type === type)) { reconnect = null; addNode(type, world(event)); } });
+svg.addEventListener('dragover', event => {
+  event.preventDefault();
+  const type = draggingPart || event.dataTransfer.getData('text/rrplot-part');
+  if (pipeMountsSupported && MOUNT_TYPES.includes(type)) {
+    mountPreview = nearestMount(doc, { id: '__drop__', type }, currentNodes(), world(event), screenMatrix());
+    renderMountPreview();
+  }
+});
+svg.addEventListener('dragleave', event => {
+  if (!mountPreview || svg.contains(event.relatedTarget)) return;
+  const box = svg.getBoundingClientRect();
+  if (event.clientX >= box.left && event.clientX < box.right
+    && event.clientY >= box.top && event.clientY < box.bottom) return;
+  mountPreview = null; renderMountPreview();
+});
+svg.addEventListener('drop', event => {
+  event.preventDefault();
+  const type = draggingPart || event.dataTransfer.getData('text/rrplot-part');
+  draggingPart = null; mountPreview = null; renderMountPreview();
+  if (catalog.some(c => c.type === type)) { reconnect = null; addNode(type, world(event)); }
+});
 
 $('title').addEventListener('change', event => edit(() => { doc.title = event.target.value; }));
 document.addEventListener('input', event => {
@@ -2725,6 +2864,10 @@ window.addEventListener('keydown', async event => {
     event.preventDefault(); nudgeSelected(event); return;
   }
   if (!['Shift', 'Alt', 'Control', 'Meta'].includes(event.key)) endNudge();
+  if (event.key === 'Escape' && paletteDrag) {
+    event.preventDefault(); endPaletteDrag({ pointerId: paletteDrag.pointerId }, true);
+    status('已取消图元拖放'); return;
+  }
   if (event.key === 'Escape' && drag?.kind === 'connection-vertex') {
     event.preventDefault(); cancelDrag(); status('已取消本次折点拖动 · 保留连线起点和原折点'); return;
   }
@@ -2768,11 +2911,20 @@ async function init() {
     const data = await Promise.all([api('catalog'), api('templates'), api('templates/evi_ftvi')]);
     [catalog] = data;
     for (const entry of catalog) {
-      const b = html('button', undefined, 'part-button'); b.dataset.part = entry.type; b.draggable = true;
+      const b = html('button', undefined, 'part-button'); b.dataset.part = entry.type; b.draggable = false;
       b.append(html('span', entry.label.slice(0, 1), 'part-icon'));
       const name = html('span', entry.label); name.append(html('small', entry.type)); b.append(name);
-      b.addEventListener('click', () => { placement = entry.type; mode = 'select'; pendingPort = null; connectionVertices = []; previewTarget = null; reconnect = null; document.body.classList.remove('library-open'); render(); status('在画布点击放置：' + entry.label); });
-      b.addEventListener('dragstart', event => event.dataTransfer.setData('text/rrplot-part', entry.type));
+      b.addEventListener('click', event => {
+        if (suppressedPaletteClick === b && event.detail !== 0) { suppressedPaletteClick = null; return; }
+        mountPreview = null; placement = entry.type; mode = 'select'; pendingPort = null; connectionVertices = []; previewTarget = null; reconnect = null; document.body.classList.remove('library-open'); render(); status('在画布点击放置：' + entry.label);
+      });
+      b.addEventListener('pointerdown', event => beginPaletteDrag(event, entry.type, b));
+      b.addEventListener('pointermove', movePaletteDrag);
+      b.addEventListener('pointerup', event => endPaletteDrag(event));
+      b.addEventListener('pointercancel', event => endPaletteDrag(event, true));
+      b.addEventListener('lostpointercapture', event => endPaletteDrag(event, true));
+      b.addEventListener('dragstart', event => { draggingPart = entry.type; event.dataTransfer.setData('text/rrplot-part', entry.type); });
+      b.addEventListener('dragend', () => { draggingPart = null; mountPreview = null; if (doc) renderMountPreview(); });
       $('palette').append(b);
     }
     for (const template of data[1]) {

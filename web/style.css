@@ -31,6 +31,7 @@ input[type=checkbox] { min-height: unset; accent-color: var(--accent); }
 .muted { color: #85909a; font-size: 11px; line-height: 1.7; }
 .panel-note { font-size: 10px; margin: 9px 0 16px; }
 .palette { display: grid; gap: 7px; }
+.part-button { touch-action: none; user-select: none; }
 .library-switch { display: flex; gap: 5px; margin: 14px 0 10px; }
 .library-switch button { flex: 1; font-size: 11px; padding: 5px 3px; }
 #objects-panel:not([hidden]) { display: flex; flex-direction: column; flex: 1; min-height: 250px; }
@@ -80,6 +81,7 @@ input[type=checkbox] { min-height: unset; accent-color: var(--accent); }
 .edge { cursor: pointer; }
 .connection-preview { fill: none; stroke: var(--accent); stroke-width: 1.8; stroke-dasharray: 6 4; stroke-linecap: round; opacity: .8; pointer-events: none; }
 .connection-preview.invalid { stroke: #b83d36; }
+.mount-target { fill: #17796722; stroke: var(--accent); stroke-width: 2; pointer-events: none; }
 .connection-waypoint { fill: #fff; stroke: var(--accent); stroke-width: 1.5; pointer-events: none; }
 .connection-waypoint-handle { cursor: move; }
 .connection-waypoint-handle:hover .connection-waypoint { fill: #c5e5da; stroke-width: 2; }

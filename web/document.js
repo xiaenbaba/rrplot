@@ -15,6 +15,16 @@ function selectedRefs(document, selection) {
   return [...refs.values()];
 }
 
+function copyRefs(document, selection) {
+  const refs = selectedRefs(document, selection).filter(ref => ref.kind !== 'edge');
+  const chosen = new Set(refs.map(key));
+  const inside = ref => chosen.has(key(ref.nodeId ? { kind: 'node', id: ref.nodeId } : { kind: 'junction', id: ref.junctionId }));
+  const pipes = new Set(document.edges.filter(e => inside(e.source) && inside(e.target)).map(e => e.id));
+  for (const node of document.nodes) if (pipes.has(node.mount?.edgeId) && !chosen.has(key({ kind: 'node', id: node.id })))
+    refs.push({ kind: 'node', id: node.id });
+  return refs;
+}
+
 export function connectedSelection(document, selection) {
   const refs = new Map(), links = new Map();
   for (const kind of ['node', 'junction', 'edge', 'label']) {
@@ -35,6 +45,7 @@ export function connectedSelection(document, selection) {
     if (label.nodeId || label.edgeId) connect(key({ kind: 'label', id: label.id }),
       key(label.nodeId ? { kind: 'node', id: label.nodeId } : { kind: 'edge', id: label.edgeId }));
   }
+  for (const node of document.nodes) if (node.mount) connect(key({ kind: 'node', id: node.id }), key({ kind: 'edge', id: node.mount.edgeId }));
   const chosen = new Set(selection.map(key).filter(id => refs.has(id))), queue = [...chosen];
   for (let i = 0; i < queue.length; ++i) {
     for (const id of links.get(queue[i])) if (!chosen.has(id)) { chosen.add(id); queue.push(id); }
@@ -45,7 +56,7 @@ export function connectedSelection(document, selection) {
 }
 
 function copyInto(document, selection, newId, offset, destination) {
-  const refs = selectedRefs(document, selection).filter(ref => ref.kind !== 'edge');
+  const refs = copyRefs(document, selection);
   const selected = new Set(refs.map(key)), ids = new Map();
   const used = new Set(Object.values(collections).flatMap(name => destination[name].map(item => item.id)));
   const result = structuredClone(destination);
@@ -70,6 +81,11 @@ function copyInto(document, selection, newId, offset, destination) {
     if (!source || !target) continue;
     result.edges.push({ ...structuredClone(edge), id: allocate('edge', edge.id), source, target,
       vertices: edge.vertices.map(p => p.map((v, i) => v + offset[i])) });
+  }
+  for (const copy of result.nodes.slice(destination.nodes.length)) if (copy.mount) {
+    const pipe = ids.get(key({ kind: 'edge', id: copy.mount.edgeId }));
+    if (pipe) copy.mount.edgeId = pipe;
+    else delete copy.mount;
   }
   for (const label of document.labels) {
     const parent = ids.get(key({ kind: 'node', id: label.nodeId }));
@@ -99,7 +115,7 @@ export function copySelection(document, selection, newId, offset = [20, 20]) {
 }
 
 export function captureSelection(document, selection, labelPositions = new Map()) {
-  const refs = selectedRefs(document, selection).filter(ref => ref.kind !== 'edge');
+  const refs = copyRefs(document, selection);
   const selected = new Set(refs.map(key));
   const has = (kind, id) => selected.has(key({ kind, id }));
   const nodes = document.nodes.filter(n => has('node', n.id));
@@ -110,6 +126,7 @@ export function captureSelection(document, selection, labelPositions = new Map()
   const labels = document.labels.filter(l => has('label', l.id) || has('node', l.nodeId) || edgeIds.has(l.edgeId));
   const fragment = structuredClone({ schemaVersion: 1, title: '编辑器剪贴板', page: document.page,
     nodes, junctions, edges, labels, selection: refs });
+  for (const node of fragment.nodes) if (node.mount && !edgeIds.has(node.mount.edgeId)) delete node.mount;
   for (const label of fragment.labels) {
     if ((label.nodeId && !has('node', label.nodeId)) || (label.edgeId && !edgeIds.has(label.edgeId))) {
       const point = labelPositions.get(label.id);
@@ -139,12 +156,14 @@ export function translateSelection(document, selection, offset) {
     }
   }
   for (const label of result.labels) {
-    if (!moving('label', label.id) || moving('node', label.nodeId) || movedEdges.has(label.edgeId)) continue;
+    const parentMount = document.nodes.find(n => n.id === label.nodeId)?.mount;
+    if (!moving('label', label.id) || moving('node', label.nodeId) || movedEdges.has(label.edgeId) || movedEdges.has(parentMount?.edgeId)) continue;
     const delta = label.nodeId ? localOffset(offset, document.nodes.find(n => n.id === label.nodeId).rotation) : offset;
     label.x += delta[0]; label.y += delta[1];
   }
   for (const edge of result.edges) if ([edge.source, edge.target].every(movedEndpoint))
     edge.vertices = edge.vertices.map(p => p.map((v, i) => v + offset[i]));
+  for (const node of result.nodes) if (node.mount && moving('node', node.id) && !movedEdges.has(node.mount.edgeId)) delete node.mount;
   return result;
 }
 
@@ -204,8 +223,9 @@ export function deleteSelection(document, selection, routes = new Map()) {
       const vertices = points ? points.slice(1, -1) : [...incoming.vertices, ...outgoing.vertices];
       if (vertices.length > 100) throw new Error('合并后的管路折点超过 100 个，请先清除部分折点再删除三通。');
       result.edges.push({ ...incoming, target: outgoing.target, vertices });
+      const mounted = result.nodes.filter(n => [incoming.id, outgoing.id].includes(n.mount?.edgeId));
       const attached = result.labels.filter(l => [incoming.id, outgoing.id].includes(l.edgeId));
-      if (attached.length) {
+      if (attached.length || mounted.length) {
         if (!points) throw new Error('无法计算管路状态点位置，请等待图纸更新后重试。');
         const length = path => path.slice(1).reduce((sum, p, i) => sum + Math.hypot(p[0] - path[i][0], p[1] - path[i][1]), 0);
         const first = length(a), total = first + length(b);
@@ -213,12 +233,18 @@ export function deleteSelection(document, selection, routes = new Map()) {
           label.at = total ? (label.edgeId === incoming.id ? label.at * first : first + label.at * (total - first)) / total : 0;
           label.edgeId = incoming.id;
         }
+        for (const node of mounted) {
+          const mount = node.mount;
+          mount.at = total ? (mount.edgeId === incoming.id ? mount.at * first : first + mount.at * (total - first)) / total : 0;
+          mount.edgeId = incoming.id;
+        }
       }
       if (points) routes.set(incoming.id, points);
     }
   }
   result.junctions = result.junctions.filter(j => !removing('junction', j.id));
   const remaining = new Set(result.edges.map(e => e.id));
+  for (const node of result.nodes) if (node.mount && !remaining.has(node.mount.edgeId)) delete node.mount;
   result.labels = result.labels.filter(l => !l.edgeId || remaining.has(l.edgeId));
   return result;
 }
@@ -234,6 +260,9 @@ function reversePipe(document, edge, points) {
   if (vertices.length > 100) throw new Error('反向后的管路折点超过 100 个，请先清除部分折点。');
   [edge.source, edge.target] = [edge.target, edge.source]; edge.vertices = vertices;
   for (const label of document.labels) if (label.edgeId === edge.id) label.at = 1 - label.at;
+  for (const node of document.nodes) if (node.mount?.edgeId === edge.id) {
+    node.mount.at = 1 - node.mount.at; node.mount.reverse = !node.mount.reverse;
+  }
 }
 
 export function editSelectedEdges(document, selection, action, routes = new Map()) {

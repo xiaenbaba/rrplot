@@ -5,7 +5,7 @@ import json
 from functools import lru_cache
 
 import matplotlib as mpl
-from matplotlib.patches import Circle
+from matplotlib.patches import Circle, Rectangle
 from matplotlib.transforms import Affine2D
 
 from .core import Diagram
@@ -35,7 +35,7 @@ def resolve_for_editor(document):
         node["geometry"]["image"] = _glyph(
             node["type"], json.dumps(node["params"], sort_keys=True))
     result["fontFamily"] = ", ".join(FONT_STACK)
-    result["features"] = ["edgeLabels"]
+    result["features"] = ["edgeLabels", "pipeMounts"]
     return result
 
 
@@ -66,6 +66,8 @@ def build_scene(document):
     diagram = Diagram(width=d["page"]["width"], height=d["page"]["height"])
     try:
         for node in resolved["nodes"]:
+            if node.get("mount"):
+                continue
             part = make_registered(node["type"], node["params"])
             diagram.add(_rotated(part, node["rotation"]), None,
                         loc=(node["x"], node["y"]))
@@ -76,6 +78,26 @@ def build_scene(document):
                          lw=edge["width"], color=edge["color"],
                          linestyle=edge["linestyle"])
         diagram.render()
+        # Accessories sit above their parent pipe in both editor and exports.
+        # An opaque body mask removes the pipe and arrow beneath the symbol.
+        for node in resolved["nodes"]:
+            if not node.get("mount"):
+                continue
+            x, y = node["x"], node["y"]
+            p = node["params"]
+            w, h = (2*p["r"], 2*p["r"]) if "r" in p else (p["w"], p["h"])
+            transform = Affine2D().rotate_deg_around(x, y, node["rotation"])
+            mask = Rectangle((x-w/2, y-h/2), w, h, facecolor="white",
+                             edgecolor="none", zorder=8,
+                             transform=transform + diagram.ax.transData)
+            diagram.ax.add_patch(mask)
+            lines, patches = len(diagram.ax.lines), len(diagram.ax.patches)
+            _rotated(make_registered(node["type"], p), node["rotation"]).draw(
+                diagram.ax, x, y, label=None)
+            artists = (list(diagram.ax.lines)[lines:]
+                       + list(diagram.ax.patches)[patches:])
+            for artist in artists:
+                artist.set_zorder(9)
         for junction in d["junctions"]:
             diagram.ax.add_patch(Circle((junction["x"], junction["y"]), 4,
                                         facecolor="#111111", edgecolor="none",

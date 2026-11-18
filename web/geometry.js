@@ -215,3 +215,57 @@ export function splitRoute(points, fraction = .5) {
     suffix: [point, ...points.slice(index + 1, -1)],
   };
 }
+
+/* Pipe accessories keep the parent pipe intact. No hydraulic calculations. */
+
+export const MOUNT_TYPES = ['expansion_valve', 'globe_valve', 'solenoid_valve', 'check_valve', 'filter', 'capillary', 'muffler'];
+export function canMount(document, node) {
+  return MOUNT_TYPES.includes(node?.type) && !document.edges.some(edge =>
+    [edge.source, edge.target].some(ref => ref.nodeId === node.id));
+}
+export function mountPose(node, geometry, points, mount = node.mount) {
+  const info = along(points, mount.at);
+  if (!info.length) throw new Error('管路长度为零，无法挂接阀件。');
+  const a = geometry.ports.in.point, b = geometry.ports.out.point;
+  const native = Math.atan2(b[1] - a[1], b[0] - a[0]) * 180 / Math.PI;
+  const tangent = Math.atan2(info.direction[1], info.direction[0]) * 180 / Math.PI;
+  return { x: info.point[0], y: info.point[1],
+    rotation: ((Math.round((tangent - native) / 90) * 90 + (mount.reverse ? 180 : 0)) % 360 + 360) % 360 };
+}
+export function mountedNodes(document, nodes) {
+  if (!nodes.some(node => node.mount)) return nodes;
+  const routes = new Map(document.edges.map(edge => [edge.id, route(
+    endpoint(edge.source, nodes, document.junctions), endpoint(edge.target, nodes, document.junctions), edge.vertices)]));
+  return nodes.map(node => node.mount ? { ...node, ...mountPose(node, node.geometry, routes.get(node.mount.edgeId)) } : node);
+}
+export function mountNode(document, nodeId, edgeId, at = .5, reverse = false) {
+  const node = document.nodes.find(node => node.id === nodeId);
+  if (!node || !canMount(document, node)) throw new Error('该设备不支持挂接，或已接有独立管路；请先调整相连管路。');
+  if (!document.edges.some(edge => edge.id === edgeId)) throw new Error('挂接管路不存在。');
+  if (!Number.isFinite(at) || at < 0 || at > 1) throw new Error('挂接位置须为 0～100%。');
+  node.mount = { edgeId, at, reverse: !!reverse };
+}
+export function detachNode(node, resolved) {
+  if (!node.mount) return;
+  Object.assign(node, { x: resolved.x, y: resolved.y, rotation: resolved.rotation });
+  delete node.mount;
+}
+export function nearestMount(document, node, nodes, point, matrix = null, tolerance = 18) {
+  if (!canMount(document, node)) return null;
+  let best = null;
+  for (const edge of document.edges) {
+    const points = route(endpoint(edge.source, nodes, document.junctions), endpoint(edge.target, nodes, document.junctions), edge.vertices);
+    const projected = projectOnRoute(points, point, matrix);
+    if (projected.distance > tolerance || (best && projected.distance >= best.distance)) continue;
+    if (along(points, projected.at).length < 1) continue;
+    best = { edgeId: edge.id, ...projected };
+  }
+  return best;
+}
+export function splitMounts(document, edgeId, nextId, fraction) {
+  for (const node of document.nodes) {
+    if (node.mount?.edgeId !== edgeId) continue;
+    if (node.mount.at <= fraction) node.mount.at /= fraction;
+    else { node.mount.at = (node.mount.at - fraction) / (1 - fraction); node.mount.edgeId = nextId; }
+  }
+}

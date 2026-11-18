@@ -18,7 +18,7 @@ export function objectIndex(document, catalog = []) {
         : kind === 'label' ? item.text || '空文字' : item.id;
       const parent = kind === 'label' ? nodes.get(item.nodeId) : null;
       const pipe = kind === 'label' ? edges.get(item.edgeId) : null;
-      const detail = kind === 'node' ? `${names.get(item.type) || item.type} · ${item.type}` : parent ? `附着设备：${parent.title || parent.id}`
+      const detail = kind === 'node' ? `${names.get(item.type) || item.type} · ${item.type}${item.mount ? ' · 挂接管路：' + item.mount.edgeId : ''}` : parent ? `附着设备：${parent.title || parent.id}`
         : pipe ? `附着管路：${pipe.id}` : kind === 'label' ? '独立文字' : type;
       result.push({ kind, id: item.id, type, title, detail,
         search: normalized([type, title, item.id, detail, parent?.id,

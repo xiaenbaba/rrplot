@@ -106,6 +106,30 @@ def test_legacy_fan_coil_resolves_to_editable_heat_exchanger(service):
     assert changed["edges"][0]["points"] == result["edges"][0]["points"]
 
 
+def test_pipe_mount_resolve_reopen_export_and_invalid_parent(service):
+    document = dict(schemaVersion=1, page=dict(width=800, height=600),
+                    nodes=[dict(id="valve", type="globe_valve", x=0, y=0,
+                                mount=dict(edgeId="pipe", at=.4))],
+                    junctions=[dict(id="a", x=100, y=200),
+                               dict(id="b", x=600, y=200)],
+                    edges=[dict(id="pipe", source=dict(junctionId="a"),
+                                target=dict(junctionId="b"))])
+    status, _, data = post(service, "/api/resolve", dict(document=document))
+    assert status == 200
+    result = json.loads(data)
+    assert "pipeMounts" in result["features"]
+    valve = result["document"]["nodes"][0]
+    assert [valve["x"], valve["y"]] == [300, 200]
+    assert post(service, "/api/resolve", dict(document=result["document"]))[0] == 200
+    for fmt, signature in (("svg", b"<?xml"), ("png", b"\x89PNG"),
+                           ("pdf", b"%PDF")):
+        status, _, data = post(service, "/api/export/" + fmt, dict(document=document))
+        assert status == 200 and data.startswith(signature)
+    document["nodes"][0]["mount"]["edgeId"] = "missing"
+    status, _, data = post(service, "/api/resolve", dict(document=document))
+    assert status == 400 and json.loads(data)["error"]
+
+
 @pytest.mark.parametrize("name", list(TEMPLATES))
 def test_template_edit_reopen_preview_and_exports(service, name):
     document = json.loads(request(service, "/api/templates/" + name)[2])
