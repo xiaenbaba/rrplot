@@ -187,19 +187,26 @@ Linux 装 ``fonts-noto-cjk``。详见 README 的"字体"一节。
    * - ``solenoid_valve``
      - ``in`` ``out``
      - 电磁阀:圆体 + 圆内 X + 电磁横杠
+       工厂参数 ``style="bowtie"`` 改为对顶三角 + 横杆 + Σ 折线,
+       默认 ``style="circle_x"``;两侧接管及 ``in/out`` 端口保持不变。
+       Web/场景出图的对顶三角执行机构保持水平朝上、竖直朝右。
    * - ``expansion_valve_eng``
      - ``in`` ``out``
      - 电子膨胀阀工程画法:圆体 + 圆内 X(无执行机构)
    * - ``expansion_valve_x``
      - ``in`` ``out``
      - 膨胀阀圆 + 内接 X,端口在圆周,``orient="h"/"v"`` 水平/竖直通用
+       工厂参数 ``style="dome"`` 改为对顶三角 + 闭合半圆穹顶,
+       默认 ``style="circle_x"``;端口不变。Web/场景出图按最终连接方向
+       保持穹顶水平朝上、竖直朝右,不随挂接反向翻转。
    * - ``bowtie_valve`` 系
      - ``in`` ``out``
      - 对顶三角阀;``bowtie_valve_dome`` 穹顶 / ``bowtie_valve_solenoid``
        电磁 / ``tee`` T 形截止阀
    * - ``check_valve`` / ``check_valve_w``
      - ``in`` ``out``
-     - 单向阀:实心三角 + 尖端挡条,``_w`` 为反向实例
+     - 单向阀:三角 + 尖端挡条,``_w`` 为反向实例;工厂参数
+       ``style="hollow"`` 为空心黑框,默认 ``"solid"`` 保持实心
    * - ``line_filter`` (兼容名 ``filter``)
      - ``in`` ``out``
      - 过滤器:矩形 + 菱形网格。``filter`` 会覆盖 Python 内置名

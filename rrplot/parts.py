@@ -178,21 +178,29 @@ def _expansion_valve_eng(ax, x, y, label=None, r=34, **kw):
 
 
 def _check_valve(ax, x, y, label=None, w=56, h=32, stub=12, point="e",
-                 **kw):
-    """单向阀(止回阀):实心三角指向流通方向 + 尖端挡条 + 贯穿接管。
+                 style="solid", **kw):
+    """单向阀(止回阀):三角指向流通方向 + 尖端挡条 + 接管。
 
     point: "e" 三角指向东(默认,流西→东);"w" 三角指向西(流东→西)。
-    三角实心填充,挡条为竖直短棒,横管贯穿整个符号。
+    style: "solid" 黑色实心(默认);"hollow" 空心黑框,接管不穿过阀体。
     """
     if point not in ("e", "w"):
         raise ValueError(f"未知 point={point!r},可用:'e' / 'w'")
+    if style not in ("solid", "hollow"):
+        raise ValueError(f"未知 style={style!r},可用:'solid' / 'hollow'")
     s = 1 if point == "e" else -1
     ax.add_patch(Polygon([(x - s * w / 2, y - h / 2),
                           (x - s * w / 2, y + h / 2),
                           (x + s * w / 2, y)], closed=True,
-                         facecolor=LINE, edgecolor=LINE, lw=LW_PART))
-    line(ax, [(x - s * (w / 2 + stub), y), (x + s * (w / 2 + stub), y)],
-         lw=LW_STRONG)                                   # 贯穿接管
+                         facecolor=LINE if style == "solid" else FILL,
+                         edgecolor=LINE, lw=LW_PART))
+    if style == "solid":
+        line(ax, [(x - s * (w / 2 + stub), y),
+                  (x + s * (w / 2 + stub), y)], lw=LW_STRONG)
+    else:
+        for end in (-1, 1):
+            line(ax, [(x + end * (w / 2 + stub), y),
+                      (x + end * w / 2, y)], lw=LW_STRONG)
     line(ax, [(x + s * w / 2, y - 0.275 * h), (x + s * w / 2, y + 0.275 * h)],
          lw=LW_STRONG)                                   # 尖端挡条
     if label:
@@ -463,13 +471,28 @@ def make_globe_valve(w=64, h=48, stem=26, handle=44, name="截止阀"):
 globe_valve = make_globe_valve()
 
 
-def make_solenoid_valve(r=34, stem=20, handle=40, name="电磁阀"):
+def make_solenoid_valve(r=34, stem=20, handle=40, name="电磁阀",
+                         style="circle_x"):
     """电磁阀部件:圆体 + 圆内 X + 顶部电磁引线与横杠。端口 in/out。
 
     端口落在圆左右接管外端,沿水平方向(in=w, out=e)。
+    style="bowtie" 改为对顶三角 + 横杆 + Σ 折线,保留尺寸与端口。
     """
+    if style not in ("circle_x", "bowtie"):
+        raise ValueError(f"未知 style={style!r},可用:'circle_x' / 'bowtie'")
+
     def draw(ax, x, y, label=None, **kw):
-        _solenoid_valve(ax, x, y, label=label, r=r, stem=stem, handle=handle)
+        if style == "bowtie":
+            _bowtie_valve(ax, x, y, w=2*r, h=1.2*r, actuator="solenoid",
+                          sol_len=r+stem, sol_bar=r, sol_width=handle,
+                          sol_rise=0.65*stem)
+            for side in (-1, 1):
+                line(ax, [(x + side*r, y), (x + side*(r+12), y)],
+                     lw=LW_STRONG)
+            if label:
+                txt(ax, x, y + r + 26, label)
+        else:
+            _solenoid_valve(ax, x, y, label=label, r=r, stem=stem, handle=handle)
 
     return Part(name, draw,
                 {"in": (-r - 12, 0), "out": (r + 12, 0)},
@@ -495,23 +518,43 @@ def make_expansion_valve_eng(r=34, name="电子膨胀阀"):
 expansion_valve_eng = make_expansion_valve_eng()
 
 
-def make_expansion_valve_x(r=10, orient="h", name="膨胀阀(圆X)"):
-    """膨胀阀部件(圆 + 内接 X,参考图叠画法,圆周上无接管短管)。
+def make_expansion_valve_x(r=10, orient="h", name="膨胀阀(圆X)",
+                           style="circle_x"):
+    """膨胀阀部件,默认圆 + 内接 X,端口无接管短管。
 
     圆体与内接 X 旋转对称,水平/竖直管路通用;端口落在圆周上,
     管线分两段接入。orient="h" 时 in 西口/out 东口(流向西→东),
     orient="v" 时 in 顶口/out 底口(流向自上而下)。
+    style="dome" 复用对顶三角 + 闭合半圆穹顶,阀体半宽为 r;
+    竖直连接时整体顺时针转 90 度,穹顶在右侧。切换样式不改变端口。
     """
     if orient not in ("h", "v"):
         raise ValueError(f"未知 orient={orient!r},可用:'h' / 'v'")
+    if style not in ("circle_x", "dome"):
+        raise ValueError(f"未知 style={style!r},可用:'circle_x' / 'dome'")
 
     def draw(ax, x, y, label=None, **kw):
-        ax.add_patch(Circle((x, y), r, facecolor=FILL, edgecolor=LINE,
-                            lw=LW_OUTLINE))
-        c = 0.72 * r
-        for s in (-1, 1):
-            line(ax, [(x - c, y - s * c), (x + c, y + s * c)],
-                 lw=LW_PART)
+        if style == "dome":
+            before_lines, before_patches = len(ax.lines), len(ax.patches)
+            _bowtie_valve(ax, x, y, w=2 * r, h=1.2 * r, actuator="dome",
+                          stem=0.5 * r, dome_r=0.55 * r)
+            if orient == "v":
+                # 旋转实际坐标,让场景外层旋转仍能正确叠加。
+                for patch in list(ax.patches)[before_patches:]:
+                    points = patch.get_xy()
+                    patch.set_xy(np.column_stack((x - (points[:, 1] - y),
+                                                   y + (points[:, 0] - x))))
+                for artist in list(ax.lines)[before_lines:]:
+                    xs = np.asarray(artist.get_xdata())
+                    ys = np.asarray(artist.get_ydata())
+                    artist.set_data(x - (ys - y), y + (xs - x))
+        else:
+            ax.add_patch(Circle((x, y), r, facecolor=FILL, edgecolor=LINE,
+                                lw=LW_OUTLINE))
+            c = 0.72 * r
+            for s in (-1, 1):
+                line(ax, [(x - c, y - s * c), (x + c, y + s * c)],
+                     lw=LW_PART)
         if label:
             txt(ax, x, y + r + 24, label)
 
@@ -527,19 +570,24 @@ def make_expansion_valve_x(r=10, orient="h", name="膨胀阀(圆X)"):
 expansion_valve_x = make_expansion_valve_x()
 
 
-def make_check_valve(w=56, h=32, stub=12, point="e", name="单向阀"):
-    """单向阀部件:实心三角 + 尖端挡条,point 见 _check_valve。
+def make_check_valve(w=56, h=32, stub=12, point="e", name="单向阀",
+                     style="solid"):
+    """单向阀部件:三角 + 尖端挡条,point 见 _check_valve。
 
-    端口在贯穿接管两端:point="e" 时 in=西口 / out=东口,
+    端口在两侧接管端点:point="e" 时 in=西口 / out=东口,
     point="w" 时反向;也可 add() 后用法不变。
+    style="solid" 为原实心样式,"hollow" 为空心黑框;端口与尺寸不变。
     """
     if point not in ("e", "w"):
         raise ValueError(f"未知 point={point!r},可用:'e' / 'w'")
+    if style not in ("solid", "hollow"):
+        raise ValueError(f"未知 style={style!r},可用:'solid' / 'hollow'")
     s = 1 if point == "e" else -1
     xin = -s * (w / 2 + stub)
 
     def draw(ax, x, y, label=None, **kw):
-        _check_valve(ax, x, y, label=label, w=w, h=h, stub=stub, point=point)
+        _check_valve(ax, x, y, label=label, w=w, h=h, stub=stub, point=point,
+                     style=style)
 
     return Part(name, draw,
                 {"in": (xin, 0), "out": (-xin, 0)},
@@ -571,7 +619,8 @@ BOWTIE_ACTUATORS = ("none", "dome", "solenoid", "tee")
 
 
 def _bowtie_valve(ax, x, y, label=None, w=76, h=44, actuator="none",
-                  stem=14, dome_r=21, sol_len=62, handle=30, **kw):
+                  stem=14, dome_r=21, sol_len=62, handle=30,
+                  sol_bar=26, sol_width=48, sol_rise=20, **kw):
     """对顶三角阀(参考图画法):两竖边三角相对,阀杆自中心引出。
 
     actuator: "none"     裸阀(通用截断阀符号)
@@ -596,9 +645,11 @@ def _bowtie_valve(ax, x, y, label=None, w=76, h=44, actuator="none",
         line(ax, pts + [(x + dome_r, base)], lw=LW_PART)      # 闭合平底
     elif actuator == "solenoid":
         line(ax, [(x, y), (x, y - sol_len)], lw=LW_PART)           # 阀杆
-        bar = y - 26
-        line(ax, [(x - 26, bar), (x + 22, bar)], lw=LW_PART)       # 线圈横杆
-        line(ax, [(x - 26, bar), (x - 7, bar - 20), (x + 8, bar - 20)],
+        bar = y - sol_bar
+        left, right = x - sol_width*26/48, x + sol_width*22/48
+        line(ax, [(left, bar), (right, bar)], lw=LW_PART)        # 线圈横杆
+        line(ax, [(left, bar), (x - sol_width*7/48, bar - sol_rise),
+                  (x + sol_width*8/48, bar - sol_rise)],
              lw=LW_PART)                                           # Σ 折线
     elif actuator == "tee":
         top = y - h / 2 - stem

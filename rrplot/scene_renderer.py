@@ -60,6 +60,18 @@ def _rotated(part, angle):
     return Part(part.name, draw, {})
 
 
+def _node_part(node):
+    """只校正阀顶执行机构朝向,保留场景端口、挂接及标签旋转。"""
+    params = node["params"]
+    angle = node["rotation"]
+    if node["type"] == "expansion_valve" and params["style"] == "dome":
+        if (angle + (90 if params["orient"] == "v" else 0)) % 360 >= 180:
+            angle = (angle + 180) % 360
+    elif node["type"] == "solenoid_valve" and params["style"] == "bowtie":
+        angle %= 180
+    return _rotated(make_registered(node["type"], params), angle)
+
+
 def build_scene(document):
     resolved = resolve_scene(document)
     d = resolved["document"]
@@ -68,8 +80,7 @@ def build_scene(document):
         for node in resolved["nodes"]:
             if node.get("mount"):
                 continue
-            part = make_registered(node["type"], node["params"])
-            diagram.add(_rotated(part, node["rotation"]), None,
+            diagram.add(_node_part(node), None,
                         loc=(node["x"], node["y"]))
         for edge in resolved["edges"]:
             points = edge["points"]
@@ -92,8 +103,7 @@ def build_scene(document):
                              transform=transform + diagram.ax.transData)
             diagram.ax.add_patch(mask)
             lines, patches = len(diagram.ax.lines), len(diagram.ax.patches)
-            _rotated(make_registered(node["type"], p), node["rotation"]).draw(
-                diagram.ax, x, y, label=None)
+            _node_part(node).draw(diagram.ax, x, y, label=None)
             artists = (list(diagram.ax.lines)[lines:]
                        + list(diagram.ax.patches)[patches:])
             for artist in artists:

@@ -38,8 +38,11 @@ REGISTRY = {
         "stub": number("左右接管长度", 0, 0, 100)}),
     "expansion_valve": dict(label="膨胀阀", factory=parts.make_expansion_valve_x,
                             fields={
-        "r": number("半径", 10, 4, 80),
-        "orient": choice("连接方向", "v", ["h", "v"])}),
+        "r": number("阀体半径 / 半宽", 10, 4, 80),
+        "orient": choice("连接方向", "v", ["h", "v"]),
+        "style": dict(choice("阀体样式", "circle_x", ["circle_x", "dome"]),
+                      optionLabels={"circle_x": "圆圈 X",
+                                    "dome": "对顶三角＋半圆穹顶"})}),
     "vessel": dict(label="闪蒸罐", factory=parts.make_vessel, fields={
         "w": number("宽度", 66, 16, 300),
         "h": number("高度", 130, 20, 600),
@@ -67,14 +70,19 @@ REGISTRY = {
         "handle": number("手轮宽度", 28, 8, 240)}),
     "solenoid_valve": dict(label="电磁阀",
                            factory=parts.make_solenoid_valve, fields={
-        "r": number("半径", 16, 6, 120),
+        "r": number("阀体半径 / 半宽", 16, 6, 120),
         "stem": number("引线长度", 12, 4, 100),
-        "handle": number("线圈横杠宽度", 26, 8, 240)}),
+        "handle": number("线圈横杠宽度", 26, 8, 240),
+        "style": dict(choice("阀体样式", "circle_x", ["circle_x", "bowtie"]),
+                      optionLabels={"circle_x": "圆圈 X＋横杆",
+                                    "bowtie": "对顶三角＋横杆＋Σ 折线"})}),
     "check_valve": dict(label="单向阀", factory=parts.make_check_valve, fields={
         "w": number("阀体宽度", 40, 16, 300),
         "h": number("阀体高度", 24, 12, 180),
         "stub": number("接管长度", 10, 4, 100),
-        "point": choice("流通方向（e 右 / w 左）", "e", ["e", "w"])}),
+        "point": choice("流通方向（e 右 / w 左）", "e", ["e", "w"]),
+        "style": dict(choice("阀体样式", "solid", ["solid", "hollow"]),
+                      optionLabels={"solid": "黑色实心", "hollow": "空心黑框"})}),
     "filter": dict(label="过滤器", factory=parts.make_filter, fields={
         "w": number("宽度", 48, 16, 300),
         "h": number("高度", 26, 12, 180),
@@ -160,13 +168,25 @@ def describe(kind, params):
     else:
         w, h = params["w"], params["h"]
     left, top, right, bottom = -w / 2, -h / 2, w / 2, h / 2
-    if kind == "separator_utube":
+    if kind == "expansion_valve" and params["style"] == "dome":
+        if params["orient"] == "h":
+            top = -1.65 * params["r"]
+            bottom = -top
+        else:
+            right = 1.65 * params["r"]
+            left = -right
+    elif kind == "separator_utube":
         top -= params["stub"]
     elif kind == "four_way_valve" and params["mark"]:
         left -= 30
         right += 30
         top -= 30
         bottom += 30
+    elif kind == "solenoid_valve" and params["style"] == "bowtie":
+        extent = max(params["r"] + 12, params["handle"] * 26/48)
+        left, right = -extent, extent
+        top = -params["r"] - params["stem"]
+        bottom = -top
     elif kind in ("globe_valve", "solenoid_valve"):
         left = min(left - 12, -params["handle"] / 2)
         right = max(right + 12, params["handle"] / 2)

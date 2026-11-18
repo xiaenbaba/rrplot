@@ -1,4 +1,4 @@
-import { rotate, endpoint, route, along, nearestSegment, splitRoute, translateDocument, layoutPage, fitViewport, editableSegments, moveSegment, transformedBox, selectInBox, projectOnRoute, MOUNT_TYPES, canMount, mountNode, detachNode, mountedNodes, nearestMount, splitMounts } from './geometry.js';
+import { rotate, endpoint, route, along, nearestSegment, splitRoute, translateDocument, layoutPage, fitViewport, editableSegments, moveSegment, transformedBox, selectInBox, projectOnRoute, MOUNT_TYPES, glyphRotation, canMount, mountNode, detachNode, mountedNodes, nearestMount, splitMounts } from './geometry.js';
 import { copySelection, captureSelection, pasteFragment, deleteSelection, translateSelection, moveContents, connectedSelection, editSelectedEdges, splitEdgeLabels, reconnectEdge, nudgeSelection } from './document.js';
 import { inspectDiagram } from './checks.js';
 import { objectIndex, filterObjects } from './objects.js';
@@ -741,7 +741,8 @@ function renderCanvas() {
     shape('title', {}, g).textContent = n.title;
     if (n.mount) shape('rect', { x: -(n.params.w || 2*n.params.r)/2, y: -(n.params.h || 2*n.params.r)/2,
       width: n.params.w || 2*n.params.r, height: n.params.h || 2*n.params.r, fill: '#fff', 'pointer-events': 'none' }, g);
-    shape('image', { x, y, width: w, height: h, href: n.geometry.image, class: 'node-image' }, g);
+    shape('image', { x, y, width: w, height: h, href: n.geometry.image, class: 'node-image',
+      transform: `rotate(${glyphRotation(n)})` }, g);
     shape('rect', { x: x - 3, y: y - 3, width: w + 6, height: h + 6, rx: 2, class: 'node-hit' }, g);
     const seen = new Set();
     if (n.mount) continue;
@@ -950,10 +951,12 @@ function renderInspector() {
     }
     if (MOUNT_TYPES.includes(item.type)) renderMountFields(root, item);
     root.append(html('div', '图元参数', 'section-label'));
+    if (item.type === 'solenoid_valve') root.append(html('p', '阀体样式可选圆圈 X＋横杆或对顶三角＋横杆＋Σ 折线。切换保持端口与挂接；对顶三角样式的执行机构保持水平朝上、竖直朝右，不随反向挂接翻转。', 'muted'));
+    if (item.type === 'expansion_valve') root.append(html('p', '阀体样式可选圆圈 X 或对顶三角＋半圆穹顶，切换保持端口与挂接。穹顶按画布连接方向自动保持水平朝上、竖直朝右，不随管路反向翻到另一侧。', 'muted'));
     const entry = catalog.find(c => c.type === item.type);
     for (const [key, f] of Object.entries(entry.fields)) field(root, f.label, item.params[key], v => { item.params[key] = v; }, f);
     if (item.type === 'four_way_valve') root.append(html('p', 'D / exhaust：排气；S / suction：回气；C / condenser、E / evaporator：两侧换热器。端口随旋转移动，图元只表示接管关系。', 'muted'));
-    if (item.type === 'check_valve') root.append(html('p', '三角尖端指向 out；改变流通方向会交换 in/out 的位置，已有管路继续按端口 ID 跟随。', 'muted'));
+    if (item.type === 'check_valve') root.append(html('p', '阀体样式可选黑色实心或空心黑框，切换样式保持端口与挂接。三角尖端指向 out；改变流通方向会交换 in/out 的位置，已有管路继续按端口 ID 跟随。', 'muted'));
     inspectorButton(root, '添加设备标签', () => edit(() => {
       const id = uid('label'); doc.labels.push({ id, nodeId: item.id, x: 0, y: 70, text: item.title, size: 15, ha: 'center', boxed: true, color: '#111111' }); setSelection('label', id);
     }));

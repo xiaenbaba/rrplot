@@ -219,6 +219,13 @@ export function splitRoute(points, fraction = .5) {
 /* Pipe accessories keep the parent pipe intact. No hydraulic calculations. */
 
 export const MOUNT_TYPES = ['expansion_valve', 'globe_valve', 'solenoid_valve', 'check_valve', 'filter', 'capillary', 'muffler'];
+export function glyphRotation(node) {
+  if (node.type === 'solenoid_valve' && node.params?.style === 'bowtie')
+    return (node.rotation || 0) % 360 >= 180 ? 180 : 0;
+  if (node.type !== 'expansion_valve' || node.params?.style !== 'dome') return 0;
+  const angle = ((node.rotation || 0) + (node.params.orient === 'v' ? 90 : 0)) % 360;
+  return angle >= 180 ? 180 : 0;
+}
 export function canMount(document, node) {
   return MOUNT_TYPES.includes(node?.type) && !document.edges.some(edge =>
     [edge.source, edge.target].some(ref => ref.nodeId === node.id));
