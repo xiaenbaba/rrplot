@@ -280,26 +280,27 @@ def _capillary(ax, x, y, label="毛细管", w=18, h=80, n=5, **kw):
         txt(ax, x + w / 2 + 18, y, label, ha="left", boxed=True)
 
 
-HEX_SHAPES = ("rect_diag", "rect_x", "rect_zigzag7")
+HEX_SHAPES = ("rect_diag", "rect_x", "rect_zigzag7", "fan_coil")
 
 
 # =========================
 # 按尺寸生成端口的部件工厂
 # =========================
 def make_heat_exchanger(w=80, h=80, shape="rect_zigzag7", orient="h",
-                        name="冷凝器"):
-    """换热器部件(蒸发器/冷凝器通用):矩形外壳 + 3 种换热面画法。
+                        name="冷凝器", stub=0):
+    """换热器部件(蒸发器/冷凝器通用):矩形外壳 + 4 种换热面画法。
 
     :param shape: 取值 ``HEX_SHAPES`` 之一:
 
       - ``rect_diag`` 矩形外壳 + 左上→右下对角线(简化符号)
       - ``rect_x`` 矩形外壳 + 两条对角线交叉(X 形换热面)
       - ``rect_zigzag7`` 矩形外壳 + 7 点之字盘管
+      - ``fan_coil`` 矩形外壳 + 风机和盘管(室内机)
 
     :param orient: 之字盘管走向,"h" 左口→右口水平(默认),
         "v" 顶口→底口竖直(对角线与 X 旋转对称,不受影响)。
 
-    端口落在四边中点。
+    左右端口可通过 stub 增加接管，顶部/底部端口落在边中点。
     """
     if shape not in HEX_SHAPES:
         raise ValueError(f"未知换热器 shape={shape!r},可用:"
@@ -307,7 +308,7 @@ def make_heat_exchanger(w=80, h=80, shape="rect_zigzag7", orient="h",
     if orient not in ("h", "v"):
         raise ValueError(f"未知 orient={orient!r},可用:'h' / 'v'")
     rx, ry = w / 2, h / 2
-    ports = {"left": (-rx, 0), "right": (rx, 0),
+    ports = {"left": (-rx - stub, 0), "right": (rx + stub, 0),
              "top": (0, -ry), "bottom": (0, ry)}
     dirs = {"top": "n", "bottom": "s"}
 
@@ -320,6 +321,21 @@ def make_heat_exchanger(w=80, h=80, shape="rect_zigzag7", orient="h",
             for s in (-1, 1):
                 line(ax, [(x - rx, y - s * ry), (x + rx, y + s * ry)],
                      lw=LW_OUTLINE)
+        elif shape == "fan_coil":
+            cx = x - w * 0.32
+            radius = min(w * 0.13, h * 0.28)
+            ax.add_patch(Circle((cx, y), radius, facecolor=FILL,
+                                edgecolor=LINE, lw=LW_FINE))
+            for angle in (0, 120, 240):
+                points = [(cx, y)] + [
+                    (cx + radius * 0.85 * math.cos(math.radians(angle + a)),
+                     y + radius * 0.85 * math.sin(math.radians(angle + a)))
+                    for a in (0, 55)]
+                ax.add_patch(Polygon(points, facecolor=FILL, edgecolor=LINE,
+                                     lw=LW_FINE))
+            for dy in (-0.28 * h, 0, 0.28 * h):
+                line(ax, [(x - 0.08 * w, y + dy), (x + 0.40 * w, y + dy)],
+                     lw=LW_PART)
         elif orient == "v":
             # 之字盘管(竖):顶口中点起笔,底口中点收笔,折点左右交替
             amp = rx * 0.42
@@ -338,6 +354,9 @@ def make_heat_exchanger(w=80, h=80, shape="rect_zigzag7", orient="h",
                 pts.append((xi, y - amp if i % 2 == 0 else y + amp))
             pts.append((x + rx, y))
             line(ax, pts, lw=LW_OUTLINE)
+        if stub:
+            line(ax, [(x - rx - stub, y), (x - rx, y)], lw=LW_PART)
+            line(ax, [(x + rx, y), (x + rx + stub, y)], lw=LW_PART)
         if label:
             txt(ax, x, y + ry + 26, label, boxed=True)
 
@@ -664,6 +683,63 @@ def make_oil_separator(w=64, h=176, stub=16, name="油分离器"):
 
 
 oil_separator = make_oil_separator()
+
+
+def make_capillary(w=18, h=80, n=5, name="毛细管"):
+    """可调尺寸毛细管，in 顶部、out 底部；端口随高度变化。"""
+    if isinstance(n, bool) or not isinstance(n, int) or n < 1:
+        raise ValueError("毛细管圈数必须为正整数")
+
+    def draw(ax, x, y, label=None, **kw):
+        _capillary(ax, x, y, label=label, w=w, h=h, n=n)
+
+    return Part(name, draw, {"in": (0, -h / 2), "out": (0, h / 2)},
+                {"in": "n", "out": "s"})
+
+
+def make_fan_coil(w=120, h=64, stub=12, name="室内风机盘管"):
+    """旧 Python 接口：复用换热器 fan_coil 样式，保留 in/out 端口。"""
+    part = make_heat_exchanger(w=w, h=h, shape="fan_coil", stub=stub, name=name)
+
+    def draw(ax, x, y, label=None, **kw):
+        part.draw(ax, x, y, label=None)
+        if label:
+            txt(ax, x, y + h / 2 + 24, label)
+
+    return Part(name, draw,
+                {"in": part.port("left"), "out": part.port("right")},
+                {"in": "w", "out": "e"})
+
+
+def make_muffler(w=36, h=72, stub=12, name="消音器"):
+    """消音器：矩形壳体，in 顶部、out 底部。"""
+    def draw(ax, x, y, label=None, **kw):
+        ax.add_patch(Rectangle((x - w / 2, y - h / 2), w, h,
+                               facecolor=FILL, edgecolor=LINE, lw=LW_PART))
+        line(ax, [(x, y - h / 2 - stub), (x, y - h / 2)], lw=LW_PART)
+        line(ax, [(x, y + h / 2), (x, y + h / 2 + stub)], lw=LW_PART)
+        if label:
+            txt(ax, x + w / 2 + 18, y, label, ha="left")
+
+    return Part(name, draw,
+                {"in": (0, -h / 2 - stub), "out": (0, h / 2 + stub)},
+                {"in": "n", "out": "s"})
+
+
+def make_sensor(r=14, stub=12, mark="T", name="温度/压力传感器"):
+    """圆圈 T/P 测点，单个底部 tap 口接测量支路，不表示贯通流道。"""
+    if mark not in ("T", "P"):
+        raise ValueError("传感器标记仅支持 T 或 P")
+
+    def draw(ax, x, y, label=None, **kw):
+        ax.add_patch(Circle((x, y), r, facecolor=FILL,
+                            edgecolor=LINE, lw=LW_PART))
+        txt(ax, x, y, mark, size=0.65 * r)
+        line(ax, [(x, y + r), (x, y + r + stub)], lw=LW_PART)
+        if label:
+            txt(ax, x + r + 18, y, label, ha="left")
+
+    return Part(name, draw, {"tap": (0, r + stub)}, {"tap": "s"})
 
 
 def make_intermediate_hex(w=190, h=80, drop=0.275, name="中间换热器",

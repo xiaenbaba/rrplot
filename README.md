@@ -138,7 +138,8 @@ from rrplot.parts import (make_expansion_valve_x, make_four_way_round,
 ```
 
 压缩机 `style` 支持 圆形/方形(圆体双弦 / 胶囊壳体),换热器
-`shape` 支持 rect_diag/rect_x/rect_zigzag7,
+`shape` 支持 rect_diag/rect_x/rect_zigzag7/fan_coil（风机盘管）,
+左右接管长度由 `stub` 设置（默认 0）,
 详见各自 docstring。特殊端口定义可用 `make_partial(part, ports=..., dirs=...)`
 从现有部件派生。
 

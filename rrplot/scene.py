@@ -18,6 +18,8 @@ TEMPLATES = {
     "evi_intermediate": "EVI 中间换热器喷气增焓",
     "reversible_heat_pump_heating": "四通阀热泵（制热）",
     "reversible_heat_pump_cooling": "四通阀热泵（制冷）",
+    "vrf_multisplit_cooling": "VRF 多联机（制冷）",
+    "vrf_multisplit_evi_heating": "VRF 多联机（EVI 制热）",
 }
 
 
@@ -70,7 +72,13 @@ def validate_scene(document):
     junctions = {j["id"]: j for j in d["junctions"]}
     edge_ids = {edge["id"] for edge in d["edges"]}
     descriptions = {}
+    legacy_fan_coils = set()
     for node in d["nodes"]:
+        if node.get("type") == "fan_coil":
+            params = normalize_params("fan_coil", node.get("params", {}))
+            node["type"] = "heat_exchanger"
+            node["params"] = dict(params, shape="fan_coil", orient="h")
+            legacy_fan_coils.add(node["id"])
         node["params"] = normalize_params(node.get("type"), node.get("params", {}))
         descriptions[node["id"]] = describe(node["type"], node["params"])
         if not isinstance(node.setdefault("title", node["type"]), str):
@@ -86,6 +94,10 @@ def validate_scene(document):
     for edge in d["edges"]:
         for side in ("source", "target"):
             ref = edge.get(side)
+            if (isinstance(ref, dict) and isinstance(ref.get("nodeId"), str)
+                    and ref["nodeId"] in legacy_fan_coils):
+                ref["portId"] = {"in": "left", "out": "right"}.get(
+                    ref.get("portId"), ref.get("portId"))
             if not isinstance(ref, dict):
                 raise ValueError("管路必须引用设备端口或三通")
             if "junctionId" in ref and set(ref) == {"junctionId"}:

@@ -169,7 +169,7 @@ Linux 装 ``fonts-noto-cjk``。详见 README 的"字体"一节。
        宽 r、高 2r,与圆形等高)。改半径/机身请走工厂,不要在 ``add()`` 里改
    * - ``make_heat_exchanger(w, h, shape=...)``
      - ``left`` ``right`` ``top`` ``bottom``
-     - 换热器/蒸发器/冷凝器通用:3 种换热面(``HEX_SHAPES``),标签自定
+     - 换热器/蒸发器/冷凝器通用:4 种换热面(``HEX_SHAPES``),含风机盘管,标签自定
    * - ``capillary``
      - ``in`` ``out``
      - 弹簧形细管,竖放
@@ -225,7 +225,8 @@ Linux 装 ``fonts-noto-cjk``。详见 README 的"字体"一节。
 ``make_compressor`` 的 ``style``: ``圆形`` (圆体双弦)/
 ``方形`` (胶囊壳体);
 ``make_heat_exchanger`` 的 ``shape``:``rect_diag`` / ``rect_x`` /
-``rect_zigzag7``。
+``rect_zigzag7`` / ``fan_coil`` (风机盘管)。
+左右接管可用 ``stub`` 设置长度,默认 0;切换画法不改变端口位置。
 
 **只想改端口、不想重画图形**,用 ``make_partial``:
 

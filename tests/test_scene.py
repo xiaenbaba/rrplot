@@ -34,13 +34,13 @@ def test_template_roundtrip_and_orthogonal_edges(name):
     assert scene["document"] == d
 
 
-def test_intermediate_evi_injection_enters_compressor_left_port():
+def test_intermediate_evi_injection_enters_rotated_compressor_injection_port():
     document = load_template("evi_intermediate")
     injection = next(edge for edge in document["edges"] if edge["id"] == "injection")
-    assert injection["target"] == {"nodeId": "comp", "portId": "left"}
+    assert injection["target"] == {"nodeId": "comp", "portId": "vapor_inj"}
     resolved = resolve_scene(document)
     injection = next(edge for edge in resolved["edges"] if edge["id"] == "injection")
-    assert injection["points"][-1] == [578, 280]
+    assert injection["points"][-1] == [270, 130]
 
 
 def test_heat_pump_receiver_template_uses_gas_liquid_separator_on_suction():

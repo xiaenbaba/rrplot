@@ -158,14 +158,18 @@ export function nearestSegment(points, point) {
   return best.index;
 }
 
-export function projectOnRoute(points, point) {
+export function projectOnRoute(points, point, matrix = null) {
+  // Measure proximity on screen while retaining the original route fraction.
+  const transform = ([x, y]) => matrix ? [matrix.a * x + matrix.c * y, matrix.b * x + matrix.d * y] : [x, y];
   const lengths = points.slice(1).map((b, i) => Math.hypot(b[0] - points[i][0], b[1] - points[i][1]));
   const total = lengths.reduce((sum, length) => sum + length, 0);
   let travelled = 0, best = { point: points[0], at: 0, distance: Infinity };
   lengths.forEach((length, i) => {
     const a = points[i], delta = points[i + 1].map((v, j) => v - a[j]);
-    const t = length ? Math.max(0, Math.min(1, point.reduce((sum, v, j) => sum + (v - a[j]) * delta[j], 0) / length ** 2)) : 0;
-    const projected = a.map((v, j) => v + delta[j] * t), distance = Math.hypot(...point.map((v, j) => v - projected[j]));
+    const screenDelta = transform(delta), offset = transform(point.map((v, j) => v - a[j]));
+    const squared = screenDelta[0] ** 2 + screenDelta[1] ** 2;
+    const t = squared ? Math.max(0, Math.min(1, offset.reduce((sum, v, j) => sum + v * screenDelta[j], 0) / squared)) : 0;
+    const projected = a.map((v, j) => v + delta[j] * t), distance = Math.hypot(...transform(point.map((v, j) => v - projected[j])));
     if (distance < best.distance) best = { point: projected, at: total ? (travelled + t * length) / total : 0, distance };
     travelled += length;
   });

@@ -1,0 +1,1320 @@
+{
+  "schemaVersion": 1,
+  "title": "VRF 多联机（EVI 制热）",
+  "page": {
+    "width": 1600,
+    "height": 1000
+  },
+  "nodes": [
+    {
+      "id": "comp",
+      "type": "compressor",
+      "title": "压缩机",
+      "x": 360,
+      "y": 460,
+      "params": {
+        "r": 46,
+        "style": "圆形"
+      },
+      "rotation": 0
+    },
+    {
+      "id": "reversing",
+      "type": "four_way_valve",
+      "title": "四通换向阀",
+      "x": 440,
+      "y": 220,
+      "params": {
+        "r": 30,
+        "mark": false
+      },
+      "rotation": 180
+    },
+    {
+      "id": "oil",
+      "type": "oil_separator",
+      "title": "油分离器",
+      "x": 440,
+      "y": 340,
+      "params": {
+        "w": 40,
+        "h": 80,
+        "stub": 8
+      },
+      "rotation": 0
+    },
+    {
+      "id": "capillary",
+      "type": "capillary",
+      "title": "回油毛细管",
+      "x": 440,
+      "y": 435,
+      "params": {
+        "w": 14,
+        "h": 50,
+        "n": 4
+      },
+      "rotation": 0
+    },
+    {
+      "id": "separator",
+      "type": "separator_utube",
+      "title": "气液分离器",
+      "x": 700,
+      "y": 650,
+      "params": {
+        "w": 80,
+        "h": 80,
+        "stub": 12,
+        "flip": true
+      },
+      "rotation": 0
+    },
+    {
+      "id": "outdoor",
+      "type": "heat_exchanger",
+      "title": "室外蒸发器",
+      "x": 150,
+      "y": 450,
+      "params": {
+        "w": 100,
+        "h": 220,
+        "shape": "rect_x",
+        "orient": "h",
+        "stub": 0
+      },
+      "rotation": 0
+    },
+    {
+      "id": "gas-stop",
+      "type": "globe_valve",
+      "title": "气管截止阀",
+      "x": 940,
+      "y": 220,
+      "params": {
+        "w": 32,
+        "h": 20,
+        "stem": 10,
+        "handle": 24
+      },
+      "rotation": 0
+    },
+    {
+      "id": "liquid-stop",
+      "type": "globe_valve",
+      "title": "液管截止阀",
+      "x": 940,
+      "y": 824.75,
+      "params": {
+        "w": 32,
+        "h": 20,
+        "stem": 10,
+        "handle": 24
+      },
+      "rotation": 0
+    },
+    {
+      "id": "pressure-high",
+      "type": "sensor",
+      "title": "排气压力 P",
+      "x": 550,
+      "y": 270,
+      "params": {
+        "r": 12,
+        "stub": 12,
+        "mark": "P"
+      },
+      "rotation": 90
+    },
+    {
+      "id": "pressure-low",
+      "type": "sensor",
+      "title": "吸气压力 P",
+      "x": 850,
+      "y": 350,
+      "params": {
+        "r": 12,
+        "stub": 12,
+        "mark": "P"
+      },
+      "rotation": 90
+    },
+    {
+      "id": "indoor-1",
+      "type": "heat_exchanger",
+      "title": "室内机 1（冷凝）",
+      "x": 1260,
+      "y": 350,
+      "params": {
+        "w": 120,
+        "h": 60,
+        "shape": "fan_coil",
+        "orient": "h",
+        "stub": 12
+      },
+      "rotation": 0
+    },
+    {
+      "id": "eev-1",
+      "type": "expansion_valve",
+      "title": "EEV1",
+      "x": 1380,
+      "y": 350,
+      "params": {
+        "r": 10,
+        "orient": "h"
+      },
+      "rotation": 0
+    },
+    {
+      "id": "indoor-2",
+      "type": "heat_exchanger",
+      "title": "室内机 2（冷凝）",
+      "x": 1260,
+      "y": 500,
+      "params": {
+        "w": 120,
+        "h": 60,
+        "shape": "fan_coil",
+        "orient": "h",
+        "stub": 12
+      },
+      "rotation": 0
+    },
+    {
+      "id": "eev-2",
+      "type": "expansion_valve",
+      "title": "EEV2",
+      "x": 1380,
+      "y": 500,
+      "params": {
+        "r": 10,
+        "orient": "h"
+      },
+      "rotation": 0
+    },
+    {
+      "id": "indoor-3",
+      "type": "heat_exchanger",
+      "title": "室内机 3（冷凝）",
+      "x": 1260,
+      "y": 650,
+      "params": {
+        "w": 120,
+        "h": 60,
+        "shape": "fan_coil",
+        "orient": "h",
+        "stub": 12
+      },
+      "rotation": 0
+    },
+    {
+      "id": "eev-3",
+      "type": "expansion_valve",
+      "title": "EEV3",
+      "x": 1380,
+      "y": 650,
+      "params": {
+        "r": 10,
+        "orient": "h"
+      },
+      "rotation": 0
+    },
+    {
+      "id": "economizer",
+      "type": "intermediate_hex",
+      "title": "中间换热器",
+      "x": 500,
+      "y": 800,
+      "params": {
+        "w": 200,
+        "h": 90,
+        "drop": 0.275,
+        "orient": "h"
+      },
+      "rotation": 0
+    },
+    {
+      "id": "outdoor-eev",
+      "type": "expansion_valve",
+      "title": "室外 EEV",
+      "x": 150,
+      "y": 650,
+      "params": {
+        "r": 10,
+        "orient": "v"
+      },
+      "rotation": 180
+    },
+    {
+      "id": "injection-eev",
+      "type": "expansion_valve",
+      "title": "喷气 EEV",
+      "x": 700,
+      "y": 775.25,
+      "params": {
+        "r": 10,
+        "orient": "h"
+      },
+      "rotation": 180
+    }
+  ],
+  "junctions": [
+    {
+      "id": "discharge-tap",
+      "x": 440,
+      "y": 270
+    },
+    {
+      "id": "suction-tap",
+      "x": 770,
+      "y": 350
+    },
+    {
+      "id": "oil-return",
+      "x": 440,
+      "y": 570
+    },
+    {
+      "id": "gas-1",
+      "x": 1060,
+      "y": 350
+    },
+    {
+      "id": "liquid-1",
+      "x": 1460,
+      "y": 350
+    },
+    {
+      "id": "gas-2",
+      "x": 1060,
+      "y": 500
+    },
+    {
+      "id": "liquid-2",
+      "x": 1460,
+      "y": 500
+    },
+    {
+      "id": "gas-3",
+      "x": 1060,
+      "y": 650
+    },
+    {
+      "id": "liquid-3",
+      "x": 1460,
+      "y": 650
+    },
+    {
+      "id": "injection-split",
+      "x": 800,
+      "y": 824.75
+    }
+  ],
+  "edges": [
+    {
+      "id": "pipe-discharge",
+      "source": {
+        "nodeId": "comp",
+        "portId": "top"
+      },
+      "target": {
+        "nodeId": "oil",
+        "portId": "left"
+      },
+      "vertices": [
+        [
+          360,
+          320
+        ]
+      ],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid",
+      "headAt": [
+        0.55
+      ]
+    },
+    {
+      "id": "pipe-oil-gas",
+      "source": {
+        "nodeId": "oil",
+        "portId": "top"
+      },
+      "target": {
+        "junctionId": "discharge-tap"
+      },
+      "vertices": [],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid",
+      "headAt": [
+        0.55
+      ]
+    },
+    {
+      "id": "pipe-valve-discharge",
+      "source": {
+        "junctionId": "discharge-tap"
+      },
+      "target": {
+        "nodeId": "reversing",
+        "portId": "exhaust"
+      },
+      "vertices": [],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid",
+      "headAt": [
+        0.55
+      ]
+    },
+    {
+      "id": "pipe-pressure-high-tap",
+      "source": {
+        "junctionId": "discharge-tap"
+      },
+      "target": {
+        "nodeId": "pressure-high",
+        "portId": "tap"
+      },
+      "vertices": [],
+      "head": false,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid",
+      "headAt": [
+        0.55
+      ]
+    },
+    {
+      "id": "pipe-oil-capillary",
+      "source": {
+        "nodeId": "oil",
+        "portId": "bottom"
+      },
+      "target": {
+        "nodeId": "capillary",
+        "portId": "in"
+      },
+      "vertices": [],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid",
+      "headAt": [
+        0.55
+      ]
+    },
+    {
+      "id": "pipe-oil-return",
+      "source": {
+        "nodeId": "capillary",
+        "portId": "out"
+      },
+      "target": {
+        "junctionId": "oil-return"
+      },
+      "vertices": [],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid",
+      "headAt": [
+        0.55
+      ]
+    },
+    {
+      "id": "pipe-outdoor-gas",
+      "source": {
+        "nodeId": "outdoor",
+        "portId": "top"
+      },
+      "target": {
+        "nodeId": "reversing",
+        "portId": "condenser"
+      },
+      "vertices": [
+        [
+          150,
+          220
+        ]
+      ],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid",
+      "headAt": [
+        0.55
+      ]
+    },
+    {
+      "id": "pipe-valve-suction",
+      "source": {
+        "nodeId": "reversing",
+        "portId": "suction"
+      },
+      "target": {
+        "junctionId": "suction-tap"
+      },
+      "vertices": [
+        [
+          770,
+          220
+        ]
+      ],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid",
+      "headAt": [
+        0.55
+      ]
+    },
+    {
+      "id": "pipe-pressure-low-tap",
+      "source": {
+        "junctionId": "suction-tap"
+      },
+      "target": {
+        "nodeId": "pressure-low",
+        "portId": "tap"
+      },
+      "vertices": [],
+      "head": false,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid",
+      "headAt": [
+        0.55
+      ]
+    },
+    {
+      "id": "pipe-separator-in",
+      "source": {
+        "junctionId": "suction-tap"
+      },
+      "target": {
+        "nodeId": "separator",
+        "portId": "in"
+      },
+      "vertices": [
+        [
+          770,
+          550
+        ],
+        [
+          729.2,
+          550
+        ]
+      ],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid",
+      "headAt": [
+        0.55
+      ]
+    },
+    {
+      "id": "pipe-separator-out",
+      "source": {
+        "nodeId": "separator",
+        "portId": "out"
+      },
+      "target": {
+        "junctionId": "oil-return"
+      },
+      "vertices": [
+        [
+          665.2,
+          570
+        ]
+      ],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid",
+      "headAt": [
+        0.55
+      ]
+    },
+    {
+      "id": "pipe-suction",
+      "source": {
+        "junctionId": "oil-return"
+      },
+      "target": {
+        "nodeId": "comp",
+        "portId": "bottom"
+      },
+      "vertices": [
+        [
+          360,
+          570
+        ]
+      ],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid",
+      "headAt": [
+        0.55
+      ]
+    },
+    {
+      "id": "pipe-indoor-gas",
+      "source": {
+        "nodeId": "reversing",
+        "portId": "evaporator"
+      },
+      "target": {
+        "nodeId": "gas-stop",
+        "portId": "in"
+      },
+      "vertices": [
+        [
+          440,
+          100
+        ],
+        [
+          880,
+          100
+        ],
+        [
+          880,
+          220
+        ]
+      ],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid",
+      "headAt": [
+        0.55
+      ]
+    },
+    {
+      "id": "pipe-branch-gas-1",
+      "source": {
+        "junctionId": "gas-1"
+      },
+      "target": {
+        "nodeId": "indoor-1",
+        "portId": "left"
+      },
+      "vertices": [],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid",
+      "headAt": [
+        0.55
+      ]
+    },
+    {
+      "id": "pipe-branch-coil-eev-1",
+      "source": {
+        "nodeId": "indoor-1",
+        "portId": "right"
+      },
+      "target": {
+        "nodeId": "eev-1",
+        "portId": "in"
+      },
+      "vertices": [],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid",
+      "headAt": [
+        0.55
+      ]
+    },
+    {
+      "id": "pipe-branch-liquid-1",
+      "source": {
+        "nodeId": "eev-1",
+        "portId": "out"
+      },
+      "target": {
+        "junctionId": "liquid-1"
+      },
+      "vertices": [],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid",
+      "headAt": [
+        0.55
+      ]
+    },
+    {
+      "id": "pipe-branch-gas-2",
+      "source": {
+        "junctionId": "gas-2"
+      },
+      "target": {
+        "nodeId": "indoor-2",
+        "portId": "left"
+      },
+      "vertices": [],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid",
+      "headAt": [
+        0.55
+      ]
+    },
+    {
+      "id": "pipe-branch-coil-eev-2",
+      "source": {
+        "nodeId": "indoor-2",
+        "portId": "right"
+      },
+      "target": {
+        "nodeId": "eev-2",
+        "portId": "in"
+      },
+      "vertices": [],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid",
+      "headAt": [
+        0.55
+      ]
+    },
+    {
+      "id": "pipe-branch-liquid-2",
+      "source": {
+        "nodeId": "eev-2",
+        "portId": "out"
+      },
+      "target": {
+        "junctionId": "liquid-2"
+      },
+      "vertices": [],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid",
+      "headAt": [
+        0.55
+      ]
+    },
+    {
+      "id": "pipe-branch-gas-3",
+      "source": {
+        "junctionId": "gas-3"
+      },
+      "target": {
+        "nodeId": "indoor-3",
+        "portId": "left"
+      },
+      "vertices": [],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid",
+      "headAt": [
+        0.55
+      ]
+    },
+    {
+      "id": "pipe-branch-coil-eev-3",
+      "source": {
+        "nodeId": "indoor-3",
+        "portId": "right"
+      },
+      "target": {
+        "nodeId": "eev-3",
+        "portId": "in"
+      },
+      "vertices": [],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid",
+      "headAt": [
+        0.55
+      ]
+    },
+    {
+      "id": "pipe-branch-liquid-3",
+      "source": {
+        "nodeId": "eev-3",
+        "portId": "out"
+      },
+      "target": {
+        "junctionId": "liquid-3"
+      },
+      "vertices": [],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid",
+      "headAt": [
+        0.55
+      ]
+    },
+    {
+      "id": "pipe-gas-header-in",
+      "source": {
+        "nodeId": "gas-stop",
+        "portId": "out"
+      },
+      "target": {
+        "junctionId": "gas-1"
+      },
+      "vertices": [
+        [
+          1060,
+          220
+        ]
+      ],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid",
+      "headAt": [
+        0.55
+      ]
+    },
+    {
+      "id": "pipe-liquid-header-in",
+      "source": {
+        "junctionId": "liquid-3"
+      },
+      "target": {
+        "nodeId": "liquid-stop",
+        "portId": "out"
+      },
+      "vertices": [
+        [
+          1460,
+          824.75
+        ]
+      ],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid",
+      "headAt": [
+        0.55
+      ]
+    },
+    {
+      "id": "pipe-gas-header-1",
+      "source": {
+        "junctionId": "gas-1"
+      },
+      "target": {
+        "junctionId": "gas-2"
+      },
+      "vertices": [],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid",
+      "headAt": [
+        0.55
+      ]
+    },
+    {
+      "id": "pipe-liquid-header-1",
+      "source": {
+        "junctionId": "liquid-1"
+      },
+      "target": {
+        "junctionId": "liquid-2"
+      },
+      "vertices": [],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid",
+      "headAt": [
+        0.55
+      ]
+    },
+    {
+      "id": "pipe-gas-header-2",
+      "source": {
+        "junctionId": "gas-2"
+      },
+      "target": {
+        "junctionId": "gas-3"
+      },
+      "vertices": [],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid",
+      "headAt": [
+        0.55
+      ]
+    },
+    {
+      "id": "pipe-liquid-header-2",
+      "source": {
+        "junctionId": "liquid-2"
+      },
+      "target": {
+        "junctionId": "liquid-3"
+      },
+      "vertices": [],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid",
+      "headAt": [
+        0.55
+      ]
+    },
+    {
+      "id": "pipe-liquid-economizer",
+      "source": {
+        "nodeId": "liquid-stop",
+        "portId": "in"
+      },
+      "target": {
+        "junctionId": "injection-split"
+      },
+      "vertices": [],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid",
+      "headAt": [
+        0.55
+      ]
+    },
+    {
+      "id": "pipe-economizer-split",
+      "source": {
+        "junctionId": "injection-split"
+      },
+      "target": {
+        "nodeId": "economizer",
+        "portId": "main_out"
+      },
+      "vertices": [],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid",
+      "headAt": [
+        0.55
+      ]
+    },
+    {
+      "id": "pipe-outdoor-eev-in",
+      "source": {
+        "nodeId": "economizer",
+        "portId": "main_in"
+      },
+      "target": {
+        "nodeId": "outdoor-eev",
+        "portId": "in"
+      },
+      "vertices": [
+        [
+          150,
+          824.75
+        ]
+      ],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid",
+      "headAt": [
+        0.55
+      ]
+    },
+    {
+      "id": "pipe-outdoor-eev-out",
+      "source": {
+        "nodeId": "outdoor-eev",
+        "portId": "out"
+      },
+      "target": {
+        "nodeId": "outdoor",
+        "portId": "bottom"
+      },
+      "vertices": [],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid",
+      "headAt": [
+        0.55
+      ]
+    },
+    {
+      "id": "pipe-injection-throttle",
+      "source": {
+        "junctionId": "injection-split"
+      },
+      "target": {
+        "nodeId": "injection-eev",
+        "portId": "in"
+      },
+      "vertices": [
+        [
+          800,
+          775.25
+        ]
+      ],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid",
+      "headAt": [
+        0.55
+      ]
+    },
+    {
+      "id": "pipe-injection-hex",
+      "source": {
+        "nodeId": "injection-eev",
+        "portId": "out"
+      },
+      "target": {
+        "nodeId": "economizer",
+        "portId": "sub_in"
+      },
+      "vertices": [],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid",
+      "headAt": [
+        0.55
+      ]
+    },
+    {
+      "id": "pipe-injection",
+      "source": {
+        "nodeId": "economizer",
+        "portId": "sub_out"
+      },
+      "target": {
+        "nodeId": "comp",
+        "portId": "left"
+      },
+      "vertices": [
+        [
+          260,
+          775.25
+        ],
+        [
+          260,
+          460
+        ]
+      ],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid",
+      "headAt": [
+        0.55
+      ]
+    }
+  ],
+  "labels": [
+    {
+      "id": "heading",
+      "text": "VRF 多联机（EVI 制热）",
+      "x": 800,
+      "y": 40,
+      "size": 22,
+      "ha": "center",
+      "boxed": false,
+      "color": "#111111"
+    },
+    {
+      "id": "outdoor-title",
+      "text": "室外机",
+      "x": 440,
+      "y": 75,
+      "size": 18,
+      "ha": "center",
+      "boxed": false,
+      "color": "#111111"
+    },
+    {
+      "id": "indoor-title",
+      "text": "室内机（3 台并联）",
+      "x": 1260,
+      "y": 75,
+      "size": 18,
+      "ha": "center",
+      "boxed": false,
+      "color": "#111111"
+    },
+    {
+      "id": "valve-state",
+      "text": "四通阀：D→E，C→S",
+      "x": 650,
+      "y": 150,
+      "size": 14,
+      "ha": "center",
+      "boxed": false,
+      "color": "#111111"
+    },
+    {
+      "id": "gas-label",
+      "text": "气管总管",
+      "x": 1060,
+      "y": 170,
+      "size": 14,
+      "ha": "center",
+      "boxed": false,
+      "color": "#111111"
+    },
+    {
+      "id": "liquid-label",
+      "text": "液管总管",
+      "x": 1460,
+      "y": 860,
+      "size": 14,
+      "ha": "center",
+      "boxed": false,
+      "color": "#111111"
+    },
+    {
+      "id": "note",
+      "text": "两管制示意；交叉无圆点不连接。工况由箭头及阀内连通文字区分。",
+      "x": 800,
+      "y": 980,
+      "size": 14,
+      "ha": "center",
+      "boxed": false,
+      "color": "#111111"
+    },
+    {
+      "id": "label-comp",
+      "text": "压缩机",
+      "nodeId": "comp",
+      "x": -25,
+      "y": 50,
+      "ha": "right",
+      "size": 14,
+      "boxed": false,
+      "color": "#111111"
+    },
+    {
+      "id": "label-reversing",
+      "text": "四通换向阀",
+      "nodeId": "reversing",
+      "x": 50.0,
+      "y": 55.0,
+      "ha": "center",
+      "size": 14,
+      "boxed": false,
+      "color": "#111111"
+    },
+    {
+      "id": "label-oil",
+      "text": "油分离器",
+      "nodeId": "oil",
+      "x": 35.0,
+      "y": 0.0,
+      "ha": "left",
+      "size": 14,
+      "boxed": false,
+      "color": "#111111"
+    },
+    {
+      "id": "label-capillary",
+      "text": "回油毛细管",
+      "nodeId": "capillary",
+      "x": 25.0,
+      "y": 0.0,
+      "ha": "left",
+      "size": 14,
+      "boxed": false,
+      "color": "#111111"
+    },
+    {
+      "id": "label-separator",
+      "text": "气液分离器",
+      "nodeId": "separator",
+      "x": 0.0,
+      "y": 70.0,
+      "ha": "center",
+      "size": 14,
+      "boxed": false,
+      "color": "#111111"
+    },
+    {
+      "id": "label-outdoor",
+      "text": "室外蒸发器",
+      "nodeId": "outdoor",
+      "x": 0.0,
+      "y": -260.0,
+      "ha": "center",
+      "size": 14,
+      "boxed": false,
+      "color": "#111111"
+    },
+    {
+      "id": "label-gas-stop",
+      "text": "气管截止阀",
+      "nodeId": "gas-stop",
+      "x": 0.0,
+      "y": 40.0,
+      "ha": "center",
+      "size": 14,
+      "boxed": false,
+      "color": "#111111"
+    },
+    {
+      "id": "label-liquid-stop",
+      "text": "液管截止阀",
+      "nodeId": "liquid-stop",
+      "x": 0.0,
+      "y": 40.0,
+      "ha": "center",
+      "size": 14,
+      "boxed": false,
+      "color": "#111111"
+    },
+    {
+      "id": "label-pressure-high",
+      "text": "排气压力 P",
+      "nodeId": "pressure-high",
+      "x": 30.0,
+      "y": -10.0,
+      "ha": "center",
+      "size": 14,
+      "boxed": false,
+      "color": "#111111"
+    },
+    {
+      "id": "label-pressure-low",
+      "text": "吸气压力 P",
+      "nodeId": "pressure-low",
+      "x": 35.0,
+      "y": -0.0,
+      "ha": "center",
+      "size": 14,
+      "boxed": false,
+      "color": "#111111"
+    },
+    {
+      "id": "label-indoor-1",
+      "text": "室内机 1（冷凝）",
+      "nodeId": "indoor-1",
+      "x": 0.0,
+      "y": 55.0,
+      "ha": "center",
+      "size": 14,
+      "boxed": false,
+      "color": "#111111"
+    },
+    {
+      "id": "label-eev-1",
+      "text": "EEV1",
+      "nodeId": "eev-1",
+      "x": 0.0,
+      "y": 35.0,
+      "ha": "center",
+      "size": 14,
+      "boxed": false,
+      "color": "#111111"
+    },
+    {
+      "id": "label-indoor-2",
+      "text": "室内机 2（冷凝）",
+      "nodeId": "indoor-2",
+      "x": 0.0,
+      "y": 55.0,
+      "ha": "center",
+      "size": 14,
+      "boxed": false,
+      "color": "#111111"
+    },
+    {
+      "id": "label-eev-2",
+      "text": "EEV2",
+      "nodeId": "eev-2",
+      "x": 0.0,
+      "y": 35.0,
+      "ha": "center",
+      "size": 14,
+      "boxed": false,
+      "color": "#111111"
+    },
+    {
+      "id": "label-indoor-3",
+      "text": "室内机 3（冷凝）",
+      "nodeId": "indoor-3",
+      "x": 0.0,
+      "y": 55.0,
+      "ha": "center",
+      "size": 14,
+      "boxed": false,
+      "color": "#111111"
+    },
+    {
+      "id": "label-eev-3",
+      "text": "EEV3",
+      "nodeId": "eev-3",
+      "x": 0.0,
+      "y": 35.0,
+      "ha": "center",
+      "size": 14,
+      "boxed": false,
+      "color": "#111111"
+    },
+    {
+      "id": "label-economizer",
+      "text": "中间换热器",
+      "nodeId": "economizer",
+      "x": -0.0,
+      "y": 0.0,
+      "ha": "center",
+      "size": 14,
+      "boxed": false,
+      "color": "#111111"
+    },
+    {
+      "id": "label-outdoor-eev",
+      "text": "室外 EEV",
+      "nodeId": "outdoor-eev",
+      "x": 25.0,
+      "y": -0.0,
+      "ha": "right",
+      "size": 14,
+      "boxed": false,
+      "color": "#111111"
+    },
+    {
+      "id": "label-injection-eev",
+      "text": "喷气 EEV",
+      "nodeId": "injection-eev",
+      "x": 0,
+      "y": 35,
+      "ha": "center",
+      "size": 14,
+      "boxed": false,
+      "color": "#111111"
+    },
+    {
+      "id": "injection-label",
+      "text": "上取液：液管先分流，支路经喷气 EEV → 中间换热器 → 左侧补气口",
+      "x": 800,
+      "y": 930,
+      "size": 14,
+      "ha": "center",
+      "boxed": false,
+      "color": "#111111"
+    }
+  ]
+}

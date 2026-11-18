@@ -72,7 +72,8 @@ def test_static_and_catalog_interfaces(service):
              json.loads(request(service, "/api/catalog")[2])}
     assert {"compressor", "heat_exchanger", "expansion_valve", "vessel",
             "separator_utube", "intermediate_hex", "four_way_valve",
-            "globe_valve", "solenoid_valve", "check_valve", "filter"} == kinds
+            "globe_valve", "solenoid_valve", "check_valve", "filter",
+            "oil_separator", "capillary", "muffler", "sensor"} == kinds
     templates = json.loads(request(service, "/api/templates")[2])
     assert {entry["id"]: entry["title"] for entry in templates} == TEMPLATES
     for path in ("/../pyproject.toml", "/missing", "/api/missing"):
@@ -80,10 +81,36 @@ def test_static_and_catalog_interfaces(service):
     assert request(service, "/api/templates/missing")[0] == 400
 
 
+def test_legacy_fan_coil_resolves_to_editable_heat_exchanger(service):
+    document = dict(schemaVersion=1, title="旧风机盘管",
+                    page=dict(width=800, height=600),
+                    nodes=[dict(id="coil", type="fan_coil", x=400, y=300,
+                                params=dict(w=120, h=60, stub=12))],
+                    junctions=[dict(id="gas", x=100, y=300)],
+                    edges=[dict(id="pipe", source=dict(junctionId="gas"),
+                                target=dict(nodeId="coil", portId="in"))],
+                    labels=[])
+    status, _, data = post(service, "/api/resolve", {"document": document})
+    assert status == 200
+    result = json.loads(data)
+    canonical = result["document"]
+    assert canonical["nodes"][0]["type"] == "heat_exchanger"
+    assert canonical["nodes"][0]["params"]["shape"] == "fan_coil"
+    assert canonical["edges"][0]["target"]["portId"] == "left"
+    assert result["nodes"][0]["geometry"]["image"].startswith(
+        "data:image/svg+xml;base64,")
+    canonical["nodes"][0]["params"]["shape"] = "rect_x"
+    status, _, data = post(service, "/api/resolve", {"document": canonical})
+    assert status == 200
+    changed = json.loads(data)
+    assert changed["edges"][0]["points"] == result["edges"][0]["points"]
+
+
 @pytest.mark.parametrize("name", list(TEMPLATES))
 def test_template_edit_reopen_preview_and_exports(service, name):
     document = json.loads(request(service, "/api/templates/" + name)[2])
-    node = next(item for item in document["nodes"] if item["id"] in {"eev1", "eev"})
+    node = next(item for item in document["nodes"]
+                if item["type"] == "expansion_valve")
     node["x"] += 20
     status, _, data = post(service, "/api/resolve", {"document": document})
     assert status == 200

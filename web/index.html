@@ -59,8 +59,8 @@
           <button data-tool="select" class="active" title="选择与拖动 V">↖ <span>选择</span></button>
           <button data-tool="box-select" aria-label="框选" title="框选 B；完整框住对象，Shift+空白拖动可追加选择">▧ <span>框选</span></button>
           <button data-tool="move-all" aria-label="整体移动" title="整体移动全部内容 M / Ctrl+A">✥ <span>整体移动</span></button>
-          <button data-tool="connect" title="连线 C；依次点击起点和终点端口">⌁ <span>连线</span></button>
-          <button data-tool="junction" title="三通 J；悬停管路预览插入位置，点击插入，或在空白处放置">● <span>三通</span></button>
+          <button data-tool="connect" title="连线 C；依次点击端口，Shift+点击管路接管；选好起点后 Alt+点击空白加折点，Backspace 回退">⌁ <span>连线</span></button>
+          <button data-tool="junction" title="三通 J；靠近管路自动吸附，点击插入，Shift+点击立即接出支路">● <span>三通</span></button>
           <button data-tool="text" title="文字 T；在画布点击放置">T <span>文字</span></button>
         </div>
         <div class="tool-group" role="group" aria-label="复制粘贴">
@@ -78,6 +78,13 @@
         <button data-action="fit-content" title="缩放视图以显示全部设备、管路和文字，不调整纸张">适应内容</button>
         <button data-action="fit-selection" title="缩放视图以显示所选对象及其标签、组内管路">定位所选</button>
         <button data-action="toggle-properties" class="mobile-only">属性</button>
+      </div>
+      <div id="connection-tools" role="group" aria-label="当前连线操作" hidden>
+        <span id="connection-summary" role="status" aria-live="polite"></span>
+        <button id="connection-coordinates" data-action="connection-coordinates" title="输入各临时折点的精确 X/Y 坐标">编辑坐标</button>
+        <button id="connection-back" data-action="connection-back" title="回退最后一个临时折点（Backspace）">回退折点</button>
+        <button id="connection-clear" data-action="connection-clear" title="清除全部临时折点，保留起点并恢复自动走线">清空折点</button>
+        <button id="connection-cancel" data-action="connection-cancel" title="取消未完成的连线（Esc）；已插入的起点三通保留，可 Ctrl+Z 撤销">取消连线</button>
       </div>
       <div id="draft-banner" hidden><span id="draft-description"></span><button data-action="restore">恢复草稿</button><button data-action="dismiss-draft">暂不恢复</button></div>
       <div id="load-banner" role="status" hidden><span id="load-description"></span><button data-action="cancel-load">取消载入</button><span class="load-note">继续编辑会保留当前修改，旧载入结果将被丢弃。</span></div>
@@ -137,6 +144,55 @@
     </div>
     <div class="styles-footer"><span class="muted">应用后可用 Ctrl+Z 一次撤销</span><button id="style-apply" type="submit" class="primary" disabled>应用样式</button></div>
   </form></dialog>
+  <dialog id="connection-coordinates-dialog" aria-labelledby="connection-coordinates-heading"><form id="connection-coordinate-form" novalidate>
+    <div class="preview-heading"><strong id="connection-coordinates-heading">编辑临时折点坐标</strong><button type="button" data-action="close-connection-coordinates">取消</button></div>
+    <div class="coordinate-history button-row" role="group" aria-label="窗口内修改历史">
+      <button id="connection-coordinate-undo" type="button" data-action="undo-coordinate-form" disabled title="撤回本次窗口内尚未应用的修改">撤销输入</button>
+      <button id="connection-coordinate-redo" type="button" data-action="redo-coordinate-form" disabled title="恢复刚撤回的窗口内修改">重做输入</button>
+    </div>
+    <div class="export-body coordinate-body">
+      <p class="muted">按起点到终点的顺序填写图纸坐标，X 向右、Y 向下为正，支持小数，不受网格吸附影响。</p>
+      <details id="connection-coordinate-import" class="coordinate-import">
+        <summary>批量粘贴坐标</summary>
+        <label class="field" for="connection-coordinate-text"><span>坐标文本（每行 X、Y）</span></label>
+        <textarea id="connection-coordinate-text" rows="4" maxlength="20000" spellcheck="false" aria-describedby="coordinate-import-help connection-coordinate-import-status" placeholder="280.25, 340.75&#10;440.125, 340.75"></textarea>
+        <p id="coordinate-import-help" class="muted">可粘贴表格中的两列，或用逗号、空格分隔 X/Y；每行一个折点，最多 100 个。载入会替换窗口内列表，点击“应用坐标”后才生效。</p>
+        <button type="button" data-action="import-coordinate-rows">载入坐标列表</button>
+      </details>
+      <p id="connection-coordinate-import-status" class="muted" role="status"></p>
+      <details id="connection-coordinate-export" class="coordinate-import">
+        <summary>复制折点坐标</summary>
+        <p class="muted">复制当前列表的 X/Y 两列，保留顺序和小数；仅包含手动折点，不包含起终端口。未应用的输入也可复制。</p>
+        <button id="connection-coordinate-copy" type="button" data-action="copy-coordinate-rows" disabled>复制坐标</button>
+        <label class="field" for="connection-coordinate-output"><span>可复制的坐标文本</span></label>
+        <textarea id="connection-coordinate-output" rows="4" readonly spellcheck="false" aria-describedby="connection-coordinate-copy-status" placeholder="点击“复制坐标”生成两列文本"></textarea>
+        <p id="connection-coordinate-copy-status" class="muted" role="status"></p>
+      </details>
+      <figure class="coordinate-preview" aria-label="折点走线预览">
+        <figcaption><span class="coordinate-legend-original">灰线：原走线</span> · <span class="coordinate-legend-proposed">绿线：新走线</span> · 圆点：起点/终点</figcaption>
+        <svg id="connection-coordinate-preview" viewBox="0 0 480 160" role="group" aria-label="折点坐标走线示意"></svg>
+        <p class="muted">点击预览折点定位坐标；聚焦 X/Y 时高亮对应折点。也可用 Tab 选点，再按 Enter 或空格定位。</p>
+        <p id="connection-coordinate-preview-status" class="muted" role="status"></p>
+      </figure>
+      <div id="connection-coordinate-list"></div>
+      <div class="button-row"><button id="connection-coordinate-add" type="button" data-action="add-coordinate-row">末尾添加折点</button></div>
+    </div>
+    <div class="coordinate-footer">
+      <div class="coordinate-navigation" role="group" aria-label="折点定位">
+        <button id="connection-coordinate-previous" type="button" data-action="previous-coordinate-row" disabled>上一折点</button>
+        <select id="connection-coordinate-jump" aria-label="定位到折点" disabled><option value="">无折点</option></select>
+        <button id="connection-coordinate-next" type="button" data-action="next-coordinate-row" disabled>下一折点</button>
+      </div>
+      <p id="connection-coordinate-summary" class="muted" role="status"></p>
+      <p id="connection-coordinate-error" role="alert"></p>
+      <p id="connection-coordinate-note" class="muted">应用后继续连线，最终完成时随整条管路保存和撤销；取消或 Esc 保留原折点。</p>
+      <div class="button-row coordinate-tools">
+        <button id="connection-coordinate-clear" type="button" data-action="clear-coordinate-rows" disabled>清空列表</button>
+        <button id="connection-coordinate-reset" type="button" data-action="reset-coordinate-rows" disabled>恢复原坐标</button>
+        <button id="connection-coordinate-apply" type="submit" class="primary">应用坐标</button>
+      </div>
+    </div>
+  </form></dialog>
   <dialog id="move-dialog" aria-labelledby="move-heading"><form id="move-form">
     <div class="preview-heading"><strong id="move-heading">精确平移</strong><button type="button" data-action="close-move">取消</button></div>
     <div class="export-body">
@@ -189,8 +245,28 @@
       <section><h3>鼠标与精确编辑</h3><ul>
         <li>滚轮缩放；拖动空白平移视图。按住空格拖动或使用中键，可临时平移。</li>
         <li>框选需完整框住对象；Shift+空白处拖动追加框选，Shift+点击追加或取消选择。</li>
-        <li>单选管路后，点击两端圆圈再点新端口或三通可重接；拖动长条手柄调整线段，双击增加折点，Alt+点击方形折点删除。</li>
+        <li>单选管路后，点击两端圆圈再点新端口或三通可重接，也可 Shift+点击其他管路，自动插入三通并重接；拖动长条手柄调整线段，双击增加折点，Alt+点击方形折点删除。</li>
         <li>使用“三通”工具悬停管路，可预览插入圆环与坐标；绿色可插入，红色显示原因，点击完成插入。空白处可独立放置。管路属性可在中间插入三通、重接端点和添加状态点；属性栏“选择相连对象”扩展整个设备组。</li>
+        <li>三通工具下 Shift+点击管路，可插入三通并立即选为支路起点，再点击终点即可。属性栏也有“插入三通并接出支路”和“从此三通接出支路”。Esc 取消连线时保留三通；插入和接管分别可撤销。</li>
+        <li>连线起点已选或正在重接端点时，按住 Shift 悬停目标管路可预览接入位置，Shift+点击会插入三通并接好，整次操作可一次撤销。附近已有端口或三通时优先复用；普通点击管路不接入，不能重接到自身。</li>
+        <li>连线工具尚未选起点时，也可 Shift+点击管路插入三通并作为起点，再点端口或 Shift+点击另一管路完成支路。插入与接管分别撤销；Esc 取消连线会保留已插入三通。</li>
+        <li>新连线选好起点后，Alt+点击画布空白指定折点，Backspace 回退最后一个；再点击端口或三通，也可 Shift+点击管路完成。折点遵循网格吸附，最多 100 个，完成时整条支路一次撤销；Esc 取消未完成折点。端点重接继续保留原管路折点。</li>
+        <li>新连线中的小方框可拖动调整，Alt+点击可删除指定折点。拖动时 Esc 恢复本次拖动并保留连线，再按 Esc 取消连线；调整和删除临时折点不增加撤销记录。</li>
+        <li>选好起点后，上方操作栏显示临时折点数量，可点击“回退折点”“清空折点”或“取消连线”。清空保留起点并恢复自动走线，取消保留已插入的三通，可 Ctrl+Z 撤销插入。</li>
+        <li>已添加折点后，点击“编辑坐标”可输入每个折点的 X/Y，支持小数，不受网格吸附影响。“应用坐标”只更新当前连线，取消或 Esc 保留原折点；越界或相邻重合时提示原因并保留窗口供修改。</li>
+        <li>已有管路也可精确编辑：单选管路后，在属性栏点击“编辑折点坐标”。没有手动折点也能直接添加。坐标窗口支持末尾添加、在指定折点前插入和删除，最多 100 点；全部修改在“应用坐标”后生效，删空后恢复自动走线。已有管路可 Ctrl+Z 一次撤销，端口和样式保留，状态点沿新走线跟随；取消或 Esc 放弃本次输入与增删。</li>
+        <li>坐标窗口每行“上移 / 下移”可调整折点顺序，保留未应用的输入，自动重新编号；第一行不可上移，最后一行不可下移。排序与增删、坐标修改一起应用，取消或 Esc 放弃本次修改。</li>
+        <li>坐标窗口标题与底部操作固定显示，中间说明、预览和折点列表统一滚动；长列表仍可随时取消或应用，无需滚到底部。</li>
+        <li>底部“清空列表”一次移除窗口中的全部折点；“恢复原坐标”恢复本次打开窗口时的数量、顺序和坐标。两者仅修改待应用内容，取消或 Esc 放弃修改；清空后应用恢复自动走线。已经应用的修改可用 Ctrl+Z 撤销。</li>
+        <li>坐标或几何校验失败时，首个出错折点显示行内原因并标红相关输入。点击“应用坐标”自动定位该输入，修正后清除提示；重复走线及图纸变化等整体问题只在窗口提示。</li>
+        <li>坐标窗口的预览折点可点击定位到对应 X 输入，支持 Tab 选点后 Enter / 空格定位；聚焦坐标输入时，对应列表行和预览折点同步高亮。</li>
+        <li>坐标窗口底部的“上一折点 / 下一折点”按列表顺序定位，也可从“定位到折点”列表直接跳转。定位聚焦 X 输入，保留所有未应用修改；预览无效时仍可定位其他折点。</li>
+        <li>坐标窗口“撤销输入 / 重做输入”恢复尚未应用的坐标、增删、排序、清空和恢复操作；同一输入框连续输入合并为一步，最多保留 100 步。新修改清除重做，取消或应用后清空窗口历史；已应用的管路修改仍用画布 Ctrl+Z 撤销。</li>
+        <li>展开“批量粘贴坐标”，粘贴表格两列或每行用逗号、空格分隔的 X/Y，点击“载入坐标列表”替换窗口内折点（最多 100 个）。全部校验通过才载入，可“撤销输入”恢复，点击“应用坐标”后才改动管路；空文本不会清空列表。</li>
+        <li>展开“复制折点坐标”，点击“复制坐标”，把当前列表复制为可粘贴到表格的 X/Y 两列，不含起终端口。复制保留未应用的小数输入；空值或越界需先修正。自动复制不可用时，文本会选中，按 Ctrl+C 即可；修改列表后需重新复制。</li>
+        <li>坐标窗口内灰线为原走线、绿线为新走线，输入、增删或排序后实时更新；输入无效时提示原因，修正后恢复。已有管路预览完整路径，临时连线仅预览至最后折点，终点待选。此为局部走线示意，预览不改变图纸、草稿、历史或画布视图。</li>
+        <li>三通工具和 Shift 接管时，靠近管路 12 个屏幕像素内即可吸附；缩放不改变操作距离。直接点中的管路优先，否则选择最近管路；点中设备或文字不会误插三通。</li>
+        <li>三通工具靠近已有三通时，点击选中，Shift+点击直接接出支路；设备端口附近显示红色提示，请使用“连线”。不会重复插入三通，网格落点重合也有保护。</li>
         <li>“精确平移”输入 X/Y 位移；多选属性提供对齐、均匀分布和批量样式。</li>
       </ul></section>
       <section><h3>视图、纸张与保存</h3><ul>

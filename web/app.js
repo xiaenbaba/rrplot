@@ -19,6 +19,8 @@ let ownedDraft = null, draftError = false, draftBannerDismissed = false, restori
 let doc = null, catalog = [], geometries = new Map(), fontFamily = 'Times New Roman, SimSun, serif';
 let selection = null, multiSelection = [], mode = 'select', placement = null, ports = [], pendingPort = null;
 let previewTarget = null;
+let connectionVertices = [];
+let connectionCoordinates = null;
 let junctionPreview = null;
 let reconnect = null;
 let edgeLabelsSupported = false;
@@ -219,14 +221,18 @@ function edgePoints(edge) {
   return route(endpoint(edge.source, nodes, doc.junctions), endpoint(edge.target, nodes, doc.junctions), edge.vertices);
 }
 
+function screenMatrix() {
+  const matrix = svg.getScreenCTM?.();
+  return matrix && [matrix.a, matrix.b, matrix.c, matrix.d].every(Number.isFinite)
+    && Math.abs(matrix.a * matrix.d - matrix.b * matrix.c) >= 1e-12 ? matrix : null;
+}
 function connectionRef(event, point) {
   const hit = event.target.closest('[data-kind="port"], [data-kind="junction"]');
   const ref = hit?.dataset.kind === 'port' ? JSON.parse(hit.dataset.ref)
     : hit?.dataset.kind === 'junction' ? { junctionId: hit.dataset.id } : null;
   if (ref) return ref;
-  const matrix = svg.getScreenCTM?.();
-  if (!matrix || ![matrix.a, matrix.b, matrix.c, matrix.d].every(Number.isFinite)
-    || Math.abs(matrix.a * matrix.d - matrix.b * matrix.c) < 1e-12) return null;
+  const matrix = screenMatrix();
+  if (!matrix) return null;
   const nodes = currentNodes();
   let nearest = null, distance = 12;
   const consider = candidate => {
@@ -247,6 +253,8 @@ function connectionRef(event, point) {
   return nearest;
 }
 function connectionTarget(event, point) {
+  if (mode === 'connect' && pendingPort && event.target.closest('[data-kind]')?.dataset.kind === 'connection-vertex')
+    return { point, direction: [0, 0] };
   const ref = connectionRef(event, point);
   if (ref) {
     const target = { ...endpoint(ref, currentNodes(), doc.junctions), ref, version: revision };
@@ -254,12 +262,29 @@ function connectionTarget(event, point) {
     target.error = sameRef && previewTarget.version === revision ? previewTarget.error : connectionError(ref);
     return target;
   }
+  if ((mode === 'connect' || (mode === 'reconnect' && reconnect))
+    && event.shiftKey && !spaceDown) {
+    const target = pipeConnectionTarget(event, point);
+    if (target) return target;
+  }
   return { point, direction: [0, 0] };
+}
+function pipeConnectionTarget(event, point) {
+  const split = junctionTarget(event, point);
+  if (!split) return null;
+  const target = { pipeId: split.edgeId, point: split.point, direction: [0, 0],
+    fraction: split.fraction, version: revision, error: split.error };
+  if (!target.error) {
+    if (previewTarget?.pipeId === target.pipeId && previewTarget.fraction === target.fraction
+      && previewTarget.version === revision) target.error = previewTarget.error;
+    else try { preparePipeConnection(target); } catch (error) { target.error = error.message; }
+  }
+  return target;
 }
 function connectionError(ref) {
   try {
     if (mode === 'connect' && pendingPort)
-      checkConnection({ id: null, source: pendingPort, target: ref, vertices: [] });
+      checkConnection({ id: null, source: pendingPort, target: ref, vertices: connectionVertices });
     else if (mode === 'reconnect' && reconnect) {
       const edge = doc.edges.find(item => item.id === reconnect.edgeId);
       const previous = edge[reconnect.side];
@@ -271,12 +296,18 @@ function connectionError(ref) {
 }
 function renderConnectionFeedback() {
   const active = mode === 'connect' || reconnect;
-  const target = active && previewTarget?.ref ? previewTarget : null;
+  const target = active && (previewTarget?.ref || previewTarget?.pipeId) ? previewTarget : null;
   const hint = document.querySelector('.canvas-hint');
   hint.classList.toggle('connection-valid-hint', !!target && !target.error);
   hint.classList.toggle('connection-invalid-hint', !!target?.error);
-  if (target) hint.textContent = (target.error ? '不可连接：' : mode === 'connect' && !pendingPort ? '点击起点：' : '点击连接：') + refName(target.ref)
+  if (target?.pipeId) hint.textContent = (target.error ? '不可接入管路：' + target.error
+    : reconnect ? 'Shift+点击插入三通并重接' + (reconnect.side === 'source' ? '起点' : '终点')
+    : pendingPort ? 'Shift+点击插入三通并接入管路' : 'Shift+点击插入三通并作为连线起点')
+    + ' · X ' + target.point[0].toFixed(2) + ' / Y ' + target.point[1].toFixed(2) + ' · Esc 取消';
+  else if (target) hint.textContent = (target.error ? '不可连接：' : mode === 'connect' && !pendingPort ? '点击起点：' : '点击连接：') + refName(target.ref)
     + (target.error ? ' · ' + target.error : ' · Esc 取消');
+  if (target && mode === 'connect' && pendingPort && connectionVertices.length)
+    hint.textContent += ` · ${connectionVertices.length} 个折点 · 拖动方框调整 · Backspace 回退`;
   return target;
 }
 function clearConnectionPreview() {
@@ -286,16 +317,43 @@ function clearConnectionPreview() {
   junctionPreview = null;
   renderCanvas();
 }
+function junctionRefTarget(ref) {
+  return { ref, point: endpoint(ref, currentNodes(), doc.junctions).point, version: revision,
+    error: ref.nodeId ? '此处已有设备端口，请使用“连线”连接，不要重复插入三通。' : '' };
+}
 function junctionTarget(event, point) {
   const hit = event.target.closest('[data-kind]');
-  if (!hit || !['edge', 'vertex', 'segment', 'endpoint'].includes(hit.dataset.kind)) return null;
-  const edge = doc.edges.find(item => item.id === hit.dataset.id);
-  if (!edge) return null;
-  let points;
-  try { points = edgePoints(edge); } catch { return null; }
-  const projected = projectOnRoute(points, point);
+  if (mode === 'junction' && (!hit || ['edge', 'vertex', 'segment', 'endpoint', 'port', 'junction'].includes(hit.dataset.kind))) {
+    try {
+      const ref = connectionRef(event, point);
+      if (ref) return junctionRefTarget(ref);
+    } catch { /* Ignore stale endpoint targets until geometry refreshes. */ }
+  }
+  if (hit && !['edge', 'vertex', 'segment', 'endpoint'].includes(hit.dataset.kind)) return null;
+  const matrix = screenMatrix();
+  if (!hit && !matrix) return null;
+  let nearest = null;
+  for (const edge of hit ? doc.edges.filter(item => item.id === hit.dataset.id) : doc.edges) {
+    let points;
+    try { points = edgePoints(edge); } catch { continue; }
+    const projected = projectOnRoute(points, point, matrix);
+    if ((!hit && projected.distance > 12) || (nearest && projected.distance >= nearest.projected.distance - 1e-6)) continue;
+    nearest = { edge, points, projected };
+  }
+  if (!nearest) {
+    // Preview the actual grid landing point too, before placing a free junction.
+    if (mode === 'junction' && !hit) {
+      const landing = point.map(snapped), ref = connectionRef(event, landing);
+      if (ref) {
+        const target = junctionRefTarget(ref);
+        if (target.point.every((v, i) => Math.abs(v - landing[i]) < 1e-6)) return target;
+      }
+    }
+    return null;
+  }
+  const { edge, points, projected } = nearest;
   const target = { edgeId: edge.id, point: projected.point, fraction: projected.at, version: revision, error: '' };
-  try { junctionSplit(edge, target.fraction, points); }
+  try { junctionSplit(edge, target.fraction, points); checkJunctionCapacity(); }
   catch (error) { target.error = error.message; }
   return target;
 }
@@ -307,7 +365,8 @@ function renderJunctionFeedback() {
   hint.classList.toggle('junction-valid-hint', !!target && !target.error);
   hint.classList.toggle('junction-invalid-hint', !!target?.error);
   if (target) hint.textContent = target.error ? '不可插入：' + target.error
-    : '点击插入三通 · X ' + target.point[0].toFixed(2) + ' / Y ' + target.point[1].toFixed(2) + ' · Esc 取消';
+    : (target.ref ? '点击选择已有三通 · Shift+点击接出支路' : '点击插入三通 · Shift+点击接出支路')
+      + ' · X ' + target.point[0].toFixed(2) + ' / Y ' + target.point[1].toFixed(2) + ' · Esc 取消';
   return target;
 }
 
@@ -421,7 +480,7 @@ async function replaceDocument(next, preserveDraft = false, canApply = () => tru
   ++revision;
   doc = result.document; geometries = new Map(result.nodes.map(n => [n.id, n.geometry]));
   fontFamily = result.fontFamily; undo = []; redo = []; clearSelection(); ports = [];
-  pendingPort = null; previewTarget = null; junctionPreview = null; reconnect = null; mode = 'select'; placement = null; dirty = false;
+  pendingPort = null; connectionVertices = []; previewTarget = null; junctionPreview = null; reconnect = null; mode = 'select'; placement = null; dirty = false;
   clipboardPastes = 0;
   $('object-search').value = ''; $('object-kind').value = '';
   if (!preserveDraft) clearDraft();
@@ -561,6 +620,7 @@ function renderCanvas() {
     try { points = edgePoints(edge); } catch { continue; }
     const g = shape('g', { class: 'edge' + (selected('edge', edge.id) ? ' selected' : '')
       + (junction?.edgeId === edge.id ? ' junction-candidate' + (junction.error ? ' invalid' : '') : '')
+      + (connection?.pipeId === edge.id ? ' connection-candidate' + (connection.error ? ' invalid' : '') : '')
       + (reconnect?.edgeId === edge.id ? ' reconnecting-edge' : ''), 'data-kind': 'edge', 'data-id': edge.id });
     const p = points.map(p => p.join(',')).join(' ');
     shape('polyline', { points: p, class: 'edge-hit' }, g);
@@ -580,7 +640,7 @@ function renderCanvas() {
   if (mode === 'connect' && pendingPort && previewTarget) {
     try {
       const start = endpoint(pendingPort, nodes, doc.junctions);
-      const points = route(start, previewTarget, []);
+      const points = route(start, previewTarget, connectionVertices);
       shape('polyline', { points: points.map(p => p.join(',')).join(' '), class: previewClass });
     } catch { /* The source may have been removed while connecting. */ }
   }
@@ -635,6 +695,14 @@ function renderCanvas() {
       g.insertBefore(bg, text);
     }
   }
+  if (mode === 'connect' && pendingPort) connectionVertices.forEach(([x, y], index) => {
+    const g = shape('g', { 'data-kind': 'connection-vertex', 'data-index': index,
+      'data-point': JSON.stringify([x, y]), class: 'connection-waypoint-handle' });
+    shape('rect', { x: x - 10, y: y - 10, width: 20, height: 20, fill: 'transparent' }, g);
+    const marker = shape('rect', { x: x - 4, y: y - 4, width: 8, height: 8, rx: 1,
+      class: 'connection-waypoint', 'vector-effect': 'non-scaling-stroke' }, g);
+    shape('title', {}, marker).textContent = '拖动调整临时折点；Alt+点击删除；Esc 取消本次拖动';
+  });
   if (connection) shape('circle', { cx: connection.point[0], cy: connection.point[1], r: 9,
     class: 'connection-target' + (connection.error ? ' invalid' : ''), 'vector-effect': 'non-scaling-stroke' });
   renderVertices();
@@ -679,7 +747,7 @@ function renderVertices() {
       const handle = shape('circle', { cx: x, cy: y, r: 7, class: 'endpoint-handle',
         'data-kind': 'endpoint', 'data-id': e.id, 'data-side': side,
         'vector-effect': 'non-scaling-stroke' });
-      shape('title', {}, handle).textContent = (side === 'source' ? '重接起点' : '重接终点') + '：点击后选择新端口或三通';
+      shape('title', {}, handle).textContent = (side === 'source' ? '重接起点' : '重接终点') + '：点击后选择端口、三通，或 Shift+点击其他管路';
     }
   }
 }
@@ -689,7 +757,7 @@ function field(parent, caption, value, setter, options = {}) {
   const input = html(options.multiline ? 'textarea' : options.options ? 'select' : 'input');
   input.setAttribute('aria-label', caption);
   if (options.options) options.options.forEach(v => {
-    const o = html('option', typeof v === 'object' ? v.label : String(v)); o.value = typeof v === 'object' ? v.value : v; input.append(o);
+    const o = html('option', typeof v === 'object' ? v.label : options.optionLabels?.[v] || String(v)); o.value = typeof v === 'object' ? v.value : v; input.append(o);
   });
   else if (!options.multiline) input.type = options.type || (typeof value === 'number' ? 'number' : 'text');
   if (options.min !== undefined) input.min = options.min;
@@ -700,6 +768,7 @@ function field(parent, caption, value, setter, options = {}) {
   if (input.type === 'checkbox') input.checked = value; else input.value = value;
   let committed = value;
   function commit() {
+    if (options.deferValidation) return;
     if (!input.checkValidity()) { input.reportValidity(); return; }
     const next = input.type === 'checkbox' ? input.checked : input.type === 'number' ? Number(input.value) : input.value;
     if (next === committed) return;
@@ -722,7 +791,7 @@ function renderInspector() {
     root.append(html('h2', reconnect.side === 'source' ? '重新连接起点' : '重新连接终点', 'object-heading'));
     const edge = doc.edges.find(e => e.id === reconnect.edgeId);
     root.append(html('p', '当前端点：' + refName(edge[reconnect.side]), 'muted'));
-    root.append(html('p', '点击新的设备端口或三通。靠近时吸附并预览走线，折点、样式和状态点保留。', 'muted'));
+    root.append(html('p', '点击新的设备端口或三通，也可 Shift+点击其他管路插入三通并重接。靠近时预览走线，折点、样式和状态点保留。', 'muted'));
     inspectorButton(root, '取消重接（Esc）', cancelReconnect);
     return;
   }
@@ -819,6 +888,7 @@ function renderInspector() {
     }));
   } else if (kind === 'junction') {
     coordinateFields(root, item);
+    inspectorButton(root, '从此三通接出支路', () => beginBranch(item.id)).disabled = branchBusy();
     inspectorButton(root, '删除三通并恢复管路', () => removeSelected());
   }
   else if (kind === 'edge') {
@@ -828,8 +898,10 @@ function renderInspector() {
     field(root, '线型', item.linestyle, v => { item.linestyle = v; }, { options: ['solid', 'dashed'] });
     field(root, '显示流向箭头', item.head, v => { item.head = v; }, { type: 'checkbox' });
     root.append(html('p', `${item.vertices.length} 个手动顶点。拖动线段中间的长条手柄调整走线；双击管线添加折点，Alt+点击方形折点删除。`, 'muted'));
+    inspectorButton(root, '编辑折点坐标', () => showEdgeCoordinates(item.id)).disabled = !!pipeActionsBusy();
     renderPipeActions(root, 1);
     inspectorButton(root, '在管路中间插入三通', () => splitEdge(item));
+    inspectorButton(root, '插入三通并接出支路', () => splitEdge(item, .5, true)).disabled = branchBusy();
     inspectorButton(root, '添加状态点', () => addStateLabel(item));
     const endpoints = html('div', undefined, 'button-row reconnect-buttons'); root.append(endpoints);
     inspectorButton(endpoints, '重接起点', () => beginReconnect(item, 'source'));
@@ -965,13 +1037,14 @@ function batchLayout(action) {
 }
 
 function renderHint() {
+  renderConnectionTools();
   document.querySelector('.canvas-hint').textContent = mode === 'move-all'
     ? '拖动任意位置整体移动全部内容 · Ctrl+Z 撤销 · Esc 退出'
     : mode === 'box-select' ? '拖出矩形完整框住对象 · Shift 追加选择 · Esc 取消'
-    : mode === 'reconnect' ? '点击设备端口或三通完成重接 · 空格拖动平移 · Esc 取消'
-    : mode === 'connect' ? (pendingPort ? '起点已选 · 悬停端口或三通查看连接提示 · Esc 取消' : '点击起点端口或三通 · 再点击终点完成连线 · Esc 退出')
+    : mode === 'reconnect' ? '点击端口或三通，或 Shift+点击其他管路完成重接 · Esc 取消'
+    : mode === 'connect' ? (pendingPort ? `起点已选 · Alt+点击空白加折点（${connectionVertices.length}）· Backspace 回退 · 点击端口或三通，或 Shift+点击管路接入 · Esc 取消` : '点击端口或三通，或 Shift+点击管路作为起点 · Esc 退出')
     : placement ? '点击画布放置设备 · Esc 取消'
-    : mode === 'junction' ? '点击管路按位置插入三通 · 点击空白独立放置 · Esc 取消'
+    : mode === 'junction' ? '点击管路插入三通 · Shift+点击接出支路 · 点击空白独立放置 · Esc 取消'
     : mode === 'text' ? '点击画布空白放置文字 · Esc 取消'
     : mode === 'select' && !placement && multiSelection.some(ref => ['node', 'junction', 'label'].includes(ref.kind)) ? '方向键微调 1 单位 · Shift+方向键 10 单位 · Ctrl+Z 撤销'
     : mode === 'select' && multiSelection.some(ref => ref.kind === 'edge') ? 'Shift+点击追加管路 · 批量样式统一外观 · 单选管路调整走线'
@@ -1015,27 +1088,32 @@ function addNode(type, position) {
 }
 
 function beginReconnect(edge, side) {
+  if (drag?.kind === 'connection-vertex') cancelDrag();
   message('');
-  reconnect = { edgeId: edge.id, side }; mode = 'reconnect'; placement = null; pendingPort = null; ports = [];
+  reconnect = { edgeId: edge.id, side }; mode = 'reconnect'; placement = null; pendingPort = null; connectionVertices = []; ports = [];
   previewTarget = endpoint(edge[side], currentNodes(), doc.junctions);
-  render(); status('请选择新的' + (side === 'source' ? '起点' : '终点') + '端口或三通 · Esc 取消');
+  render(); status('请选择新的' + (side === 'source' ? '起点' : '终点') + '端口或三通，或 Shift+点击其他管路 · Esc 取消');
 }
 function cancelReconnect() {
   message('');
   reconnect = null; previewTarget = null; mode = 'select'; render(); status('已取消重接，管路保持原连接');
 }
-function checkConnection(edge, excludeId = null) {
+function checkConnection(edge, excludeId = null, document = doc) {
+  if (!excludeId && document.edges.length >= 2000)
+    throw new Error('管路数量将超过 2000 项，请先减少对象。');
   const nodes = currentNodes();
-  const [a, b] = [edge.source, edge.target].map(ref => endpoint(ref, nodes, doc.junctions));
+  const [a, b] = [edge.source, edge.target].map(ref => endpoint(ref, nodes, document.junctions));
   if (a.point.every((v, i) => Math.abs(v - b.point[i]) < 1e-6))
     throw new Error('管路两端不能连接到同一位置，请选择其他端口或三通。');
-  const edges = doc.edges.filter(item => item.id !== excludeId);
+  const edges = document.edges.filter(item => item.id !== excludeId);
   const routes = new Map();
   for (const item of edges) {
-    try { routes.set(item.id, edgePoints(item)); } catch { /* Unresolved unrelated geometry is checked after refresh. */ }
+    try { routes.set(item.id, route(endpoint(item.source, nodes, document.junctions),
+      endpoint(item.target, nodes, document.junctions), item.vertices)); }
+    catch { /* Unresolved unrelated geometry is checked after refresh. */ }
   }
   routes.set(edge.id, route(a, b, edge.vertices));
-  const duplicate = inspectDiagram({ ...doc, edges: [...edges, edge] }, { nodes, routes })
+  const duplicate = inspectDiagram({ ...document, edges: [...edges, edge] }, { nodes, routes })
     .some(issue => issue.code === 'duplicate-edge' && issue.ref.id === edge.id);
   if (duplicate) throw new Error('这两个接点之间已有相同走线的管路，请选择其他接点，或先调整已有管路的走线。');
 }
@@ -1055,17 +1133,18 @@ function onPort(ref) {
   }
   if (mode === 'connect') {
     if (!pendingPort) {
+      connectionVertices = [];
       pendingPort = ref;
       previewTarget = endpoint(ref, currentNodes(), doc.junctions);
       status('已选择起点，请点击终点端口或三通');
     }
     else {
       try {
-        const id = uid('edge'), edge = { id, source: pendingPort, target: ref, vertices: [], head: true, headAt: [.55], color: '#111111', width: 1.8, linestyle: 'solid' };
+        const id = uid('edge'), edge = { id, source: pendingPort, target: ref, vertices: clone(connectionVertices), head: true, headAt: [.55], color: '#111111', width: 1.8, linestyle: 'solid' };
         checkConnection(edge);
         message('');
         edit(() => {
-          doc.edges.push(edge); setSelection('edge', id); pendingPort = null; previewTarget = null;
+          doc.edges.push(edge); setSelection('edge', id); pendingPort = null; connectionVertices = []; previewTarget = null;
         });
       } catch (error) { message(error.message); }
     }
@@ -1073,6 +1152,452 @@ function onPort(ref) {
   }
   ports = ports.filter(p => !eqRef(p, ref));
   ports.push(ref); if (ports.length > 2) ports.shift(); render();
+}
+
+function connectionVertexPoint(point, index = connectionVertices.length, vertices = connectionVertices, snap = true, source = pendingPort) {
+  const next = snap ? point.map(snapped) : [...point];
+  if (next.some(value => !Number.isFinite(value) || Math.abs(value) > 100000))
+    throw new Error('折点坐标超出允许范围，请选择画布中的其他位置。');
+  const previous = vertices[index - 1] || endpoint(source, currentNodes(), doc.junctions).point;
+  if ([previous, vertices[index + 1]].filter(Boolean)
+    .some(neighbor => next.every((value, axis) => Math.abs(value - neighbor[axis]) < 1e-6)))
+    throw new Error('折点与相邻点重合，请选择其他位置。');
+  return next;
+}
+function addConnectionVertex(point) {
+  if (connectionVertices.length >= 100) return message('管路折点已达 100 个上限，请按 Backspace 回退。');
+  let next;
+  try { next = connectionVertexPoint(point); } catch (error) { return message(error.message); }
+  connectionVertices.push(next);
+  previewTarget = { point: next, direction: [0, 0] };
+  message(''); renderCanvas();
+  status(`已指定 ${connectionVertices.length} 个折点 · Backspace 回退 · 点击终点完成 · Esc 取消`);
+}
+function resetConnectionVertexPreview() {
+  previewTarget = connectionVertices.length ? { point: connectionVertices.at(-1), direction: [0, 0] } : null;
+}
+function connectionToolsBusy() {
+  return !!(drag || placement || reconnect || spaceDown || pageLayoutBusy);
+}
+function renderConnectionTools() {
+  const active = !!(doc && mode === 'connect' && pendingPort && !reconnect);
+  $('connection-tools').hidden = !active;
+  const text = active ? `连线中 · ${connectionVertices.length} 个临时折点` : '';
+  if ($('connection-summary').textContent !== text) $('connection-summary').textContent = text;
+  const busy = connectionToolsBusy();
+  $('connection-back').disabled = $('connection-clear').disabled = $('connection-coordinates').disabled = !active || busy || !connectionVertices.length;
+  $('connection-cancel').disabled = !active || busy;
+}
+function reduceConnectionVertices(all = false) {
+  if (!doc || mode !== 'connect' || !pendingPort || connectionToolsBusy() || !connectionVertices.length) return;
+  if (all) connectionVertices = []; else connectionVertices.pop();
+  resetConnectionVertexPreview(); message(''); renderCanvas(); svg.focus({ preventScroll: true });
+  status(`${all ? '已清空临时折点' : '已回退折点'} · 剩余 ${connectionVertices.length} 个 · 点击终点完成 · Esc 取消`);
+}
+function cancelPendingConnection() {
+  if (!doc || mode !== 'connect' || !pendingPort || connectionToolsBusy()) return;
+  ports = []; setTool('select'); message(''); svg.focus({ preventScroll: true });
+  status('已取消未完成连线 · 已插入的三通保留，可 Ctrl+Z 撤销');
+}
+function showConnectionCoordinates() {
+  if (!doc || mode !== 'connect' || !pendingPort || connectionToolsBusy() || !connectionVertices.length
+    || document.querySelector('dialog[open]')) return;
+  connectionCoordinates = { revision, source: clone(pendingPort), vertices: clone(connectionVertices), controls: [] };
+  openCoordinateForm();
+}
+function showEdgeCoordinates(id) {
+  if (!doc || pipeActionsBusy() || document.querySelector('dialog[open]') || multiSelection.length !== 1
+    || !selected('edge', id)) return;
+  const edge = doc.edges.find(item => item.id === id);
+  if (!edge) return;
+  connectionCoordinates = { kind: 'edge', revision, edge: clone(edge), vertices: clone(edge.vertices),
+    selection: clone(multiSelection), controls: [] };
+  openCoordinateForm();
+}
+function openCoordinateForm() {
+  const session = connectionCoordinates;
+  session.formUndo = []; session.formRedo = [];
+  $('connection-coordinate-import').open = false; $('connection-coordinate-text').value = '';
+  $('connection-coordinate-export').open = false;
+  coordinateImportStatus();
+  $('connection-coordinates-heading').textContent = session.kind === 'edge' ? '编辑管路折点坐标' : '编辑临时折点坐标';
+  $('connection-coordinate-note').textContent = session.kind === 'edge'
+    ? '应用后可 Ctrl+Z 一次撤销。端口、样式和状态点附着关系保留，状态点沿新走线跟随；取消或 Esc 保留原走线。'
+    : '应用后继续连线，最终完成时随整条管路保存和撤销；取消或 Esc 保留原折点。';
+  renderCoordinateRows(session.vertices);
+  $('connection-coordinates-dialog').showModal();
+  (session.controls[0]?.[0] || $('connection-coordinate-add')).focus();
+}
+function renderCoordinateRows(vertices) {
+  const session = connectionCoordinates;
+  const root = $('connection-coordinate-list'); root.replaceChildren(); session.controls = []; session.rowErrors = [];
+  session.rowElements = []; session.previewPoints = [];
+  session.activeIndex = vertices.length ? Math.max(0, Math.min(session.activeIndex ?? 0, vertices.length - 1)) : -1;
+  const navigator = $('connection-coordinate-jump'); navigator.replaceChildren();
+  (vertices.length ? vertices.map((_, index) => [`折点 ${index + 1} / ${vertices.length}`, index])
+    : [['无折点', '']]).forEach(([label, value]) => {
+    const option = html('option', label); option.value = value; navigator.append(option);
+  });
+  const rows = session.controls;
+  vertices.forEach((point, index) => {
+    const row = html('fieldset', undefined, 'connection-coordinate-row');
+    row.append(html('legend', `折点 ${index + 1}`)); root.append(row); session.rowElements.push(row);
+    const pair = html('div', undefined, 'field-pair'); row.append(pair);
+    const controls = point.map((value, axis) => {
+      const input = field(pair, axis ? 'Y' : 'X', value, () => {},
+        { type: 'number', min: -100000, max: 100000, required: true, transient: true, deferValidation: true });
+      input.setAttribute('aria-label', `折点 ${index + 1} ${axis ? 'Y' : 'X'}`);
+      input.setAttribute('aria-describedby', `coordinate-row-error-${index}`);
+      input.addEventListener('focus', () => {
+        if (connectionCoordinates === session && session.controls === rows) {
+          session.activeAxis = axis; session.inputGroup = null; highlightCoordinateRow(session, index);
+        }
+      });
+      input.addEventListener('input', () => {
+        if (connectionCoordinates !== session || session.controls !== rows) return;
+        recordCoordinateChange(session, input); renderCoordinatePreview();
+      });
+      for (const event of ['change', 'blur']) input.addEventListener(event, () => {
+        if (connectionCoordinates === session && session.controls === rows) session.inputGroup = null;
+      });
+      return input;
+    });
+    session.controls.push(controls);
+    const actions = html('div', undefined, 'button-row connection-coordinate-actions'); row.append(actions);
+    const insert = inspectorButton(actions, '在此前插入', () => changeCoordinateRows(session, index, false));
+    insert.type = 'button'; insert.disabled = vertices.length >= 100;
+    insert.setAttribute('aria-label', `在折点 ${index + 1} 前插入`);
+    const remove = inspectorButton(actions, '删除此折点', () => changeCoordinateRows(session, index, true));
+    remove.type = 'button'; remove.setAttribute('aria-label', `删除折点 ${index + 1}`);
+    const order = html('div', undefined, 'button-row connection-coordinate-actions'); row.append(order);
+    for (const [caption, delta] of [['上移', -1], ['下移', 1]]) {
+      const button = inspectorButton(order, caption, () => reorderCoordinateRows(session, rows, index, delta));
+      button.type = 'button'; button.disabled = index + delta < 0 || index + delta >= vertices.length;
+      button.setAttribute('aria-label', `${caption}折点 ${index + 1}`);
+    }
+    const error = html('p', '', 'coordinate-row-error');
+    error.id = `coordinate-row-error-${index}`; error.setAttribute('role', 'status');
+    row.append(error); session.rowErrors.push(error);
+  });
+  $('connection-coordinate-add').disabled = vertices.length >= 100;
+  $('connection-coordinate-summary').textContent = vertices.length
+    ? `共 ${vertices.length} 个折点 · 坐标、增删和排序将在应用后生效`
+    : session.kind === 'edge' ? '无手动折点 · 应用后使用自动走线，可添加折点指定路径'
+      : '无临时折点 · 应用后恢复自动走线，保留连线起点';
+  $('connection-coordinate-error').textContent = '';
+  recordCoordinateChange(session);
+  renderCoordinatePreview();
+}
+function coordinateImportStatus(text = '', error = false) {
+  $('connection-coordinate-import-status').textContent = text;
+  $('connection-coordinate-import-status').setAttribute('data-error', String(error));
+}
+function parseCoordinateText(text) {
+  if (text.length > 20000) throw new Error('坐标文本过长，请保留最多 100 行坐标。');
+  const lines = text.split(/\r\n?|\n/).map((line, index) => ({ text: line.trim(), line: index + 1 }))
+    .filter(line => line.text);
+  if (!lines.length) throw new Error('请先粘贴坐标；清空折点请使用“清空列表”。');
+  if (lines.length > 100) throw new Error('最多载入 100 个折点，请减少坐标行数。');
+  return lines.map(({ text, line }) => {
+    const pair = /[,，]/.test(text) ? text.split(/[,，]/).map(value => value.trim())
+      : text.includes('\t') ? text.split('\t').map(value => value.trim()) : text.split(/\s+/);
+    if (pair.length !== 2 || pair.some(value => !/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(value)))
+      throw new Error(`第 ${line} 行：请填写两个数字，用制表符、逗号或空格分隔 X/Y。`);
+    if (pair.some(value => !Number.isFinite(Number(value)) || Math.abs(Number(value)) > 100000))
+      throw new Error(`第 ${line} 行：坐标须在 -100000～100000 范围内。`);
+    return pair.map(value => value.replace(/^\+/, '').replace(/\.(?=e|$)/i, ''));
+  });
+}
+function importCoordinateRows() {
+  const session = connectionCoordinates;
+  if (!session || !$('connection-coordinates-dialog').open) return;
+  let vertices;
+  try {
+    const edge = coordinateSessionEdge(session);
+    vertices = parseCoordinateText($('connection-coordinate-text').value);
+    const numbers = vertices.map(point => point.map(Number));
+    if (!edge || JSON.stringify(numbers) !== JSON.stringify(session.vertices)) validateCoordinateVertices(numbers, edge);
+  } catch (error) { coordinateImportStatus(`未载入：${error.message}`, true); return; }
+  recordCoordinateChange(session); session.activeIndex = 0; session.activeAxis = 0;
+  renderCoordinateRows(vertices);
+  $('connection-coordinate-import').open = false;
+  coordinateImportStatus(`已载入 ${vertices.length} 个折点 · 仅替换窗口列表，可撤销输入，应用后生效。`);
+  session.controls[0][0].focus(); session.controls[0][0].scrollIntoView({ block: 'center', inline: 'nearest' });
+}
+function resetCoordinateCopy(session) {
+  session.copyRequest = null;
+  $('connection-coordinate-output').value = '';
+  $('connection-coordinate-copy-status').textContent = '';
+  $('connection-coordinate-copy').disabled = !session.controls.length;
+}
+async function copyCoordinateRows() {
+  const session = connectionCoordinates;
+  if (!session || !$('connection-coordinates-dialog').open || session.copyRequest) return;
+  const status = $('connection-coordinate-copy-status'), output = $('connection-coordinate-output');
+  try { coordinateSessionEdge(session); readCoordinateVertices(session); }
+  catch (error) {
+    output.value = ''; status.textContent = `未复制：${error.message}`;
+    markCoordinateError(session, error, true); return;
+  }
+  if (!session.controls.length) { status.textContent = '无手动折点可复制。'; return; }
+  const text = session.controls.map(row => row.map(input => input.value).join('\t')).join('\n');
+  const request = {}; session.copyRequest = request;
+  output.value = text; $('connection-coordinate-copy').disabled = true;
+  const current = () => {
+    if (connectionCoordinates !== session || session.copyRequest !== request
+      || !$('connection-coordinates-dialog').open) return false;
+    try { coordinateSessionEdge(session); return true; }
+    catch { resetCoordinateCopy(session); return false; }
+  };
+  const fallback = () => {
+    output.focus(); output.select();
+    status.textContent = '坐标文本已生成并选中，请按 Ctrl+C 复制。';
+  };
+  try {
+    if (typeof navigator === 'undefined' || !navigator.clipboard?.writeText) { fallback(); return; }
+    await navigator.clipboard.writeText(text);
+    if (current()) status.textContent = `已复制 ${session.controls.length} 个折点 · 可粘贴为表格两列或载入另一条管路。`;
+  } catch { if (current()) fallback(); }
+  finally { if (current()) { session.copyRequest = null; $('connection-coordinate-copy').disabled = false; } }
+}
+function coordinateFormState(session) {
+  return { vertices: session.controls.map(row => row.map(input => input.value)),
+    index: session.activeIndex, axis: session.activeAxis ?? 0 };
+}
+function renderCoordinateHistory(session) {
+  $('connection-coordinate-undo').disabled = !session.formUndo.length;
+  $('connection-coordinate-redo').disabled = !session.formRedo.length;
+}
+function recordCoordinateChange(session, group = null) {
+  if (session.restoringForm) return;
+  const next = coordinateFormState(session), before = session.formCurrent;
+  if (before && JSON.stringify(before.vertices) !== JSON.stringify(next.vertices)) {
+    if (!group || group !== session.inputGroup) {
+      session.formUndo.push(clone(before));
+      if (session.formUndo.length > 100) session.formUndo.shift();
+    }
+    session.formRedo = [];
+  }
+  session.formCurrent = next; session.inputGroup = group; renderCoordinateHistory(session);
+}
+function coordinateFormHistory(direction) {
+  const session = connectionCoordinates;
+  if (!session || !$('connection-coordinates-dialog').open) return;
+  try { coordinateSessionEdge(session); }
+  catch (error) { $('connection-coordinate-error').textContent = error.message; return; }
+  recordCoordinateChange(session);
+  const from = direction === 'undo' ? session.formUndo : session.formRedo;
+  const to = direction === 'undo' ? session.formRedo : session.formUndo;
+  if (!from.length) return;
+  to.push(coordinateFormState(session));
+  const state = from.pop(); session.restoringForm = true;
+  session.activeIndex = state.index; session.activeAxis = state.axis;
+  try { renderCoordinateRows(state.vertices); }
+  finally { session.restoringForm = false; }
+  session.formCurrent = coordinateFormState(session); session.inputGroup = null;
+  renderCoordinateHistory(session);
+  const input = session.controls[session.activeIndex]?.[session.activeAxis];
+  if (input) { input.focus(); input.scrollIntoView({ block: 'center', inline: 'nearest' }); }
+  else $('connection-coordinate-add').focus();
+}
+function coordinateSessionEdge(session) {
+  const edge = session.kind === 'edge' && doc?.edges.find(item => item.id === session.edge.id);
+  const stale = session.kind === 'edge'
+    ? pipeActionsBusy() || !edge || JSON.stringify(edge) !== JSON.stringify(session.edge)
+      || JSON.stringify(multiSelection) !== JSON.stringify(session.selection)
+    : mode !== 'connect' || connectionToolsBusy() || !eqRef(pendingPort, session.source)
+      || JSON.stringify(connectionVertices) !== JSON.stringify(session.vertices);
+  if (!doc || revision !== session.revision || stale)
+    throw new Error('连线或图纸已变化，请关闭窗口后重新编辑。');
+  return edge;
+}
+function readCoordinateVertices(session) {
+  return session.controls.map((controls, index) => controls.map((input, axis) => {
+    if (input.value === '' || !input.checkValidity() || !Number.isFinite(Number(input.value))) {
+      throw Object.assign(new Error(`折点 ${index + 1}：请输入 -100000～100000 范围内的坐标。`),
+        { coordinateIndex: index, coordinateAxis: axis });
+    }
+    return Number(input.value);
+  }));
+}
+function validateCoordinateVertices(vertices, edge) {
+  vertices.forEach((point, index) => {
+    try {
+      connectionVertexPoint(point, index, vertices, false, edge ? edge.source : pendingPort);
+      if (edge && index === vertices.length - 1
+        && point.every((value, axis) => Math.abs(value - endpoint(edge.target, currentNodes(), doc.junctions).point[axis]) < 1e-6))
+        throw new Error('折点与终点重合，请选择其他位置。');
+    } catch (error) {
+      throw Object.assign(new Error(`折点 ${index + 1}：${error.message}`), { coordinateIndex: index });
+    }
+  });
+  if (edge) checkConnection({ ...edge, vertices }, edge.id);
+}
+function markCoordinateError(session, error, focus = false) {
+  const index = error.coordinateIndex, controls = session.controls[index];
+  if (!controls || !Number.isInteger(index)) return;
+  session.rowErrors[index].textContent = error.message;
+  controls.forEach((input, axis) => input.setAttribute('aria-invalid',
+    String(error.coordinateAxis === undefined || error.coordinateAxis === axis)));
+  if (focus) {
+    const input = controls[error.coordinateAxis ?? 0];
+    input.focus(); input.scrollIntoView({ block: 'center', inline: 'nearest' });
+  }
+}
+function highlightCoordinateRow(session, index) {
+  session.activeIndex = index;
+  if (session.formCurrent) { session.formCurrent.index = index; session.formCurrent.axis = session.activeAxis ?? 0; }
+  $('connection-coordinate-previous').disabled = index <= 0;
+  $('connection-coordinate-next').disabled = index < 0 || index >= session.controls.length - 1;
+  $('connection-coordinate-jump').disabled = !session.controls.length;
+  $('connection-coordinate-jump').value = index < 0 ? '' : String(index);
+  session.rowElements.forEach((row, i) => row.setAttribute('data-active', String(i === index)));
+  session.previewPoints.forEach((point, i) => {
+    point.setAttribute('data-active', String(i === index));
+    point.setAttribute('aria-pressed', String(i === index));
+  });
+}
+function focusCoordinateRow(session, rows, index, marker) {
+  if (connectionCoordinates !== session || session.controls !== rows
+    || !$('connection-coordinates-dialog').open || (marker && !session.previewPoints.includes(marker))) return;
+  const input = rows[index]?.[0];
+  if (!input) return;
+  session.activeAxis = 0; session.inputGroup = null;
+  highlightCoordinateRow(session, index);
+  input.focus(); input.scrollIntoView({ block: 'center', inline: 'nearest' });
+}
+function navigateCoordinateRows(delta, value) {
+  const session = connectionCoordinates;
+  if (!session || !$('connection-coordinates-dialog').open) return;
+  const index = delta ? session.activeIndex + delta : value === '' ? -1 : Number(value);
+  if (!Number.isInteger(index) || index < 0 || index >= session.controls.length) return;
+  focusCoordinateRow(session, session.controls, index);
+}
+function renderCoordinatePreview() {
+  const session = connectionCoordinates;
+  const canvas = $('connection-coordinate-preview'); canvas.replaceChildren();
+  if (!session) return;
+  coordinateImportStatus();
+  resetCoordinateCopy(session);
+  session.previewPoints = [];
+  $('connection-coordinate-error').textContent = '';
+  session.controls.forEach((row, index) => {
+    session.rowErrors[index].textContent = '';
+    row.forEach(input => input.setAttribute('aria-invalid', 'false'));
+  });
+  $('connection-coordinate-clear').disabled = !session.controls.length;
+  $('connection-coordinate-reset').disabled = JSON.stringify(session.controls.map(row => row.map(input => input.value)))
+    === JSON.stringify(session.vertices.map(point => point.map(String)));
+  const caption = $('connection-coordinate-preview-status');
+  try {
+    const edge = coordinateSessionEdge(session), vertices = readCoordinateVertices(session);
+    // Unchanged legacy routes may contain coincident points; applying them is a no-op.
+    const changed = JSON.stringify(vertices) !== JSON.stringify(session.vertices);
+    if (!edge || changed) validateCoordinateVertices(vertices, edge);
+    const nodes = currentNodes(), source = endpoint(edge ? edge.source : session.source, nodes, doc.junctions);
+    const target = edge && endpoint(edge.target, nodes, doc.junctions);
+    const pointsFor = points => target ? route(source, target, points)
+      : points.length ? route(source, { point: points.at(-1), direction: [0, 0] }, points) : [source.point];
+    const original = pointsFor(session.vertices), proposed = pointsFor(vertices);
+    const all = [...original, ...proposed];
+    const left = Math.min(...all.map(p => p[0])), top = Math.min(...all.map(p => p[1]));
+    const width = Math.max(...all.map(p => p[0])) - left, height = Math.max(...all.map(p => p[1])) - top;
+    const scale = Math.min(432 / Math.max(width, 1), 112 / Math.max(height, 1));
+    const map = ([x, y]) => [240 + (x - left - width / 2) * scale, 80 + (y - top - height / 2) * scale];
+    for (const [points, className] of [[original, 'coordinate-route-original'], [proposed, 'coordinate-route-proposed']])
+      shape('polyline', { points: points.map(p => map(p).join(',')).join(' '), class: className }, canvas);
+    const marker = (point, text, className) => {
+      const [cx, cy] = map(point);
+      const circle = shape('circle', { cx, cy, r: 4, class: className }, canvas);
+      shape('title', {}, circle).textContent = `${text} (${point.join(', ')})`;
+      return circle;
+    };
+    marker(source.point, '起点', 'coordinate-source');
+    if (target) marker(target.point, '终点', 'coordinate-target');
+    vertices.forEach((point, index) => {
+      const control = marker(point, `折点 ${index + 1}`, 'coordinate-waypoint'), rows = session.controls;
+      control.setAttribute('r', 8); control.setAttribute('tabindex', 0);
+      control.setAttribute('role', 'button');
+      control.setAttribute('aria-label', `定位折点 ${index + 1} 坐标`);
+      session.previewPoints.push(control);
+      control.addEventListener('click', () => focusCoordinateRow(session, rows, index, control));
+      control.addEventListener('keydown', event => {
+        if (!['Enter', ' '].includes(event.key)) return;
+        event.preventDefault(); focusCoordinateRow(session, rows, index, control);
+      });
+      if (vertices.length <= 12) {
+        const [x, y] = map(point);
+        shape('text', { x: x + 6, y: y - 7, class: 'coordinate-point-number' }, canvas).textContent = index + 1;
+      }
+    });
+    caption.textContent = edge ? `${changed ? '新走线预览' : '原走线'} · ${vertices.length} 个折点 · 应用后生效`
+      : vertices.length ? '临时走线预览 · 起点至最后折点，终点待选' : '无临时折点 · 应用后恢复自动走线，终点待选';
+    canvas.toggleAttribute('hidden', false);
+  } catch (error) {
+    markCoordinateError(session, error);
+    canvas.toggleAttribute('hidden', true); caption.textContent = `暂无法预览：${error.message}`;
+  }
+  highlightCoordinateRow(session, session.activeIndex);
+}
+function changeCoordinateRows(session, index, remove) {
+  if (!session || session !== connectionCoordinates || !$('connection-coordinates-dialog').open) return;
+  const vertices = session.controls.map(row => row.map(input => input.value));
+  if (!Number.isInteger(index) || index < 0 || index > vertices.length || (remove && index === vertices.length)) return;
+  if (!remove && vertices.length >= 100) {
+    $('connection-coordinate-error').textContent = '折点已达 100 个上限，请先删除部分折点。'; return;
+  }
+  vertices.splice(index, remove ? 1 : 0, ...(!remove ? [['', '']] : []));
+  recordCoordinateChange(session); session.activeIndex = Math.min(index, vertices.length - 1); session.activeAxis = 0;
+  renderCoordinateRows(vertices);
+  (session.controls[Math.min(index, vertices.length - 1)]?.[0] || $('connection-coordinate-add')).focus();
+}
+function reorderCoordinateRows(session, rows, index, delta) {
+  if (!session || session !== connectionCoordinates || session.controls !== rows
+    || !$('connection-coordinates-dialog').open || !Number.isInteger(index) || ![-1, 1].includes(delta)) return;
+  const next = index + delta;
+  if (index < 0 || index >= rows.length || next < 0 || next >= rows.length) return;
+  const vertices = rows.map(pair => pair.map(input => input.value));
+  [vertices[index], vertices[next]] = [vertices[next], vertices[index]];
+  recordCoordinateChange(session); session.activeIndex = next; session.activeAxis = 0;
+  renderCoordinateRows(vertices);
+  session.controls[next][0].focus();
+}
+function resetCoordinateRows(restore = false) {
+  const session = connectionCoordinates;
+  if (!session || !$('connection-coordinates-dialog').open) return;
+  try { coordinateSessionEdge(session); }
+  catch (error) { $('connection-coordinate-error').textContent = error.message; return; }
+  const vertices = restore ? session.vertices : [];
+  if (JSON.stringify(session.controls.map(row => row.map(input => input.value)))
+    === JSON.stringify(vertices.map(point => point.map(String)))) return;
+  recordCoordinateChange(session); session.activeIndex = 0; session.activeAxis = 0;
+  renderCoordinateRows(vertices);
+  (session.controls[0]?.[0] || $('connection-coordinate-add')).focus();
+}
+function applyConnectionCoordinates(event) {
+  event.preventDefault();
+  const session = connectionCoordinates;
+  if (!session || !$('connection-coordinates-dialog').open) return;
+  const fail = error => {
+    $('connection-coordinate-error').textContent = error.message; markCoordinateError(session, error, true);
+  };
+  let edge, vertices;
+  try { edge = coordinateSessionEdge(session); vertices = readCoordinateVertices(session); }
+  catch (error) { return fail(error); }
+  const changed = JSON.stringify(vertices) !== JSON.stringify(session.vertices);
+  if (edge && !changed) {
+    $('connection-coordinates-dialog').close(); status('折点坐标未改变 · 原管路保持'); return;
+  }
+  try {
+    validateCoordinateVertices(vertices, edge);
+  } catch (error) { return fail(error); }
+  if (edge) {
+    edit(() => { edge.vertices = vertices; }); message(''); $('connection-coordinates-dialog').close();
+    status('已更新管路折点坐标 · Ctrl+Z 一次撤销'); return;
+  }
+  if (changed) { connectionVertices = vertices; resetConnectionVertexPreview(); message(''); renderCanvas(); }
+  $('connection-coordinates-dialog').close();
+  status(changed ? '已应用临时折点坐标 · 点击终点完成连线 · Esc 取消' : '折点坐标未改变 · 继续连线');
 }
 
 function alignPorts(axis) {
@@ -1097,25 +1622,114 @@ function junctionSplit(edge, fraction, points = edgePoints(edge)) {
     throw new Error('管路长度为零，无法插入三通。');
   return split;
 }
-function splitEdge(edge, fraction = .5) {
-  let split;
-  try { split = junctionSplit(edge, fraction); }
-  catch (error) { return message(error.message); }
+function checkJunctionCapacity(extraEdges = 1) {
+  if (doc.junctions.length >= 2000 || doc.edges.length + extraEdges > 2000)
+    throw new Error('三通或管路数量将超过 2000 项，请先减少对象。');
+}
+function applyJunctionSplit(document, edgeId, split, fraction, id, otherId) {
+  const edge = document.edges.find(item => item.id === edgeId);
   const { point: p, prefix, suffix } = split;
+  document.junctions.push({ id, x: p[0], y: p[1] });
+  // Explicit split vertices keep both routes anchored at the junction.
+  const other = { ...clone(edge), id: otherId, source: { junctionId: id }, vertices: suffix };
+  edge.target = { junctionId: id }; edge.vertices = prefix;
+  document.edges.push(other);
+  document.labels = splitEdgeLabels(document.labels, edge.id, other.id, fraction);
+}
+function preparePipeConnection(target, createId = null) {
+  const rejoining = mode === 'reconnect' && reconnect;
+  const connecting = mode === 'connect' && pendingPort && !reconnect;
+  const starting = mode === 'connect' && !pendingPort && !reconnect;
+  if ((!connecting && !rejoining && !starting) || placement || drag || spaceDown || pageLayoutBusy)
+    throw new Error('请先切换连线工具或选择重接端点，再按住 Shift 点击目标管路。');
+  const edge = doc.edges.find(item => item.id === target.pipeId);
+  if (!edge) throw new Error('目标管路已不存在，请重新选择。');
+  if (rejoining) {
+    if (!doc.edges.some(item => item.id === rejoining.edgeId) || !['source', 'target'].includes(rejoining.side))
+      throw new Error('找不到需要重接的管路端点。');
+    if (rejoining.edgeId === edge.id) throw new Error('不能将管路重接到自身，请选择其他管路或已有接点。');
+  }
+  const split = junctionSplit(edge, target.fraction);
+  checkJunctionCapacity(rejoining || starting ? 1 : 2);
+  let next = clone(doc);
+  // Hover checks use local IDs and never consume real object IDs or edit history.
+  const used = new Set(['nodes', 'edges', 'junctions', 'labels'].flatMap(key => next[key].map(item => item.id)));
+  let serial = 0;
+  const idFor = createId || (prefix => {
+    let id; do { id = prefix + '-preview-' + serial++; } while (used.has(id));
+    used.add(id); return id;
+  });
+  const junctionId = idFor('junction');
+  applyJunctionSplit(next, edge.id, split, target.fraction, junctionId, idFor('edge'));
+  if (starting) return { document: next, startId: junctionId };
+  if (rejoining) {
+    next = reconnectEdge(next, rejoining.edgeId, rejoining.side, { junctionId });
+    const edited = next.edges.find(item => item.id === rejoining.edgeId);
+    checkConnection(edited, edited.id, next);
+    return { document: next, branchId: edited.id, reconnected: true };
+  }
+  const branch = { id: idFor('edge'), source: clone(pendingPort), target: { junctionId },
+    vertices: clone(connectionVertices), head: true, headAt: [.55], color: '#111111', width: 1.8, linestyle: 'solid' };
+  checkConnection(branch, null, next);
+  next.edges.push(branch);
+  return { document: next, branchId: branch.id };
+}
+function connectToPipe(target) {
+  try {
+    const next = preparePipeConnection(target, uid);
+    message('');
+    edit(() => {
+      doc = next.document;
+      if (next.startId) { setSelection('junction', next.startId); mode = 'select'; }
+      else setSelection('edge', next.branchId);
+      pendingPort = null; connectionVertices = []; previewTarget = null; junctionPreview = null; ports = [];
+      if (next.reconnected) { reconnect = null; mode = 'select'; }
+    });
+    if (next.startId) { beginBranch(next.startId); return; }
+    status((next.reconnected ? '已插入三通并完成重接' : '已插入三通并接入管路') + ' · Ctrl+Z 可一次撤销');
+  } catch (error) {
+    previewTarget = { ...target, error: error.message };
+    message(error.message); renderCanvas();
+  }
+}
+function branchBusy() {
+  return !['select', 'junction'].includes(mode) || !!(placement || pendingPort || reconnect || drag || spaceDown || pageLayoutBusy);
+}
+function beginBranch(junctionId) {
+  if (branchBusy()) return message('请先完成当前操作或按 Esc，再接出支路。');
+  if (!doc.junctions.some(item => item.id === junctionId)) return message('找不到支路起点三通。');
+  message('');
+  mode = 'connect'; placement = null; ports = []; junctionPreview = null;
+  pendingPort = { junctionId };
+  connectionVertices = [];
+  previewTarget = endpoint(pendingPort, currentNodes(), doc.junctions);
+  render(); status('三通已选为支路起点 · 点击终点端口或三通 · Esc 取消连线并保留三通');
+}
+function useJunctionTarget(target, branch = false) {
+  junctionPreview = target;
+  if (target.error) { message(target.error); renderCanvas(); return; }
+  if (!target.ref) {
+    splitEdge(doc.edges.find(item => item.id === target.edgeId), target.fraction, branch);
+    return;
+  }
+  message('');
+  setSelection('junction', target.ref.junctionId); mode = 'select'; ports = []; junctionPreview = null;
+  render(); status('已选择已有三通 · 未新增三通或管路');
+  if (branch) beginBranch(target.ref.junctionId);
+}
+function splitEdge(edge, fraction = .5, branch = false) {
+  if (branch && branchBusy()) return message('请先完成当前操作或按 Esc，再接出支路。');
+  let split;
+  try { split = junctionSplit(edge, fraction); checkJunctionCapacity(); }
+  catch (error) { return message(error.message); }
   const id = uid('junction');
   message('');
   edit(() => {
-    doc.junctions.push({ id, x: p[0], y: p[1] });
-    // Keep the split point in both routes explicitly.  The junction endpoint
-    // has no direction, so relying on route() to reconstruct the last/first
-    // segment can otherwise leave a visible gap or make the branch start away
-    // from the junction when the original edge contains corners.
-    const other = { ...clone(edge), id: uid('edge'), source: { junctionId: id }, vertices: suffix };
-    edge.target = { junctionId: id }; edge.vertices = prefix;
-    doc.edges.push(other); setSelection('junction', id);
-    doc.labels = splitEdgeLabels(doc.labels, edge.id, other.id, fraction);
+    applyJunctionSplit(doc, edge.id, split, fraction, id, uid('edge'));
+    setSelection('junction', id);
     mode = 'select'; ports = []; junctionPreview = null;
   });
+  if (branch) beginBranch(id);
 }
 
 function removeSelected() {
@@ -1131,7 +1745,7 @@ function removeSelected() {
       doc = next;
       ports = ports.filter(ref => ref.nodeId ? doc.nodes.some(n => n.id === ref.nodeId)
         : doc.junctions.some(j => j.id === ref.junctionId));
-      pendingPort = null; previewTarget = null; clearSelection();
+      pendingPort = null; connectionVertices = []; previewTarget = null; clearSelection();
     });
   } catch (error) { message(error.message); }
 }
@@ -1147,7 +1761,7 @@ function copySelected() {
     });
     edit(() => {
       doc = result.document; multiSelection = result.selection; selection = multiSelection.at(-1) || null;
-      pendingPort = null; previewTarget = null; mode = 'select'; placement = null;
+      pendingPort = null; connectionVertices = []; previewTarget = null; mode = 'select'; placement = null;
     });
   } catch (error) { message(error.message); }
 }
@@ -1253,7 +1867,7 @@ function pasteClipboard() {
     });
     edit(() => {
       doc = result.document; multiSelection = result.selection; selection = multiSelection.at(-1) || null;
-      ports = []; pendingPort = null; previewTarget = null;
+      ports = []; pendingPort = null; connectionVertices = []; previewTarget = null;
     });
     clipboardPastes++;
     document.body.classList.remove('library-open');
@@ -1262,11 +1876,12 @@ function pasteClipboard() {
   } catch (error) { message(error.message); }
 }
 function history(direction) {
+  if (drag?.kind === 'connection-vertex') cancelDrag();
   if (reconnect) cancelReconnect();
   const from = direction === 'undo' ? undo : redo, to = direction === 'undo' ? redo : undo;
   if (!from.length) return;
   cancelDocumentLoad();
-  to.push(clone(doc)); doc = from.pop(); clearSelection(); ports = []; pendingPort = null; previewTarget = null;
+  to.push(clone(doc)); doc = from.pop(); clearSelection(); ports = []; pendingPort = null; connectionVertices = []; previewTarget = null;
   revision++; dirty = true; saveDraft(); render(); void refresh();
 }
 
@@ -1524,7 +2139,7 @@ function objectName(ref) {
 }
 function locateObject(ref, additive = false) {
   if (drag || reconnect || pendingPort) return message('请先完成当前连接或拖动，或按 Esc 取消，再定位对象。');
-  mode = 'select'; placement = null; reconnect = null; pendingPort = null; previewTarget = null; ports = [];
+  mode = 'select'; placement = null; reconnect = null; pendingPort = null; connectionVertices = []; previewTarget = null; ports = [];
   setSelection(ref.kind, ref.id, additive); render();
   let box = selectionCandidates().find(item => item.kind === ref.kind && item.id === ref.id)?.box;
   if (ref.kind === 'edge') {
@@ -1641,6 +2256,19 @@ const actions = {
   'toggle-library': () => { document.body.classList.toggle('library-open'); document.body.classList.remove('properties-open'); },
   'toggle-properties': () => { document.body.classList.toggle('properties-open'); document.body.classList.remove('library-open'); },
   undo: () => history('undo'), redo: () => history('redo'), copy: copySelected, delete: removeSelected,
+  'connection-back': () => reduceConnectionVertices(), 'connection-clear': () => reduceConnectionVertices(true),
+  'connection-cancel': cancelPendingConnection,
+  'connection-coordinates': showConnectionCoordinates,
+  'add-coordinate-row': () => changeCoordinateRows(connectionCoordinates, connectionCoordinates?.controls.length, false),
+  'import-coordinate-rows': importCoordinateRows,
+  'copy-coordinate-rows': copyCoordinateRows,
+  'clear-coordinate-rows': () => resetCoordinateRows(),
+  'reset-coordinate-rows': () => resetCoordinateRows(true),
+  'undo-coordinate-form': () => coordinateFormHistory('undo'),
+  'redo-coordinate-form': () => coordinateFormHistory('redo'),
+  'previous-coordinate-row': () => navigateCoordinateRows(-1),
+  'next-coordinate-row': () => navigateCoordinateRows(1),
+  'close-connection-coordinates': () => $('connection-coordinates-dialog').close(),
   'clipboard-copy': copyToClipboard, 'clipboard-paste': pasteClipboard,
   'page-layout': showPageLayout, 'batch-styles': showBatchStyles,
   'close-styles': () => $('styles-dialog').close(),
@@ -1648,13 +2276,24 @@ const actions = {
   fit, 'fit-content': () => focusDrawing('all'), 'fit-selection': () => focusDrawing('selection'),
   'zoom-in': () => zoom(.85), 'zoom-out': () => zoom(1 / .85),
   'align-x': () => alignPorts('x'), 'align-y': () => alignPorts('y'),
-  'clear-ports': () => { ports = []; pendingPort = null; previewTarget = null; render(); },
+  'clear-ports': () => { if (drag?.kind === 'connection-vertex') cancelDrag(); ports = []; pendingPort = null; connectionVertices = []; previewTarget = null; render(); },
   restore: showDrafts, drafts: showDrafts,
   'close-drafts': closeDrafts,
   'dismiss-draft': () => { draftBannerDismissed = true; $('draft-banner').hidden = true; }
 };
 
 $('move-scope').addEventListener('change', renderMoveState);
+$('connection-coordinate-form').addEventListener('submit', applyConnectionCoordinates);
+$('connection-coordinate-jump').addEventListener('change', event => navigateCoordinateRows(0, event.target.value));
+$('connection-coordinate-text').addEventListener('input', () => coordinateImportStatus());
+$('connection-coordinates-dialog').addEventListener('close', () => {
+  if ($('connection-coordinates-dialog').open) return;
+  connectionCoordinates = null;
+  $('connection-coordinate-output').value = ''; $('connection-coordinate-copy-status').textContent = '';
+  $('connection-coordinate-preview').replaceChildren();
+  $('connection-coordinate-preview-status').textContent = '';
+  if (doc) svg.focus({ preventScroll: true });
+});
 for (const id of ['move-x', 'move-y']) $(id).addEventListener('input', renderMoveState);
 $('move-form').addEventListener('submit', applyMove);
 $('move-dialog').addEventListener('close', () => { if (!$('move-dialog').open) moveSession = null; });
@@ -1693,18 +2332,38 @@ document.addEventListener('click', async event => {
 });
 
 function setTool(tool) {
+  if (drag?.kind === 'connection-vertex') cancelDrag();
   junctionPreview = null;
-  mode = tool; placement = null; pendingPort = null; previewTarget = null; reconnect = null;
+  mode = tool; placement = null; pendingPort = null; connectionVertices = []; previewTarget = null; reconnect = null;
   if (tool === 'move-all') { clearSelection(); ports = []; }
   render();
-  status('工具：' + { select: '选择', 'box-select': '框选：拖出矩形完整框住对象，Shift 可追加', 'move-all': '整体移动：按住左键拖动全部内容', connect: '连线：点击起点和终点端口，鼠标靠近时自动吸附', junction: '点击管路按位置插入三通，或点击空白独立放置', text: '在画布点击放置文字' }[tool]);
+  status('工具：' + { select: '选择', 'box-select': '框选：拖出矩形完整框住对象，Shift 可追加', 'move-all': '整体移动：按住左键拖动全部内容', connect: '连线：点击端口或三通，或 Shift+点击管路作为起点', junction: '点击管路按位置插入三通，或点击空白独立放置', text: '在画布点击放置文字' }[tool]);
 }
 
 svg.addEventListener('pointerdown', event => {
   if (!doc || event.button > 1) return;
+  if (drag?.kind === 'connection-vertex') return;
   svg.focus({ preventScroll: true });
   const p = world(event), hit = event.target.closest('[data-kind]');
   if (event.button === 1 || spaceDown) return startPan(event);
+  if (hit?.dataset.kind === 'connection-vertex') {
+    event.preventDefault();
+    const index = Number(hit.dataset.index), vertex = connectionVertices[index];
+    if (mode !== 'connect' || !pendingPort || placement || drag || pageLayoutBusy
+      || event.shiftKey || event.ctrlKey || event.metaKey || !Number.isInteger(index)
+      || !vertex || hit.dataset.point !== JSON.stringify(vertex)) return;
+    if (event.altKey) {
+      connectionVertices.splice(index, 1); resetConnectionVertexPreview(); message(''); renderCanvas();
+      status(`已删除指定折点 · 剩余 ${connectionVertices.length} 个 · 点击终点完成`);
+    } else {
+      drag = { kind: 'connection-vertex', index, start: p, origin: [...vertex],
+        beforeVertices: clone(connectionVertices), pointerId: event.pointerId, moved: false };
+      previewTarget = null; message(''); renderCanvas();
+      svg.setPointerCapture(event.pointerId);
+      status('拖动调整临时折点 · Esc 取消本次拖动');
+    }
+    return;
+  }
   if (mode === 'select' && !placement && hit?.dataset.kind === 'endpoint') {
     const edge = doc.edges.find(item => item.id === hit.dataset.id);
     if (multiSelection.length === 1 && selected('edge', edge?.id)
@@ -1716,30 +2375,33 @@ svg.addEventListener('pointerdown', event => {
   if (mode === 'connect' || mode === 'reconnect') {
     const ref = connectionRef(event, p);
     if (ref) { event.preventDefault(); onPort(ref); return; }
+    if ((mode === 'connect' || (mode === 'reconnect' && reconnect)) && event.shiftKey) {
+      const target = pipeConnectionTarget(event, p);
+      if (target) { event.preventDefault(); connectToPipe(target); return; }
+    }
   }
   if (mode === 'reconnect') {
     event.preventDefault();
-    status('请点击设备端口或三通 · 空格拖动平移 · Esc 取消');
+    status('请点击端口或三通，或 Shift+点击其他管路重接 · 空格拖动平移 · Esc 取消');
     return;
   }
   if (mode === 'connect') {
     event.preventDefault();
+    if (!hit && pendingPort && event.altKey && !event.shiftKey && !event.ctrlKey && !event.metaKey
+      && !placement && !drag && !pageLayoutBusy) { addConnectionVertex(p); return; }
     if (!hit) return startPan(event);
-    status('请点击端口或三通连接 · 切换“选择”工具后可移动设备或编辑管路 · Esc 取消');
+    status('请点击端口或三通连接 · 起点已选时可 Shift+点击管路接入 · Esc 取消');
     return;
   }
   if (mode === 'junction' && !placement) {
     event.preventDefault();
-    if (hit && ['edge', 'vertex', 'segment', 'endpoint'].includes(hit.dataset.kind)) {
-      const target = junctionTarget(event, p);
-      if (target) {
-        junctionPreview = target;
-        if (target.error) { message(target.error); renderCanvas(); }
-        else splitEdge(doc.edges.find(item => item.id === target.edgeId), target.fraction);
-      }
+    const target = junctionTarget(event, p);
+    if (target) {
+      useJunctionTarget(target, !!event.shiftKey);
     } else if (!hit) {
       message('');
-      edit(() => { const id = uid('junction'); doc.junctions.push({ id, x: snapped(p[0]), y: snapped(p[1]) }); setSelection('junction', id); mode = 'select'; });
+      const point = p.map(snapped);
+      edit(() => { const id = uid('junction'); doc.junctions.push({ id, x: point[0], y: point[1] }); setSelection('junction', id); mode = 'select'; });
     } else status('请点击管路内部插入三通，或点击空白独立放置 · Esc 取消');
     return;
   }
@@ -1803,6 +2465,7 @@ function startPan(event) {
   clearConnectionPreview();
   drag = { kind: 'pan', client: [event.clientX, event.clientY], origin: { ...view }, pointerId: event.pointerId };
   svg.setPointerCapture(event.pointerId); svg.classList.add('panning'); event.preventDefault();
+  renderConnectionTools();
 }
 svg.addEventListener('pointermove', event => {
   if (!drag) {
@@ -1815,10 +2478,11 @@ svg.addEventListener('pointermove', event => {
     }
     if (mode === 'connect' || reconnect) {
       let next = connectionTarget(event, world(event));
-      if (mode === 'connect' && !pendingPort && !next.ref) next = null;
+      if (mode === 'connect' && !pendingPort && !next.ref && !next.pipeId) next = null;
       const changed = !!next !== !!previewTarget || (next && (next.point.some((value, index) => value !== previewTarget.point[index])
         || next.direction.some((value, index) => value !== previewTarget.direction[index])
         || JSON.stringify(next.ref) !== JSON.stringify(previewTarget.ref) || next.error !== previewTarget.error
+        || next.pipeId !== previewTarget.pipeId || next.fraction !== previewTarget.fraction
         || next.version !== previewTarget.version));
       if (changed) { previewTarget = next; renderCanvas(); }
     }
@@ -1830,6 +2494,17 @@ svg.addEventListener('pointermove', event => {
     updateView(); return;
   }
   const p = world(event), delta = p.map((v, i) => v - drag.start[i]);
+  if (drag.kind === 'connection-vertex') {
+    if (event.pointerId !== drag.pointerId) return;
+    if (!drag.moved && Math.hypot(...delta) < 1) return;
+    let next;
+    try { next = connectionVertexPoint(drag.origin.map((v, i) => v + delta[i]), drag.index); }
+    catch (error) { message(error.message); return; }
+    if (next.every((value, i) => value === connectionVertices[drag.index][i])) return;
+    drag.moved = true; connectionVertices[drag.index] = next;
+    previewTarget = { point: connectionVertices.at(-1), direction: [0, 0] };
+    message(''); renderCanvas(); return;
+  }
   if (drag.kind === 'box') {
     if (!drag.moved && Math.hypot(...delta) < 2) return;
     drag.moved = true; drag.point = p;
@@ -1869,8 +2544,15 @@ svg.addEventListener('pointerleave', () => {
 });
 function endDrag(event) {
   if (!drag) return;
+  if (drag.kind === 'connection-vertex' && event.pointerId !== drag.pointerId) return;
   const current = drag; drag = null; svg.classList.remove('panning');
+  renderConnectionTools();
   if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
+  if (current.kind === 'connection-vertex') {
+    resetConnectionVertexPreview(); renderCanvas();
+    status('临时折点已调整 · Alt+点击折点可删除 · 点击终点完成 · Esc 取消连线');
+    return;
+  }
   if (current.kind === 'box') {
     if (!current.moved && !current.additive) clearSelection();
     mode = 'select'; render();
@@ -1883,6 +2565,9 @@ function endDrag(event) {
 svg.addEventListener('pointerup', endDrag);
 function cancelDrag() {
   const current = drag;
+  if (current?.kind === 'connection-vertex') {
+    connectionVertices = current.beforeVertices; resetConnectionVertexPreview();
+  }
   if (drag?.before) doc = drag.before;
   if (drag?.kind === 'box') {
     multiSelection = drag.beforeSelection;
@@ -1893,6 +2578,7 @@ function cancelDrag() {
   render();
 }
 svg.addEventListener('pointercancel', cancelDrag);
+svg.addEventListener('lostpointercapture', () => { if (drag?.kind === 'connection-vertex') cancelDrag(); });
 svg.addEventListener('dblclick', event => {
   if (event.shiftKey || mode !== 'select' || placement || reconnect) return;
   if (event.target.closest('[data-kind="segment"]')) return;
@@ -2039,10 +2725,21 @@ window.addEventListener('keydown', async event => {
     event.preventDefault(); nudgeSelected(event); return;
   }
   if (!['Shift', 'Alt', 'Control', 'Meta'].includes(event.key)) endNudge();
+  if (event.key === 'Escape' && drag?.kind === 'connection-vertex') {
+    event.preventDefault(); cancelDrag(); status('已取消本次折点拖动 · 保留连线起点和原折点'); return;
+  }
+  if (mode === 'connect' && pendingPort && ['Backspace', 'Delete'].includes(event.key)) {
+    event.preventDefault();
+    if (event.key === 'Backspace' && !event.ctrlKey && !event.metaKey && !event.altKey && !event.repeat
+      && !drag && !spaceDown && !placement && !pageLayoutBusy && connectionVertices.length) {
+      reduceConnectionVertices();
+    } else status('连线中 Backspace 回退折点 · Esc 取消连线后可删除对象');
+    return;
+  }
   if (event.key === 'Escape' && reconnect) { event.preventDefault(); cancelReconnect(); return; }
   const modifier = event.ctrlKey || event.metaKey;
-  if (event.code === 'Space') { spaceDown = true; event.preventDefault(); }
-  if (event.key === 'Escape') { mode = 'select'; placement = null; pendingPort = null; previewTarget = null; junctionPreview = null; ports = []; cancelDrag(); }
+  if (event.code === 'Space') { spaceDown = true; event.preventDefault(); renderConnectionTools(); }
+  if (event.key === 'Escape') { mode = 'select'; placement = null; pendingPort = null; connectionVertices = []; previewTarget = null; junctionPreview = null; ports = []; cancelDrag(); }
   if (drag) return;
   if (handleEditorShortcut(event)) return;
   if (modifier && event.key.toLowerCase() === 'a') { event.preventDefault(); setTool('move-all'); }
@@ -2056,9 +2753,11 @@ window.addEventListener('keydown', async event => {
 });
 window.addEventListener('keyup', event => {
   if (event.key === nudge?.key) endNudge();
+  if (event.key === 'Shift' && previewTarget?.pipeId) clearConnectionPreview();
   if (event.code === 'Space') spaceDown = false;
+  if (event.code === 'Space') renderConnectionTools();
 });
-window.addEventListener('blur', () => { spaceDown = false; endNudge(); });
+window.addEventListener('blur', () => { spaceDown = false; endNudge(); if (drag?.kind === 'connection-vertex') cancelDrag(); if (previewTarget?.pipeId) clearConnectionPreview(); renderConnectionTools(); });
 new ResizeObserver(() => { if (doc) { clearConnectionPreview(); updateView(); } }).observe(svg);
 new ResizeObserver(() => {
   $('editor').style.setProperty('--toolbar-height', `${$('canvas-toolbar').offsetHeight}px`);
@@ -2072,7 +2771,7 @@ async function init() {
       const b = html('button', undefined, 'part-button'); b.dataset.part = entry.type; b.draggable = true;
       b.append(html('span', entry.label.slice(0, 1), 'part-icon'));
       const name = html('span', entry.label); name.append(html('small', entry.type)); b.append(name);
-      b.addEventListener('click', () => { placement = entry.type; mode = 'select'; pendingPort = null; previewTarget = null; reconnect = null; document.body.classList.remove('library-open'); render(); status('在画布点击放置：' + entry.label); });
+      b.addEventListener('click', () => { placement = entry.type; mode = 'select'; pendingPort = null; connectionVertices = []; previewTarget = null; reconnect = null; document.body.classList.remove('library-open'); render(); status('在画布点击放置：' + entry.label); });
       b.addEventListener('dragstart', event => event.dataTransfer.setData('text/rrplot-part', entry.type));
       $('palette').append(b);
     }

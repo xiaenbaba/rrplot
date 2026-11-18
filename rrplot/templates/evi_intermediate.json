@@ -1,34 +1,424 @@
 {
   "schemaVersion": 1,
   "title": "EVI 中间换热器喷气增焓",
-  "page": {"width": 760, "height": 580},
+  "page": {
+    "width": 860,
+    "height": 640
+  },
   "nodes": [
-    {"id": "cond", "type": "heat_exchanger", "title": "冷凝器", "x": 360, "y": 80, "params": {"w": 220, "h": 60, "shape": "rect_x", "orient": "h"}, "rotation": 0},
-    {"id": "evap", "type": "heat_exchanger", "title": "蒸发器", "x": 360, "y": 480, "params": {"w": 220, "h": 60, "shape": "rect_x", "orient": "h"}, "rotation": 0},
-    {"id": "comp", "type": "compressor", "title": "压缩机", "x": 620, "y": 280, "params": {"r": 42, "style": "圆形"}, "rotation": 0},
-    {"id": "eev2", "type": "expansion_valve", "title": "EEV2", "x": 120, "y": 440, "params": {"r": 10, "orient": "v"}, "rotation": 0},
-    {"id": "hex", "type": "intermediate_hex", "title": "中间换热器", "x": 120, "y": 280, "params": {"w": 80, "h": 190, "drop": 0.275, "orient": "v"}, "rotation": 0},
-    {"id": "eev1", "type": "expansion_valve", "title": "EEV1", "x": 40, "y": 165, "params": {"r": 10, "orient": "v"}, "rotation": 0}
+    {
+      "id": "cond",
+      "type": "heat_exchanger",
+      "title": "冷凝器",
+      "x": 560,
+      "y": 80,
+      "params": {
+        "w": 180,
+        "h": 56,
+        "shape": "rect_x",
+        "orient": "h",
+        "stub": 0
+      },
+      "rotation": 0
+    },
+    {
+      "id": "evap",
+      "type": "heat_exchanger",
+      "title": "蒸发器",
+      "x": 125,
+      "y": 310,
+      "params": {
+        "w": 64,
+        "h": 160,
+        "shape": "rect_x",
+        "orient": "h",
+        "stub": 0
+      },
+      "rotation": 0
+    },
+    {
+      "id": "comp",
+      "type": "compressor",
+      "title": "压缩机",
+      "x": 270,
+      "y": 80,
+      "params": {
+        "r": 50,
+        "style": "圆形"
+      },
+      "rotation": 90
+    },
+    {
+      "id": "eev2",
+      "type": "expansion_valve",
+      "title": "主路膨胀阀",
+      "x": 300,
+      "y": 440,
+      "params": {
+        "r": 12,
+        "orient": "h"
+      },
+      "rotation": 180
+    },
+    {
+      "id": "hex",
+      "type": "heat_exchanger",
+      "title": "过冷器",
+      "x": 520,
+      "y": 440,
+      "params": {
+        "w": 200,
+        "h": 80,
+        "shape": "rect_zigzag7",
+        "orient": "h",
+        "stub": 0
+      },
+      "rotation": 0
+    },
+    {
+      "id": "eev1",
+      "type": "expansion_valve",
+      "title": "补气膨胀阀",
+      "x": 640,
+      "y": 570,
+      "params": {
+        "r": 12,
+        "orient": "h"
+      },
+      "rotation": 180
+    },
+    {
+      "id": "solenoid",
+      "type": "solenoid_valve",
+      "title": "电磁阀",
+      "x": 410,
+      "y": 280,
+      "params": {
+        "r": 18,
+        "stem": 12,
+        "handle": 28
+      },
+      "rotation": 0
+    }
   ],
-  "junctions": [{"id": "split", "x": 120, "y": 80}],
+  "junctions": [
+    {
+      "id": "split",
+      "x": 760,
+      "y": 440
+    }
+  ],
   "edges": [
-    {"id": "discharge", "source": {"nodeId": "comp", "portId": "top"}, "target": {"nodeId": "cond", "portId": "right"}, "vertices": [[620, 80]], "headAt": [0.3, 0.7], "head": true, "width": 1.8, "color": "#111111", "linestyle": "solid"},
-    {"id": "suction", "source": {"nodeId": "evap", "portId": "right"}, "target": {"nodeId": "comp", "portId": "bottom"}, "vertices": [[620, 480]], "headAt": [0.3, 0.7], "head": true, "width": 1.8, "color": "#111111", "linestyle": "solid"},
-    {"id": "cond-split", "source": {"nodeId": "cond", "portId": "left"}, "target": {"junctionId": "split"}, "vertices": [], "headAt": [0.55], "head": true, "width": 1.8, "color": "#111111", "linestyle": "solid"},
-    {"id": "main-in", "source": {"junctionId": "split"}, "target": {"nodeId": "hex", "portId": "main_in"}, "vertices": [], "headAt": [0.5], "head": true, "width": 1.8, "color": "#111111", "linestyle": "solid"},
-    {"id": "main-out", "source": {"nodeId": "hex", "portId": "main_out"}, "target": {"nodeId": "eev2", "portId": "in"}, "vertices": [[120, 420]], "headAt": [0.55], "head": true, "width": 1.8, "color": "#111111", "linestyle": "solid"},
-    {"id": "branch-in", "source": {"junctionId": "split"}, "target": {"nodeId": "eev1", "portId": "in"}, "vertices": [[40, 80]], "headAt": [0.5], "head": true, "width": 1.8, "color": "#111111", "linestyle": "solid"},
-    {"id": "branch-expanded", "source": {"nodeId": "eev1", "portId": "out"}, "target": {"nodeId": "hex", "portId": "sub_in"}, "vertices": [[40, 375]], "headAt": [0.55], "head": true, "width": 1.8, "color": "#111111", "linestyle": "solid"},
-    {"id": "to-evap", "source": {"nodeId": "eev2", "portId": "out"}, "target": {"nodeId": "evap", "portId": "left"}, "vertices": [[120, 480]], "headAt": [0.55], "head": true, "width": 1.8, "color": "#111111", "linestyle": "solid"},
-    {"id": "injection", "source": {"nodeId": "hex", "portId": "sub_out"}, "target": {"nodeId": "comp", "portId": "left"}, "vertices": [[88, 185], [558, 185], [558, 280]], "headAt": [0.55], "head": true, "width": 1.8, "color": "#111111", "linestyle": "solid"}
+    {
+      "id": "discharge",
+      "source": {
+        "nodeId": "comp",
+        "portId": "top"
+      },
+      "target": {
+        "nodeId": "cond",
+        "portId": "left"
+      },
+      "vertices": [],
+      "headAt": [
+        0.55
+      ],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid"
+    },
+    {
+      "id": "suction",
+      "source": {
+        "nodeId": "evap",
+        "portId": "top"
+      },
+      "target": {
+        "nodeId": "comp",
+        "portId": "bottom"
+      },
+      "vertices": [
+        [
+          125,
+          80
+        ]
+      ],
+      "headAt": [
+        0.55
+      ],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid"
+    },
+    {
+      "id": "cond-split",
+      "source": {
+        "nodeId": "cond",
+        "portId": "right"
+      },
+      "target": {
+        "junctionId": "split"
+      },
+      "vertices": [
+        [
+          760,
+          80
+        ]
+      ],
+      "headAt": [
+        0.55
+      ],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid"
+    },
+    {
+      "id": "main-in",
+      "source": {
+        "junctionId": "split"
+      },
+      "target": {
+        "nodeId": "hex",
+        "portId": "right"
+      },
+      "vertices": [],
+      "headAt": [
+        0.55
+      ],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid"
+    },
+    {
+      "id": "main-out",
+      "source": {
+        "nodeId": "hex",
+        "portId": "left"
+      },
+      "target": {
+        "nodeId": "eev2",
+        "portId": "in"
+      },
+      "vertices": [],
+      "headAt": [
+        0.55
+      ],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid"
+    },
+    {
+      "id": "branch-in",
+      "source": {
+        "junctionId": "split"
+      },
+      "target": {
+        "nodeId": "eev1",
+        "portId": "in"
+      },
+      "vertices": [
+        [
+          760,
+          570
+        ]
+      ],
+      "headAt": [
+        0.55
+      ],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid"
+    },
+    {
+      "id": "branch-expanded",
+      "source": {
+        "nodeId": "eev1",
+        "portId": "out"
+      },
+      "target": {
+        "nodeId": "hex",
+        "portId": "bottom"
+      },
+      "vertices": [
+        [
+          520,
+          570
+        ]
+      ],
+      "headAt": [
+        0.55
+      ],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid"
+    },
+    {
+      "id": "to-evap",
+      "source": {
+        "nodeId": "eev2",
+        "portId": "out"
+      },
+      "target": {
+        "nodeId": "evap",
+        "portId": "bottom"
+      },
+      "vertices": [
+        [
+          125,
+          440
+        ]
+      ],
+      "headAt": [
+        0.55
+      ],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid"
+    },
+    {
+      "id": "branch-solenoid",
+      "source": {
+        "nodeId": "hex",
+        "portId": "top"
+      },
+      "target": {
+        "nodeId": "solenoid",
+        "portId": "out"
+      },
+      "vertices": [
+        [
+          520,
+          280
+        ]
+      ],
+      "headAt": [
+        0.55
+      ],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid"
+    },
+    {
+      "id": "injection",
+      "source": {
+        "nodeId": "solenoid",
+        "portId": "in"
+      },
+      "target": {
+        "nodeId": "comp",
+        "portId": "vapor_inj"
+      },
+      "vertices": [
+        [
+          270,
+          280
+        ]
+      ],
+      "headAt": [
+        0.55
+      ],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid"
+    }
   ],
   "labels": [
-    {"id": "label-cond", "text": "冷凝器", "x": 0, "y": -44, "size": 15, "ha": "center", "boxed": false, "color": "#111111", "nodeId": "cond"},
-    {"id": "label-evap", "text": "蒸发器", "x": 0, "y": -44, "size": 15, "ha": "center", "boxed": false, "color": "#111111", "nodeId": "evap"},
-    {"id": "label-comp", "text": "压缩机", "x": -60, "y": 26, "size": 15, "ha": "right", "boxed": false, "color": "#111111", "nodeId": "comp"},
-    {"id": "label-eev2", "text": "EEV2", "x": 20, "y": 0, "size": 13, "ha": "left", "boxed": false, "color": "#111111", "nodeId": "eev2"},
-    {"id": "label-hex", "text": "中间换热器", "x": 42, "y": -100, "size": 13, "ha": "left", "boxed": false, "color": "#111111", "nodeId": "hex"},
-    {"id": "label-eev1", "text": "EEV1", "x": 16, "y": 0, "size": 13, "ha": "left", "boxed": false, "color": "#111111", "nodeId": "eev1"},
-    {"id": "label-branch", "text": "喷气支路", "x": 330, "y": 178, "size": 11, "ha": "center", "boxed": false, "color": "#111111"}
+    {
+      "id": "label-cond",
+      "text": "冷凝器",
+      "x": 0,
+      "y": -46,
+      "size": 15,
+      "ha": "center",
+      "boxed": false,
+      "color": "#111111",
+      "nodeId": "cond"
+    },
+    {
+      "id": "label-evap",
+      "text": "蒸发器",
+      "x": -43,
+      "y": 0,
+      "size": 14,
+      "ha": "right",
+      "boxed": false,
+      "color": "#111111",
+      "nodeId": "evap"
+    },
+    {
+      "id": "label-comp",
+      "text": "涡旋压缩机",
+      "x": 61,
+      "y": -66,
+      "size": 15,
+      "ha": "left",
+      "boxed": false,
+      "color": "#111111",
+      "nodeId": "comp"
+    },
+    {
+      "id": "label-eev2",
+      "text": "主路膨胀阀",
+      "x": 0,
+      "y": -36,
+      "size": 13,
+      "ha": "center",
+      "boxed": false,
+      "color": "#111111",
+      "nodeId": "eev2"
+    },
+    {
+      "id": "label-hex",
+      "text": "过冷器",
+      "x": 32,
+      "y": -62,
+      "size": 15,
+      "ha": "left",
+      "boxed": false,
+      "color": "#111111",
+      "nodeId": "hex"
+    },
+    {
+      "id": "label-eev1",
+      "text": "补气膨胀阀",
+      "x": 0,
+      "y": 33,
+      "size": 13,
+      "ha": "center",
+      "boxed": false,
+      "color": "#111111",
+      "nodeId": "eev1"
+    },
+    {
+      "id": "label-solenoid",
+      "text": "电磁阀",
+      "x": 34,
+      "y": -34,
+      "size": 13,
+      "ha": "left",
+      "boxed": false,
+      "color": "#111111",
+      "nodeId": "solenoid"
+    },
+    {
+      "id": "label-branch",
+      "text": "主路分流",
+      "x": 783,
+      "y": 418,
+      "size": 11,
+      "ha": "left",
+      "boxed": false,
+      "color": "#111111"
+    }
   ]
 }

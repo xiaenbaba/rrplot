@@ -29,8 +29,13 @@ REGISTRY = {
                            fields={
         "w": number("宽度", 160, 16, 700),
         "h": number("高度", 56, 16, 700),
-        "shape": choice("画法", "rect_x", parts.HEX_SHAPES),
-        "orient": choice("盘管方向", "h", ["h", "v"])}),
+        "shape": dict(choice("画法", "rect_x", parts.HEX_SHAPES),
+                      optionLabels={"rect_diag": "单对角线",
+                                    "rect_x": "对角交叉",
+                                    "rect_zigzag7": "折线盘管",
+                                    "fan_coil": "风机盘管"}),
+        "orient": choice("折线盘管方向", "h", ["h", "v"]),
+        "stub": number("左右接管长度", 0, 0, 100)}),
     "expansion_valve": dict(label="膨胀阀", factory=parts.make_expansion_valve_x,
                             fields={
         "r": number("半径", 10, 4, 80),
@@ -75,6 +80,28 @@ REGISTRY = {
         "h": number("高度", 26, 12, 180),
         "stub": number("接管长度", 10, 4, 100),
         "n": integer("网格线数", 7, 3, 25)}),
+    "oil_separator": dict(label="油分离器", factory=parts.make_oil_separator,
+                           fields={
+        "w": number("宽度", 40, 16, 300),
+        "h": number("高度", 100, 20, 600),
+        "stub": number("接管长度", 12, 4, 100)}),
+    "capillary": dict(label="毛细管", factory=parts.make_capillary, fields={
+        "w": number("宽度", 18, 6, 100),
+        "h": number("高度", 80, 16, 400),
+        "n": integer("圈数", 5, 1, 25)}),
+    "fan_coil": dict(label="室内风机盘管", factory=parts.make_fan_coil,
+                     legacy=True, fields={
+        "w": number("宽度", 120, 40, 600),
+        "h": number("高度", 64, 24, 400),
+        "stub": number("接管长度", 12, 4, 100)}),
+    "muffler": dict(label="消音器", factory=parts.make_muffler, fields={
+        "w": number("宽度", 36, 12, 200),
+        "h": number("高度", 72, 16, 400),
+        "stub": number("接管长度", 12, 4, 100)}),
+    "sensor": dict(label="温度/压力传感器", factory=parts.make_sensor, fields={
+        "r": number("半径", 14, 8, 80),
+        "stub": number("测量接管长度", 12, 4, 100),
+        "mark": choice("测量类型", "T", ["T", "P"])}),
 }
 
 
@@ -82,7 +109,7 @@ def catalog():
     """仅返回 JSON 可序列化的描述。"""
     return [dict(type=key, label=item["label"],
                  fields=copy.deepcopy(item["fields"]))
-            for key, item in REGISTRY.items()]
+            for key, item in REGISTRY.items() if not item.get("legacy")]
 
 
 def normalize_params(kind, params):
@@ -125,7 +152,7 @@ def describe(kind, params):
     params = normalize_params(kind, params)
     part = make_registered(kind, params)
     if kind in ("compressor", "expansion_valve", "four_way_valve",
-                "solenoid_valve"):
+                "solenoid_valve", "sensor"):
         w = 2 * params["r"]
         h = w
         if kind == "compressor" and params["style"] == "方形":
@@ -147,6 +174,18 @@ def describe(kind, params):
     elif kind in ("check_valve", "filter"):
         left -= params["stub"]
         right += params["stub"]
+    elif kind == "oil_separator":
+        left -= params["stub"]
+        top -= params["stub"]
+        bottom += params["stub"]
+    elif kind in ("fan_coil", "heat_exchanger"):
+        left -= params["stub"]
+        right += params["stub"]
+    elif kind == "muffler":
+        top -= params["stub"]
+        bottom += params["stub"]
+    elif kind == "sensor":
+        bottom += params["stub"]
     return dict(width=w, height=h, box=[left - 3, top - 3,
                                       right - left + 6, bottom - top + 6],
                 ports={key: dict(point=list(point),
