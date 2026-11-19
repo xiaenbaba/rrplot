@@ -2,13 +2,14 @@
 import argparse
 import json
 import mimetypes
+import secrets
 import socket
 import sys
 import threading
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -20,7 +21,17 @@ matplotlib.use("Agg")
 from rrplot import __version__  # noqa: E402
 from rrplot.registry import catalog  # noqa: E402
 from rrplot.scene import TEMPLATES, load_template  # noqa: E402
-from rrplot.scene_renderer import export_scene, resolve_for_editor  # noqa: E402
+from rrplot.scene_renderer import (  # noqa: E402
+    export_scene,
+    preview_glyph,
+    resolve_for_editor,
+)
+from server.service import (  # noqa: E402
+    code_fingerprint,
+    identity,
+    remove_instance,
+    save_instance,
+)
 
 WEB = ROOT / "web"
 MIMES = {"svg": "image/svg+xml", "png": "image/png", "pdf": "application/pdf"}
@@ -60,9 +71,21 @@ class Handler(BaseHTTPRequestHandler):
         path = urlsplit(self.path).path
         try:
             if path == "/api/health":
-                return self.json_response(dict(ok=True, version=__version__))
+                current = code_fingerprint()
+                return self.json_response(dict(
+                    self.server.identity, ok=True, version=__version__,
+                    codeChanged=current != self.server.identity["build"],
+                    diskBuild=current))
             if path == "/api/catalog":
                 return self.json_response(catalog())
+            if path.startswith("/api/glyph/"):
+                query = parse_qs(urlsplit(self.path).query)
+                params = json.loads(query.get("params", ["{}"])[0])
+                if not isinstance(params, dict):
+                    raise ValueError("params 必须是对象")
+                with RENDER_LOCK:
+                    image = preview_glyph(path.rsplit("/", 1)[-1], params)
+                return self.send_data(image, MIMES["svg"])
             if path == "/api/templates":
                 return self.json_response([dict(id=k, title=v)
                                            for k, v in TEMPLATES.items()])
@@ -91,6 +114,16 @@ class Handler(BaseHTTPRequestHandler):
             if self.headers.get_content_type() != "application/json":
                 raise ValueError("请求必须使用 application/json")
             body = json.loads(raw)
+            if path == "/api/shutdown":
+                token = body.get("token") if isinstance(body, dict) else None
+                if (self.headers.get("Origin") is not None
+                        or not isinstance(token, str)
+                        or not secrets.compare_digest(
+                            token, self.server.shutdown_token)):
+                    return self.json_response(dict(error="服务实例身份校验失败"), 403)
+                self.json_response(dict(ok=True))
+                threading.Thread(target=self.server.shutdown, daemon=True).start()
+                return
             if not isinstance(body, dict) or "document" not in body:
                 raise ValueError("请求缺少 document")
             if path == "/api/resolve":
@@ -117,7 +150,10 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def make_server(port=8765):
-    return LocalHTTPServer(("127.0.0.1", port), Handler)
+    server = LocalHTTPServer(("127.0.0.1", port), Handler)
+    server.identity = identity()
+    server.shutdown_token = secrets.token_hex(32)
+    return server
 
 
 def main():
@@ -130,12 +166,15 @@ def main():
         parser.exit(1, f"无法启动本机服务（端口 {args.port}）：{exc}\n"
                     "如服务已启动，请直接打开网页；也可用 --port 指定其他端口。\n")
     with server:
+        save_instance(server)
         print(f"rrplot Web: http://127.0.0.1:{server.server_port}", flush=True)
         print("按 Ctrl+C 停止。", flush=True)
         try:
             server.serve_forever()
         except KeyboardInterrupt:
             pass
+        finally:
+            remove_instance(server)
 
 
 if __name__ == "__main__":

@@ -81,6 +81,32 @@ def test_static_and_catalog_interfaces(service):
     assert request(service, "/api/templates/missing")[0] == 400
 
 
+@pytest.mark.parametrize("kind,params", [
+    ("heat_exchanger", dict(shape="fan_coil")),
+    ("expansion_valve", dict(style="dome")),
+    ("solenoid_valve", dict(style="bowtie")),
+    ("check_valve", dict(style="hollow")),
+])
+def test_symbol_thumbnails_use_registered_styles(service, kind, params):
+    from urllib.parse import quote
+    query = quote(json.dumps(params))
+    path = f"/api/glyph/{kind}?params={query}"
+    status, headers, data = request(service, path)
+    assert status == 200 and b"<svg" in data
+    assert headers["Content-Type"] == "image/svg+xml"
+    assert request(service, path)[2] == data
+
+
+@pytest.mark.parametrize("path", [
+    "/api/glyph/missing", "/api/glyph/compressor?params=null",
+    "/api/glyph/compressor?params=%7B",
+    "/api/glyph/expansion_valve?params=%7B%22style%22:%22bad%22%7D",
+])
+def test_invalid_thumbnail_parameters_are_json_errors(service, path):
+    status, _, data = request(service, path)
+    assert status == 400 and json.loads(data)["error"]
+
+
 def test_legacy_fan_coil_resolves_to_editable_heat_exchanger(service):
     document = dict(schemaVersion=1, title="旧风机盘管",
                     page=dict(width=800, height=600),

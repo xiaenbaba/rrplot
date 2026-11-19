@@ -9,7 +9,7 @@ from matplotlib.patches import Circle, Rectangle
 from matplotlib.transforms import Affine2D
 
 from .core import Diagram
-from .registry import describe, make_registered
+from .registry import describe, make_registered, normalize_params
 from .scene import resolve_scene
 from .style import FONT_STACK
 
@@ -27,6 +27,13 @@ def _glyph(kind, params_json):
             diagram.fig.savefig(out, format="svg", transparent=True,
                                 metadata={"Date": None})
     return "data:image/svg+xml;base64," + base64.b64encode(out.getvalue()).decode()
+
+
+def preview_glyph(kind, params=None):
+    """复用图元缓存提供库与属性面板缩略图，不构建临时图纸。"""
+    normalized = normalize_params(kind, {} if params is None else params)
+    image = _glyph(kind, json.dumps(normalized, sort_keys=True))
+    return base64.b64decode(image.split(",", 1)[1])
 
 
 def resolve_for_editor(document):
@@ -115,6 +122,7 @@ def build_scene(document):
         for label in resolved["labels"]:
             diagram.text(*label["position"], label["text"], size=label["size"],
                          ha=label["ha"], color=label["color"], boxed=label["boxed"])
+            diagram.ax.texts[-1].set_zorder(10)
         return diagram
     except Exception:
         diagram.close()

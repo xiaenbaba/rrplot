@@ -1,0 +1,17 @@
+{
+  "routes": [
+    {"name": "opposite-ports", "source": {"point": [20, 30], "direction": [1, 0]}, "target": {"point": [240, 170], "direction": [-1, 0]}, "vertices": []},
+    {"name": "cross-directions", "source": {"point": [240, 170], "direction": [0, -1]}, "target": {"point": [20, 30], "direction": [1, 0]}, "vertices": []},
+    {"name": "manual-detour", "source": {"point": [20, 30], "direction": [1, 0]}, "target": {"point": [240, 170], "direction": [0, 1]}, "vertices": [[80, 30], [80, 210], [240, 210]]},
+    {"name": "coincident-junctions", "source": {"point": [100, 100], "direction": [0, 0]}, "target": {"point": [100, 100], "direction": [0, 0]}, "vertices": []}
+  ],
+  "mounts": [
+    {"name": "horizontal-forward", "points": [[100, 200], [600, 200]], "at": 0.3, "reverse": false},
+    {"name": "horizontal-backward", "points": [[600, 200], [100, 200]], "at": 0.3, "reverse": true},
+    {"name": "vertical-up", "points": [[300, 500], [300, 100]], "at": 0.75, "reverse": false},
+    {"name": "corner-reverse", "points": [[100, 100], [400, 100], [400, 500]], "at": 0.6, "reverse": true},
+    {"name": "start-endpoint", "points": [[100, 100], [500, 100]], "at": 0, "reverse": false},
+    {"name": "last-endpoint", "points": [[100, 100], [500, 100]], "at": 1, "reverse": true}
+  ]
+}
+

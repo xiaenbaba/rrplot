@@ -239,11 +239,26 @@ export function mountPose(node, geometry, points, mount = node.mount) {
   return { x: info.point[0], y: info.point[1],
     rotation: ((Math.round((tangent - native) / 90) * 90 + (mount.reverse ? 180 : 0)) % 360 + 360) % 360 };
 }
-export function mountedNodes(document, nodes) {
+export function mountedNodes(document, nodes, { strict = true } = {}) {
   if (!nodes.some(node => node.mount)) return nodes;
-  const routes = new Map(document.edges.map(edge => [edge.id, route(
-    endpoint(edge.source, nodes, document.junctions), endpoint(edge.target, nodes, document.junctions), edge.vertices)]));
-  return nodes.map(node => node.mount ? { ...node, ...mountPose(node, node.geometry, routes.get(node.mount.edgeId)) } : node);
+  const edges = new Map(document.edges.map(edge => [edge.id, edge])), routes = new Map();
+  const ready = ref => ref.nodeId
+    ? nodes.some(node => node.id === ref.nodeId && node.geometry.ports[ref.portId])
+    : document.junctions.some(junction => junction.id === ref.junctionId);
+  for (const node of nodes) {
+    if (!node.mount || routes.has(node.mount.edgeId)) continue;
+    const edge = edges.get(node.mount.edgeId);
+    if (!edge) throw new Error('挂接管路不存在。');
+    // Undo can restore an endpoint before its geometry arrives from the server.
+    if (!ready(edge.source) || !ready(edge.target)) continue;
+    routes.set(edge.id, route(endpoint(edge.source, nodes, document.junctions),
+      endpoint(edge.target, nodes, document.junctions), edge.vertices));
+  }
+  return nodes.map(node => {
+    const points = node.mount && routes.get(node.mount.edgeId);
+    if (!points || (!strict && !along(points, 0).length)) return node;
+    return { ...node, ...mountPose(node, node.geometry, points) };
+  });
 }
 export function mountNode(document, nodeId, edgeId, at = .5, reverse = false) {
   const node = document.nodes.find(node => node.id === nodeId);

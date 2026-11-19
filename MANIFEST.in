@@ -1,4 +1,9 @@
 include WEB_PROJECT_PLAN.md
-include start-web.cmd
+include start-web.cmd stop-web.cmd restart-web.cmd status-web.cmd web-service.cmd
+include ROADMAP.md
+include ARCHITECTURE.md CHANGELOG.md
+recursive-include tests/fixtures *.json
+include tests/conftest.py
+recursive-include tools *.py
 recursive-include server *.py
 recursive-include web *.html *.css *.js *.md

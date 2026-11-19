@@ -53,11 +53,13 @@ ruff check rrplot tests examples server
 .\.venv\Scripts\python.exe server\run.py
 ```
 
-打开 <http://127.0.0.1:8765>，左侧“模板”可选择普通热泵、带气液分离器的普通热泵、EVI 过冷器、FTVI 闪蒸罐、EVI 中间换热器、四通阀热泵（制热/制冷），共 7 个模板。可放置图元、连接端口、
+打开 <http://127.0.0.1:8765>，左侧“模板”可选择普通热泵、带气液分离器的普通热泵、EVI 过冷器、FTVI 闪蒸罐、EVI 中间换热器、四通阀热泵（制热/制冷），以及 VRF 多联机制冷、EVI 制热，共 9 个模板。可放置图元、连接端口、
 调整折点和标签、多选管路、批量反转流向和清除折点、跨图纸复制粘贴、批量修改样式、内容居中和页面适配，保存 JSON，并导出 PNG/SVG/PDF。前端使用原生 SVG，
 服务使用 Python 标准库，无需安装 Node.js、npm 或图编辑器框架。
 
-详细操作见 [Web 使用说明](web/README.md)，设计与验收记录见
+支持 `start-web.cmd`、`status-web.cmd`、`stop-web.cmd`、`restart-web.cmd` 统一服务管理。
+现行架构见 [ARCHITECTURE.md](ARCHITECTURE.md)，优化进度见 [ROADMAP.md](ROADMAP.md)。
+详细操作见 [Web 使用说明](web/README.md)，历史设计与验收记录见
 [Web 项目方案](WEB_PROJECT_PLAN.md)。首版面向本机单用户，尚不支持自动避障和全图元库。
 
 ## 快速上手

@@ -1,9 +1,12 @@
 """管路附件的前后端定位、编辑、保存和实际编辑器事件。"""
 
 import copy
+import io
 import json
 
+import numpy as np
 import pytest
+from PIL import Image
 from test_web_checks import inspect
 from test_web_connections import connection_scenario
 from test_web_document import edit_document
@@ -359,3 +362,133 @@ def test_pointer_palette_drag_commits_only_on_canvas_release(end):
     else:
         assert finished["before"] == finished["after"]
     assert finished["suppressed"] is (end != "click")
+
+
+MOUNT_CANVAS = """
+  const shapes=[];
+  shape=(tag,attrs={})=>{
+    shapes.push({tag,...attrs});
+    return {setAttribute(){},classList:{add(){},remove(){},toggle(){}}};
+  };
+  svg.replaceChildren=()=>{shapes.length=0;};
+  renderVertices=()=>{};updateView=()=>{};
+  render=actualRenderCanvas;renderCanvas=actualRenderCanvas;
+"""
+
+
+def test_delete_endpoint_undo_redo_renders_while_geometry_refresh_is_pending():
+    document = mount_document(points=[[100, 200], [600, 200]])
+    document["nodes"].append(dict(id="device", type="compressor", x=650, y=200))
+    document["edges"][0]["target"] = dict(nodeId="device", portId="suction")
+    document = validate_scene(document)
+    output = connection_scenario(
+        MOUNT_CANVAS + """
+      pipeMountsSupported=true;refresh=actualRefresh;
+      const known=new Map(geometries),pending=[];
+      api=(path,body)=>new Promise(resolve=>pending.push({
+        document:structuredClone(body.document),resolve}));
+      const complete=async()=>{
+        const job=pending.shift();
+        job.resolve({nodes:job.document.nodes.map(n=>({...n,
+          geometry:known.get(n.id)})),fontFamily:'serif'});
+        for(let i=0;i<12;i++)await Promise.resolve();
+      };
+      setSelection('node','device');removeSelected();await complete();
+      results.push({deleted:!geometries.has('device'),state:snapshot()});
+      history('undo');
+      results.push({pending:pending.length,state:snapshot()});
+      await complete();
+      results.push({restored:geometries.has('device'),state:snapshot(),
+        drawn:shapes.filter(s=>s['data-kind']==='node').map(s=>s['data-id'])});
+      history('redo');await complete();results.push(snapshot());
+      history('undo');await complete();results.push(snapshot());
+    """,
+        document,
+    )
+    deleted, waiting, restored, redone, undone = output["results"]
+    assert deleted["deleted"]
+    assert not deleted["state"]["doc"]["edges"]
+    assert waiting["pending"] == 1
+    assert waiting["state"]["doc"] == document
+    assert restored["restored"] and set(restored["drawn"]) == {"valve", "device"}
+    assert restored["state"]["doc"] == undone["doc"] == document
+    assert redone["doc"] == deleted["state"]["doc"]
+    assert not output["messages"]
+
+
+@pytest.mark.parametrize("operation", ["edit", "drag"])
+def test_collapsing_mounted_pipe_rolls_back_without_changing_history(operation):
+    output = connection_scenario(
+        MOUNT_CANVAS + "const operation=" + json.dumps(operation) + ";" + """
+      pipeMountsSupported=true;
+      undo=[{old:true}];redo=[{future:true}];ownedDraft='existing-draft';
+      if(operation==='edit'){
+        results.push(snapshot());edit(()=>{doc.junctions[1].x=doc.junctions[0].x;});
+      }
+      else {
+        const hit={dataset:{kind:'junction',id:'b'}};
+        listeners.get('diagram:pointerdown')({button:0,pointerId:1,
+          point:[600,200],target:{closest:()=>hit},preventDefault(){}});
+        results.push(snapshot());
+        listeners.get('diagram:pointermove')({point:[100,200]});
+        results.push({preview:doc.junctions[1].x});
+        listeners.get('diagram:pointerup')({pointerId:1});
+      }
+      const after=snapshot();results.push(after);
+      edit(()=>{doc.junctions[1].x=550;});results.push(snapshot());
+    """,
+        mount_document(points=[[100, 200], [600, 200]]),
+    )
+    before, *others = output["results"]
+    if operation == "drag":
+        assert others.pop(0) == dict(preview=100)
+    rejected, accepted = others
+    for field in ("doc", "undo", "redo", "dirty", "revision", "request", "ownedDraft"):
+        assert rejected[field] == before[field]
+    assert accepted["doc"]["junctions"][1]["x"] == 550
+    assert len(accepted["undo"]) == len(before["undo"]) + 1
+    assert not accepted["redo"]
+    assert output["saves"] == output["refreshes"] == 1
+    assert any("长度为零" in message for message in output["messages"])
+    validate_scene(rejected["doc"])
+    validate_scene(accepted["doc"])
+
+
+def test_rejected_repeated_nudge_keeps_last_valid_move_and_undo():
+    document = mount_document(points=[[100, 200], [102, 200]])
+    output = connection_scenario(
+        MOUNT_CANVAS + """
+      pipeMountsSupported=true;setSelection('junction','b');
+      nudgeSelected({key:'ArrowLeft',repeat:false});results.push(snapshot());
+      nudgeSelected({key:'ArrowLeft',repeat:true});results.push(snapshot());
+      results.push({nudge});
+      history('undo');results.push(snapshot());
+      history('redo');results.push(snapshot());
+    """,
+        document,
+    )
+    accepted, rejected, session, undone, redone = output["results"]
+    assert accepted["doc"] == rejected["doc"] == redone["doc"]
+    assert accepted["doc"]["junctions"][1]["x"] == 101
+    assert accepted["undo"] == rejected["undo"] == [document]
+    assert session == dict(nudge=None)
+    assert undone["doc"] == document
+    assert output["saves"] == output["refreshes"] == 3
+    assert any("长度为零" in message for message in output["messages"])
+
+
+@pytest.mark.parametrize("boxed", [False, True])
+def test_exported_labels_remain_visible_over_mounted_valve_mask(boxed):
+    document = mount_document(at=0.5, points=[[100, 200], [600, 200]])
+    document["nodes"][0]["params"]["h"] = 180
+    document["labels"] = [dict(id="label", nodeId="valve", text="V",
+                               x=0, y=70, size=10, color="red", boxed=boxed)]
+    with Image.open(io.BytesIO(export_scene(document, "png", dpi=100))) as image:
+        labelled = np.asarray(image).copy()
+    document["labels"] = []
+    with Image.open(io.BytesIO(export_scene(document, "png", dpi=100))) as image:
+        unlabelled = np.asarray(image).copy()
+    assert np.count_nonzero(labelled != unlabelled) > 0
+    red = ((labelled[:, :, 0] > 150) & (labelled[:, :, 1] < 100)
+           & (labelled[:, :, 2] < 100))
+    assert np.count_nonzero(red) > 0

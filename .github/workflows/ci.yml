@@ -4,10 +4,13 @@ on:
   push:
     branches: [main, master]
   pull_request:
+  workflow_call:
 
 jobs:
   test:
     runs-on: ${{ matrix.os }}
+    env:
+      RRPLOT_REQUIRE_NODE: "1"
     strategy:
       fail-fast: false
       matrix:
@@ -15,6 +18,10 @@ jobs:
         python-version: ["3.9", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
 
       - uses: actions/setup-python@v5
         with:
@@ -82,7 +89,7 @@ jobs:
         run: python -m pip install ruff==0.15.13
 
       - name: Ruff check
-        run: ruff check rrplot tests examples server
+        run: ruff check rrplot tests examples server tools
 
   package:
     runs-on: ubuntu-latest

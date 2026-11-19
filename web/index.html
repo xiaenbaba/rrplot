@@ -106,7 +106,7 @@
       <div class="property-help">端口连线保持连接关系。改变图元尺寸后，端口和外形同步更新。正式效果请使用顶部预览。</div>
     </aside>
   </main>
-  <footer class="statusbar"><span id="status">正在连接本机绘图服务…</span><span id="counts"></span><span>原生 SVG · 无图编辑器依赖</span></footer>
+  <footer class="statusbar"><span id="status">正在连接本机绘图服务…</span><span id="counts"></span><button id="service-state" title="点击检查本机服务状态" aria-label="检查本机服务状态">检查服务…</button></footer>
   <input id="file-input" type="file" accept=".json,application/json" hidden>
   <dialog id="drafts-dialog" aria-labelledby="drafts-heading"><div class="preview-heading"><strong id="drafts-heading">恢复本机草稿</strong><button data-action="close-drafts">关闭</button></div><div class="drafts-body"><p id="draft-summary" role="status"></p><p class="muted">保留当前自动草稿及最近 5 份受保护的历史草稿。草稿只在当前浏览器与服务地址中可用，清理浏览器数据会删除草稿；请保存 JSON 作为文件备份。</p><p id="draft-error" role="alert"></p><div id="draft-list"></div></div></dialog>
   <dialog id="export-dialog" aria-labelledby="export-heading"><form id="export-form">

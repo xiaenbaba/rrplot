@@ -3,6 +3,9 @@ import { copySelection, captureSelection, pasteFragment, deleteSelection, transl
 import { inspectDiagram } from './checks.js';
 import { objectIndex, filterObjects } from './objects.js';
 import { styleTargets, applyStyles } from './styles.js';
+import { createLatestQueue } from './requests.js';
+import { monitorService } from './service.js';
+import { propertySection, glyphImage } from './inspector.js';
 
 const $ = id => document.getElementById(id);
 const svg = $('diagram');
@@ -39,6 +42,8 @@ let documentLoad = null;
 let navigationSession = null, viewRevision = 0;
 let moveSession = null;
 let revision = 0, request = 0, messageTimer = null;
+let resolveQueue = null;
+const inspectorGroups = new Map();
 let view = { x: -40, y: -30, w: 840, h: 640 };
 
 function html(tag, text, className) {
@@ -78,13 +83,13 @@ async function api(path, body) {
   return response.headers.get('content-type')?.includes('application/json') ? response.json() : response.blob();
 }
 
-function currentNodes() {
+function currentNodes(strict = false) {
   const nodes = doc.nodes.map(n => ({ ...n, geometry: geometries.get(n.id) })).filter(n => n.geometry);
-  return nodes.some(n => n.mount) ? mountedNodes(doc, nodes) : nodes;
+  return nodes.some(n => n.mount) ? mountedNodes(doc, nodes, { strict }) : nodes;
 }
 function syncMounts() {
   if (!doc?.nodes.some(n => n.mount)) return;
-  for (const n of currentNodes()) if (n.mount) {
+  for (const n of currentNodes(true)) if (n.mount) {
     const item = doc.nodes.find(item => item.id === n.id);
     Object.assign(item, { x: n.x, y: n.y, rotation: n.rotation });
   }
@@ -468,7 +473,9 @@ async function refresh() {
   const token = ++request, version = revision;
   status('正在更新图纸…');
   try {
-    const result = await api('resolve', { document: doc });
+    resolveQueue ||= createLatestQueue(body => api('resolve', body));
+    const result = await resolveQueue({ document: clone(doc) });
+    if (!result) return;
     if (token !== request || version !== revision) return;
     geometries = new Map(result.nodes.map(n => [n.id, n.geometry]));
     syncMounts();
@@ -486,13 +493,17 @@ async function refresh() {
 }
 
 function finishEdit(before, { merge = false, deferRefresh = false } = {}) {
-  syncMounts();
+  try { syncMounts(); }
+  catch (error) {
+    doc = before; message(error.message); render(); return false;
+  }
   if (JSON.stringify(before) === JSON.stringify(doc)) return render();
   cancelDocumentLoad();
   if (!merge || !undo.length) { undo.push(before); if (undo.length > 80) undo.shift(); }
   redo = [];
   dirty = true; revision++; saveDraft(); render();
   if (!deferRefresh) void refresh();
+  return true;
 }
 function edit(fn) {
   if (!doc) return;
@@ -868,6 +879,10 @@ function field(parent, caption, value, setter, options = {}) {
 function inspectorButton(parent, caption, action) {
   const b = html('button', caption); b.addEventListener('click', action); parent.append(b); return b;
 }
+function inspectorSection(parent, caption) {
+  return propertySection(parent, caption, inspectorGroups.get(caption) !== false,
+    open => inspectorGroups.set(caption, open));
+}
 function renderInspector() {
   renderHint();
   renderObjectList();
@@ -941,20 +956,24 @@ function renderInspector() {
   root.append(html('h2', kind === 'node' ? item.title : { edge: '管路', label: '文字标签', junction: '分流三通' }[kind], 'object-heading'));
   if (kind !== 'label' || item.nodeId || item.edgeId) connectedSelectionButton(root);
   if (kind === 'node') {
-    field(root, '设备名称', item.title, v => {
+    const position = inspectorSection(root, '名称与位置');
+    field(position, '设备名称', item.title, v => {
       const l = doc.labels.find(l => l.nodeId === item.id && l.text === item.title);
       if (l) l.text = v; item.title = v;
     });
     if (!item.mount) {
-      coordinateFields(root, item);
-      field(root, '旋转角度', item.rotation, v => { item.rotation = Number(v); }, { options: [0, 90, 180, 270] });
+      coordinateFields(position, item);
+      field(position, '旋转角度', item.rotation, v => { item.rotation = Number(v); }, { options: [0, 90, 180, 270] });
     }
-    if (MOUNT_TYPES.includes(item.type)) renderMountFields(root, item);
-    root.append(html('div', '图元参数', 'section-label'));
+    if (MOUNT_TYPES.includes(item.type)) renderMountFields(inspectorSection(root, '管路挂接'), item);
+    const parameters = inspectorSection(root, '图元参数');
+    const preview = html('figure', undefined, 'glyph-preview');
+    preview.append(glyphImage(item.type, item.params, item.title));
+    preview.append(html('figcaption', '当前样式 · 连接端口按画布旋转')); parameters.append(preview);
     if (item.type === 'solenoid_valve') root.append(html('p', '阀体样式可选圆圈 X＋横杆或对顶三角＋横杆＋Σ 折线。切换保持端口与挂接；对顶三角样式的执行机构保持水平朝上、竖直朝右，不随反向挂接翻转。', 'muted'));
     if (item.type === 'expansion_valve') root.append(html('p', '阀体样式可选圆圈 X 或对顶三角＋半圆穹顶，切换保持端口与挂接。穹顶按画布连接方向自动保持水平朝上、竖直朝右，不随管路反向翻到另一侧。', 'muted'));
     const entry = catalog.find(c => c.type === item.type);
-    for (const [key, f] of Object.entries(entry.fields)) field(root, f.label, item.params[key], v => { item.params[key] = v; }, f);
+    for (const [key, f] of Object.entries(entry.fields)) field(parameters, f.label, item.params[key], v => { item.params[key] = v; }, f);
     if (item.type === 'four_way_valve') root.append(html('p', 'D / exhaust：排气；S / suction：回气；C / condenser、E / evaporator：两侧换热器。端口随旋转移动，图元只表示接管关系。', 'muted'));
     if (item.type === 'check_valve') root.append(html('p', '阀体样式可选黑色实心或空心黑框，切换样式保持端口与挂接。三角尖端指向 out；改变流通方向会交换 in/out 的位置，已有管路继续按端口 ID 跟随。', 'muted'));
     inspectorButton(root, '添加设备标签', () => edit(() => {
@@ -2852,7 +2871,7 @@ function nudgeSelected(event) {
     const merge = !!event.repeat && nudge?.key === event.key && nudge.refs === refs && nudge.version === revision;
     const before = doc; doc = next;
     ++request;
-    finishEdit(before, { merge, deferRefresh: true });
+    if (finishEdit(before, { merge, deferRefresh: true }) === false) { endNudge(); return; }
     nudge = { key: event.key, refs, version: revision };
     status(`已微调 ${event.shiftKey ? 10 : 1} 单位 · 松开方向键结束 · Ctrl+Z 撤销`);
   } catch (error) { endNudge(); message(error.message); }
@@ -2910,12 +2929,14 @@ new ResizeObserver(() => {
 }).observe($('canvas-toolbar'));
 
 async function init() {
+  monitorService($('service-state'));
   try {
     const data = await Promise.all([api('catalog'), api('templates'), api('templates/evi_ftvi')]);
     [catalog] = data;
     for (const entry of catalog) {
       const b = html('button', undefined, 'part-button'); b.dataset.part = entry.type; b.draggable = false;
-      b.append(html('span', entry.label.slice(0, 1), 'part-icon'));
+      const icon = html('span', undefined, 'part-icon');
+      icon.append(glyphImage(entry.type, {}, '')); b.append(icon);
       const name = html('span', entry.label); name.append(html('small', entry.type)); b.append(name);
       b.addEventListener('click', event => {
         if (suppressedPaletteClick === b && event.detail !== 0) { suppressedPaletteClick = null; return; }

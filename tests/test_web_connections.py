@@ -20,7 +20,7 @@ def connection_scenario(code, document=None):
     modules = {
         name: "data:text/javascript;base64,"
         + base64.b64encode(root.joinpath("web", name + ".js").read_bytes()).decode()
-        for name in ["geometry", "document", "checks"]
+        for name in ["geometry", "document", "checks", "requests"]
     }
     script = r"""
 import fs from 'node:fs';import vm from 'node:vm';
@@ -28,6 +28,7 @@ const input=JSON.parse(fs.readFileSync(0,'utf8'));
 const geometry=await import(input.modules.geometry);
 const edits=await import(input.modules.document);
 const checks=await import(input.modules.checks);
+const requests=await import(input.modules.requests);
 const elements=new Map(),listeners=new Map(),messages=[],statuses=[],results=[];
 const observers=[];
 let uuid=0,saves=0,refreshes=0;
@@ -37,7 +38,7 @@ function element(id){if(!elements.has(id))elements.set(id,{
   focus(){},setPointerCapture(){},classes:{},classList:{remove(){},add(){},
     toggle(name,on){element(id).classes[name]=on;}},hasPointerCapture:()=>false});
   return elements.get(id);}
-const context=vm.createContext({...geometry,...edits,...checks,input,
+const context=vm.createContext({...geometry,...edits,...checks,...requests,input,
   structuredClone,results,messages,listeners,
   crypto:{randomUUID:()=>String(++uuid).padStart(8,'0')},
   document:{getElementById:element,querySelector:s=>s==='.canvas-hint'
@@ -54,6 +55,7 @@ vm.runInContext(source,context);
 vm.runInContext(`doc=structuredClone(input.resolved.document);
   geometries=new Map(input.resolved.nodes.map(n=>[n.id,n.geometry]));
   globalThis.actualRenderCanvas=renderCanvas;
+  globalThis.actualRefresh=refresh;
   render=()=>{};renderCanvas=()=>{renderHint();};
   world=event=>event.point||[0,0];status=recordStatus;
   message=m=>messages.push(m);saveDraft=save;refresh=recordRefresh;
