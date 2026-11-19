@@ -121,8 +121,8 @@ const context=vm.createContext({structuredClone,...edits,input:input.value,butto
   document:{getElementById:()=>element,addEventListener(){},
     querySelector:()=>modal?{}:null,body:element},
   window:{addEventListener(){}},ResizeObserver:class{observe(){}}});
-const source=fs.readFileSync(input.app,'utf8').replace(/^import .*;\r?$/gm,'')
-  .replace('void init();','');
+const source=(await import('node:module')).createRequire(input.app)
+  ('../tests/web_editor_harness.cjs').loadEditorSource(input.app);
 vm.runInContext(source,context);
 vm.runInContext(`doc=structuredClone(input.document);
   multiSelection=input.refs;selection=multiSelection.at(-1);

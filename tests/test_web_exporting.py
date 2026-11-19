@@ -41,8 +41,8 @@ const context=vm.createContext({input,structuredClone,Blob,
     return new Blob(['export-file']);},
   downloadFile:(blob,name)=>files.push(name),
   showMessage:text=>messages.push(text),setStatus:text=>statuses.push(text)});
-const source=fs.readFileSync(input.path,'utf8').replace(/^import .*;\r?$/gm,'')
-  .replace('void init();','');
+const source=(await import('node:module')).createRequire(input.path)
+  ('../tests/web_editor_harness.cjs').loadEditorSource(input.path);
 vm.runInContext(source,context);
 element('export-format').value=o.format||'svg';
 element('export-dpi').value=String(o.dpi??140);

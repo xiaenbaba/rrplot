@@ -43,8 +43,8 @@ const context=vm.createContext({input,structuredClone,messages,statuses,results,
       features:body.document.title==='过期' ? [] : ['edgeLabels']};},
   element,listeners,storage,pending,calls,options:o,
   tick:async()=>{for(let i=0;i<12;i++)await Promise.resolve();}});
-const source=fs.readFileSync(input.path,'utf8').replace(/^import .*;\r?$/gm,'')
-  .replace('void init();','');
+const source=(await import('node:module')).createRequire(input.path)
+  ('../tests/web_editor_harness.cjs').loadEditorSource(input.path);
 vm.runInContext(source,context);
 vm.runInContext(`doc=structuredClone(input.original);api=send;
   message=m=>messages.push(m);status=m=>statuses.push(m);

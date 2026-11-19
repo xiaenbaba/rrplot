@@ -33,8 +33,8 @@ const context=vm.createContext({...edits,input,structuredClone,
   document:{getElementById:element,body:element('body'),addEventListener(){},
     querySelector:()=>modal?{}:null},window:{addEventListener(){}},
   ResizeObserver:class{observe(){}},setModal:v=>{modal=v;}});
-const source=fs.readFileSync(input.app,'utf8').replace(/^import .*;\r?$/gm,'')
-  .replace('void init();','');
+const source=(await import('node:module')).createRequire(input.app)
+  ('../tests/web_editor_harness.cjs').loadEditorSource(input.app);
 vm.runInContext(source,context);
 vm.runInContext(`doc=structuredClone(input.document);render=()=>{};
   status=m=>statuses.push(m);message=m=>messages.push(m);

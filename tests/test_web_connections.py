@@ -55,9 +55,8 @@ const context=vm.createContext({...geometry,...edits,...checks,...requests,...gl
   ResizeObserver:class{constructor(callback){this.callback=callback;}
     observe(target){observers.push({target,callback:this.callback});}},observers,
   save:()=>saves++,recordRefresh:()=>refreshes++,recordStatus:m=>statuses.push(m)});
-const source=fs.readFileSync(input.path,'utf8').split(String.fromCharCode(10))
-  .filter(line=>!line.startsWith('import ')).join(String.fromCharCode(10))
-  .replace("monitorService($('service-state'));",'').replace('void init();','');
+const source=(await import('node:module')).createRequire(input.path)
+  ('../tests/web_editor_harness.cjs').loadEditorSource(input.path);
 vm.runInContext(source,context);
 vm.runInContext(`doc=structuredClone(input.resolved.document);
   geometries=new Map(input.resolved.nodes.map(n=>[n.id,n.geometry]));

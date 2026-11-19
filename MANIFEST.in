@@ -4,6 +4,7 @@ include ROADMAP.md
 include ARCHITECTURE.md CHANGELOG.md
 recursive-include tests/fixtures *.json
 include tests/conftest.py
+include tests/web_editor_harness.cjs
 recursive-include tools *.py
 recursive-include server *.py
 recursive-include web *.html *.css *.js *.md

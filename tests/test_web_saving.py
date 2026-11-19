@@ -55,8 +55,8 @@ context=vm.createContext({structuredClone,Blob,input,events,messages,statuses,
   ResizeObserver:class{observe(){}},
   resolveAPI:async(path,body)=>{await phase('resolve');return{document:body.document};},
   downloadFile:(blob,name)=>{events.push('download');downloads.push({blob,name});}});
-const source=fs.readFileSync(input.path,'utf8').replace(/^import .*;\r?$/gm,'')
-  .replace('void init();','');
+const source=(await import('node:module')).createRequire(input.path)
+  ('../tests/web_editor_harness.cjs').loadEditorSource(input.path);
 vm.runInContext(source,context);
 vm.runInContext(`doc=structuredClone(input.document);dirty=input.options.clean!==true;
   api=resolveAPI;download=downloadFile;status=text=>statuses.push(text);

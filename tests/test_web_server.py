@@ -68,6 +68,17 @@ def test_static_and_catalog_interfaces(service):
     assert status == 200 and b"applyStyles" in body
     assert headers["Content-Type"].startswith("text/javascript")
     assert json.loads(request(service, "/api/health")[2])["ok"] is True
+
+
+def test_editor_controller_modules_are_served_as_javascript(service):
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1] / "web/editor"
+    for module in root.glob("*.js"):
+        status, headers, body = request(service, "/editor/" + module.name)
+        assert status == 200, module.name
+        assert headers["Content-Type"].startswith("text/javascript")
+        assert body == module.read_bytes()
     kinds = {entry["type"] for entry in
              json.loads(request(service, "/api/catalog")[2])}
     assert {"compressor", "heat_exchanger", "expansion_valve", "vessel",

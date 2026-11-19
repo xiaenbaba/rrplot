@@ -51,8 +51,8 @@ const context=vm.createContext({...geometry,...styles,input,structuredClone,
     if(o.wait)await new Promise((resolve,reject)=>pending.push({resolve,reject}));
     if(o.fail)throw Error('定位服务失败');return structuredClone(input.resolved);},
   tick:async()=>{for(let i=0;i<10;i++)await Promise.resolve();}});
-const source=fs.readFileSync(input.path,'utf8').replace(/^import .*;\r?$/gm,'')
-  .replace('void init();','');
+const source=(await import('node:module')).createRequire(input.path)
+  ('../tests/web_editor_harness.cjs').loadEditorSource(input.path);
 vm.runInContext(source,context);
 vm.runInContext(`doc=structuredClone(input.resolved.document);api=send;
   message=m=>messages.push(m);status=m=>statuses.push(m);

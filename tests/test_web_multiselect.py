@@ -90,11 +90,12 @@ const context=vm.createContext({structuredClone,...geometry,...edits,...styles,
     body:{classList:{remove(){},add(){}}}},
   window:{addEventListener(){}},ResizeObserver:class{observe(){}},
   input:input.value});
-const source=fs.readFileSync(input.app,'utf8').replace(/^import .*;\r?$/gm,'')
-  .replace('void init();','');
+const source=(await import('node:module')).createRequire(input.app)
+  ('../tests/web_editor_harness.cjs').loadEditorSource(input.app);
 vm.runInContext(source,context);
 vm.runInContext("doc=structuredClone(input);render=()=>{};renderInspector=()=>{};"
-  +"renderVertices=()=>{};world=()=>[0,0];status=()=>{};",context);
+  +"globalThis.actualRenderVertices=renderVertices;renderVertices=()=>{};"
+  +"world=()=>[0,0];status=()=>{};",context);
 function snapshot(){return JSON.parse(vm.runInContext(
   'JSON.stringify({selection,multiSelection,doc,drag})',context));}
 function click(kind,id,shift=false){
@@ -119,8 +120,7 @@ listeners.get('dblclick')({shiftKey:true,
   target:{closest:()=>highlights.get('edge:to-evap')}});
 const shiftedDouble=snapshot();
 // Real renderer must exit before accessing primary node or pipe geometry.
-vm.runInContext(source.slice(source.indexOf('function renderVertices()'),
-  source.indexOf('function field(')),context);
+vm.runInContext('renderVertices=actualRenderVertices;',context);
 vm.runInContext("setSelection('node','comp');setSelection('edge','suction',true);"
   +"renderVertices();",context);
 console.log(JSON.stringify({states,highlighted,shiftedDouble,final:snapshot()}));

@@ -9,7 +9,7 @@ window.addEventListener('message', event => {
     const rows = document.getElementById('rows'); rows.replaceChildren();
     for (const row of event.data.result.rows) {
       const tr = document.createElement('tr');
-      for (const key of ['nodes', 'loadMs', 'renderMs', 'selectMs', 'moveMs', 'undoMs', 'frameMs', 'domElements']) {
+      for (const key of ['nodes', 'loadMs', 'loadToFramesMs', 'renderMs', 'selectMs', 'moveMs', 'undoMs', 'frameMs', 'domElements']) {
         const td = document.createElement('td'); td.textContent = Number.isInteger(row[key]) ? row[key] : row[key].toFixed(2); tr.append(td);
       }
       rows.append(tr);

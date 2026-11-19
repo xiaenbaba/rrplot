@@ -37,8 +37,8 @@ const context=vm.createContext({input,structuredClone,results,messages,calls,
   ResizeObserver:class{constructor(callback){this.callback=callback;}
     observe(target){resizeObservers.set(target,this.callback);}},
   element,listeners,resizeObservers});
-const source=fs.readFileSync(input.path,'utf8').replace(/^import .*;\r?$/gm,'')
-  .replace('void init();','');
+const source=(await import('node:module')).createRequire(input.path)
+  ('../tests/web_editor_harness.cjs').loadEditorSource(input.path);
 vm.runInContext(source,context);
 vm.runInContext(`doc=structuredClone(input.document);render=()=>{};
   status=()=>{};message=m=>messages.push(m);

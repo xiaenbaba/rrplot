@@ -1,9 +1,9 @@
 <!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>rrplot 性能测量</title>
 <link rel="stylesheet" href="/style.css"><style>body{display:block;overflow:auto;padding:24px}iframe{display:block;width:1280px;height:760px;border:1px solid #ccd8d2;margin-top:16px}pre{white-space:pre-wrap}table{border-collapse:collapse;margin:16px 0}td,th{padding:8px 12px;border:1px solid #ccd8d2;text-align:right}h1{font-size:22px}</style></head>
-<body><h1>编辑器性能测量</h1><p>独立合成图纸：50 / 200 / 500 设备，不读写图纸草稿。每项重复 3 次取中位数；耗时含编辑器实际 DOM 更新，不代表连续拖动帧率。</p>
+<body><h1>编辑器性能测量</h1><p>独立合成图纸：50 / 200 / 500 设备，不读写图纸草稿。每次先清空场景，再测首次载入；交互重复 3 次取中位数。载入含本机请求和同步 DOM 更新，后续布局/绘制由浏览器完成。“载入至双帧”另记等待，后台节流会影响结果，不代表连续拖动帧率。</p>
 <button id="run" disabled>运行测量</button><span id="state" role="status">正在载入测试编辑器…</span>
-<table><thead><tr><th>设备</th><th>载入 ms</th><th>绘制 ms</th><th>选择 ms</th><th>移动 ms</th><th>撤销 ms</th><th>双帧等待 ms</th><th>DOM 元素</th></tr></thead><tbody id="rows"></tbody></table>
+<table><thead><tr><th>设备</th><th>同步载入 ms</th><th>载入至双帧 ms</th><th>绘制 ms</th><th>选择 ms</th><th>移动 ms</th><th>撤销 ms</th><th>双帧等待 ms</th><th>DOM 元素</th></tr></thead><tbody id="rows"></tbody></table>
 <iframe id="test-editor" title="独立性能测试画布" src="/?benchmark=1"></iframe>
 <details><summary>原始测量数据（JSON）</summary><pre id="result"></pre></details>
 <script type="module" src="/performance.js"></script></body></html>

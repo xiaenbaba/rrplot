@@ -209,8 +209,8 @@ const context=vm.createContext({structuredClone,
     querySelector:()=>scenario?.dialog?{}:null,body:element},
   window:{addEventListener:(name,handler)=>listeners.set(name,handler)},
   ResizeObserver:class {observe(){}},calls});
-const source=fs.readFileSync(input.path,'utf8')
-  .replace(/^import .*;\r?$/gm,'').replace('void init();','');
+const source=(await import('node:module')).createRequire(input.path)
+  ('../tests/web_editor_harness.cjs').loadEditorSource(input.path);
 vm.runInContext(source,context);
 vm.runInContext("copyToClipboard=()=>calls.push('copy');"
   +"pasteClipboard=()=>calls.push('paste');"

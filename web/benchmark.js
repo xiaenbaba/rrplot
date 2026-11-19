@@ -12,10 +12,16 @@ const median = values => [...values].sort((a, b) => a - b)[Math.floor(values.len
 export async function runBenchmark(editor, sizes = [50, 200, 500], repeat = 3) {
   const rows = [];
   for (const count of sizes) {
+    // Remove the previous scene outside the timer. Each measured load must build
+    // a fresh scene, rather than reusing the first N IDs from the smaller size.
+    await editor.load(sampleDocument(0));
+    await frame(); await frame();
     const start = performance.now();
     await editor.load(sampleDocument(count));
     const loadMs = performance.now() - start;
+    const loadPhases = editor.loadMetrics?.();
     await frame(); await frame();
+    const loadToFramesMs = performance.now() - start;
     const samples = { renderMs: [], selectMs: [], moveMs: [], undoMs: [], frameMs: [] };
     for (let i = 0; i < repeat; i++) {
       for (const [key, action] of [['renderMs', editor.render], ['selectMs', editor.select],
@@ -25,10 +31,10 @@ export async function runBenchmark(editor, sizes = [50, 200, 500], repeat = 3) {
       const t = performance.now(); await frame(); await frame();
       samples.frameMs.push(performance.now() - t);
     }
-    rows.push({ nodes: count, edges: count - 1, loadMs,
+    rows.push({ nodes: count, edges: count - 1, loadMs, loadPhases, loadToFramesMs,
       ...Object.fromEntries(Object.entries(samples).map(([k, v]) => [k, median(v)])),
       domElements: editor.elements(), repeat });
   }
   return { measuredAt: new Date().toISOString(), userAgent: navigator.userAgent,
-    viewport: [innerWidth, innerHeight], rows };
+    viewport: [innerWidth, innerHeight], visibility: document.visibilityState, rows };
 }

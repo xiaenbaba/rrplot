@@ -63,8 +63,8 @@ const context=vm.createContext({input,structuredClone,Blob,
   send:async(path,body)=>{calls.push({path,body:structuredClone(body)});
     await phase('api');return new Blob(['svg-preview']);},
   showMessage:text=>messages.push(text),setStatus:text=>statuses.push(text)});
-const source=fs.readFileSync(input.path,'utf8').replace(/^import .*;\r?$/gm,'')
-  .replace('void init();','');
+const source=(await import('node:module')).createRequire(input.path)
+  ('../tests/web_editor_harness.cjs').loadEditorSource(input.path);
 vm.runInContext(source,context);
 vm.runInContext(`doc=structuredClone(input.document);dirty=input.options.clean!==true;
   api=send;message=showMessage;status=setStatus;saveDraft();`,context);
