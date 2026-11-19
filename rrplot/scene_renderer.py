@@ -1,5 +1,6 @@
 """将可编辑 JSON 图纸适配为现有 Matplotlib 绘图。"""
 import base64
+import hashlib
 import io
 import json
 from functools import lru_cache
@@ -9,7 +10,7 @@ from matplotlib.patches import Circle, Rectangle
 from matplotlib.transforms import Affine2D
 
 from .core import Diagram
-from .registry import describe, make_registered, normalize_params
+from .registry import describe, glyph_rotation, make_registered, normalize_params
 from .scene import resolve_scene
 from .style import FONT_STACK
 
@@ -36,13 +37,22 @@ def preview_glyph(kind, params=None):
     return base64.b64decode(image.split(",", 1)[1])
 
 
-def resolve_for_editor(document):
+def resolve_for_editor(document, *, shared_glyphs=False):
     result = resolve_scene(document)
+    glyphs = {}
     for node in result["nodes"]:
-        node["geometry"]["image"] = _glyph(
-            node["type"], json.dumps(node["params"], sort_keys=True))
+        params = json.dumps(node["params"], sort_keys=True)
+        if shared_glyphs:
+            key = hashlib.sha256((node["type"] + params).encode()).hexdigest()
+            node["geometry"]["glyphId"] = key
+            if key not in glyphs:
+                glyphs[key] = _glyph(node["type"], params)
+        else:
+            node["geometry"]["image"] = _glyph(node["type"], params)
+    if shared_glyphs:
+        result["glyphs"] = glyphs
     result["fontFamily"] = ", ".join(FONT_STACK)
-    result["features"] = ["edgeLabels", "pipeMounts"]
+    result["features"] = ["edgeLabels", "pipeMounts", "sharedGlyphs"]
     return result
 
 
@@ -70,12 +80,8 @@ def _rotated(part, angle):
 def _node_part(node):
     """只校正阀顶执行机构朝向,保留场景端口、挂接及标签旋转。"""
     params = node["params"]
-    angle = node["rotation"]
-    if node["type"] == "expansion_valve" and params["style"] == "dome":
-        if (angle + (90 if params["orient"] == "v" else 0)) % 360 >= 180:
-            angle = (angle + 180) % 360
-    elif node["type"] == "solenoid_valve" and params["style"] == "bowtie":
-        angle %= 180
+    angle = (node["rotation"] + glyph_rotation(
+        node["type"], params, node["rotation"])) % 360
     return _rotated(make_registered(node["type"], params), angle)
 
 

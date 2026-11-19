@@ -20,7 +20,7 @@ def connection_scenario(code, document=None):
     modules = {
         name: "data:text/javascript;base64,"
         + base64.b64encode(root.joinpath("web", name + ".js").read_bytes()).decode()
-        for name in ["geometry", "document", "checks", "requests"]
+        for name in ["geometry", "document", "checks", "requests", "glyphs"]
     }
     script = r"""
 import fs from 'node:fs';import vm from 'node:vm';
@@ -29,6 +29,12 @@ const geometry=await import(input.modules.geometry);
 const edits=await import(input.modules.document);
 const checks=await import(input.modules.checks);
 const requests=await import(input.modules.requests);
+const glyphs=await import(input.modules.glyphs);
+// Shape-recording interaction scenarios use a stateless renderer; renderer
+// identity/order/cache behavior is covered separately in test_web_canvas.py.
+const createCanvasRenderer=root=>({begin:()=>root.replaceChildren(),
+  group:(key,tag,attrs)=>({element:vm.runInContext('shape',context)(tag,attrs),changed:true}),
+  place:element=>root.append(element),end:()=>{}});
 const elements=new Map(),listeners=new Map(),messages=[],statuses=[],results=[];
 const observers=[];
 let uuid=0,saves=0,refreshes=0;
@@ -38,7 +44,8 @@ function element(id){if(!elements.has(id))elements.set(id,{
   focus(){},setPointerCapture(){},classes:{},classList:{remove(){},add(){},
     toggle(name,on){element(id).classes[name]=on;}},hasPointerCapture:()=>false});
   return elements.get(id);}
-const context=vm.createContext({...geometry,...edits,...checks,...requests,input,
+const context=vm.createContext({...geometry,...edits,...checks,...requests,...glyphs,
+  createCanvasRenderer,input,
   structuredClone,results,messages,listeners,
   crypto:{randomUUID:()=>String(++uuid).padStart(8,'0')},
   document:{getElementById:element,querySelector:s=>s==='.canvas-hint'
@@ -50,7 +57,7 @@ const context=vm.createContext({...geometry,...edits,...checks,...requests,input
   save:()=>saves++,recordRefresh:()=>refreshes++,recordStatus:m=>statuses.push(m)});
 const source=fs.readFileSync(input.path,'utf8').split(String.fromCharCode(10))
   .filter(line=>!line.startsWith('import ')).join(String.fromCharCode(10))
-  .replace('void init();','');
+  .replace("monitorService($('service-state'));",'').replace('void init();','');
 vm.runInContext(source,context);
 vm.runInContext(`doc=structuredClone(input.resolved.document);
   geometries=new Map(input.resolved.nodes.map(n=>[n.id,n.geometry]));

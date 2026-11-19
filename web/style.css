@@ -160,6 +160,9 @@ input[type=checkbox] { min-height: unset; accent-color: var(--accent); }
 #load-description { overflow-wrap: anywhere; }
 #load-banner button { min-height: 24px; padding: 3px 7px; margin-left: 8px; font-size: 10px; }
 #load-banner .load-note { display: block; margin-top: 4px; }
+#request-banner { padding: 9px 14px; background: #fff3de; color: #79551d; font-size: 12px; z-index: 2; }
+#request-banner button { margin-left: 10px; min-height: 26px; font-size: 11px; }
+#request-banner .muted { display: block; margin-top: 4px; }
 #draft-description { overflow-wrap: anywhere; }
 #drafts-dialog { width: min(560px, 94vw); height: fit-content; max-height: 85vh; }
 .drafts-body { padding: 8px 20px 20px; }

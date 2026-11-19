@@ -46,17 +46,17 @@ def sample_document(count):
     )
 
 
-def benchmark(count, repeat):
+def benchmark(count, repeat, shared=False):
     document = sample_document(count)
     started = time.perf_counter()
-    resolve_for_editor(document)
+    resolve_for_editor(document, shared_glyphs=shared)
     warmup = (time.perf_counter() - started) * 1000
     samples = []
     for _ in range(repeat):
         changed = copy.deepcopy(document)
         changed["nodes"][count // 2]["x"] += 1
         started = time.perf_counter()
-        result = resolve_for_editor(changed)
+        result = resolve_for_editor(changed, shared_glyphs=shared)
         samples.append((time.perf_counter() - started) * 1000)
     return dict(
         nodes=count,
@@ -65,6 +65,7 @@ def benchmark(count, repeat):
         resolveMedianMs=round(statistics.median(samples), 2),
         responseBytes=len(json.dumps(result).encode()),
         repeat=repeat,
+        sharedGlyphs=shared,
     )
 
 
@@ -72,12 +73,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sizes", type=int, nargs="+", default=[50, 200, 500])
     parser.add_argument("--repeat", type=int, default=5)
+    parser.add_argument("--shared", action="store_true")
     args = parser.parse_args()
     if args.repeat < 1 or any(n < 1 or n > 500 for n in args.sizes):
         parser.error("repeat 至少 1，节点数量为 1～500")
     print(
         json.dumps(
-            [benchmark(n, args.repeat) for n in args.sizes],
+            [benchmark(n, args.repeat, args.shared) for n in args.sizes],
             ensure_ascii=False,
             indent=2,
         )

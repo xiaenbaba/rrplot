@@ -16,7 +16,7 @@
       <button data-action="drafts" id="draft-open">草稿</button>
       <button data-action="save" id="save-json">保存 JSON</button><span class="divider"></span>
       <button data-action="undo" id="undo" title="撤销 Ctrl+Z">↶</button><button data-action="redo" id="redo" title="重做 Ctrl+Y">↷</button>
-      <button data-action="check" title="检查连接关系和页面边界">检查</button><button data-action="preview" id="preview-open">预览</button>
+      <button data-action="check" title="检查连接、页面边界、设备重叠与文字压线">检查</button><button data-action="preview" id="preview-open">预览</button>
       <button data-action="export" id="export-open" class="primary">导出 ↓</button>
       <button data-action="help" aria-label="帮助与快捷键" aria-controls="help-dialog" aria-haspopup="dialog" title="帮助与快捷键（?）">?</button>
     </div>
@@ -89,6 +89,7 @@
       <div id="draft-banner" hidden><span id="draft-description"></span><button data-action="restore">恢复草稿</button><button data-action="dismiss-draft">暂不恢复</button></div>
       <div id="load-banner" role="status" hidden><span id="load-description"></span><button data-action="cancel-load">取消载入</button><span class="load-note">继续编辑会保留当前修改，旧载入结果将被丢弃。</span></div>
       <div id="download-banner" role="status" hidden>JSON 下载已发起，请检查文件已保存。<button data-action="confirm-download">确认已保存</button><button data-action="dismiss-download">暂不确认</button><span>确认前保留未保存标记和本机草稿。</span></div>
+      <div id="request-banner" role="status" hidden><span id="request-description"></span><button id="request-retry" data-action="retry-service">重新连接并更新</button><span class="muted">重试使用当前图纸，修改与撤销记录保留。</span></div>
       <div id="message" role="status" aria-live="polite" hidden></div>
       <svg id="diagram" xmlns="http://www.w3.org/2000/svg" aria-label="系统图画布" tabindex="0"></svg>
       <div class="canvas-hint">滚轮缩放 · 拖动空白平移 · 双击管线添加折点 · Esc 取消</div>

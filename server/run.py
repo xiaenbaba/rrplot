@@ -128,7 +128,9 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError("请求缺少 document")
             if path == "/api/resolve":
                 with RENDER_LOCK:
-                    result = resolve_for_editor(body["document"])
+                    result = resolve_for_editor(
+                        body["document"],
+                        shared_glyphs=body.get("sharedGlyphs") is True)
                 return self.json_response(result)
             if path == "/api/preview":
                 with RENDER_LOCK:

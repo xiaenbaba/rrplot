@@ -88,3 +88,54 @@ def test_service_status_distinguishes_offline_legacy_and_changed_code():
     assert "旧版" in values[1]["text"]
     assert "需要重启" in values[3]["text"]
     assert "restart-web.cmd" in values[3]["detail"]
+
+
+@pytest.mark.parametrize("phase", ["fetch", "body"])
+def test_deadline_releases_queue_and_aborts_stalled_operation(phase):
+    result = run_module(
+        "requests.js",
+        """
+      let signal; const stalled=()=>new Promise(()=>{});
+      const fetchImpl=async (url,options)=>{signal=options.signal;
+        if(PHASE==='fetch')return stalled();
+        return {ok:true,headers:{get:()=> 'application/json'},json:stalled};};
+      const queue=module.createLatestQueue(x=>x===1
+        ?module.requestResource('/resolve',{}, {timeoutMs:10,fetchImpl}) : x);
+      const first=queue(1).catch(e=>e.code);const last=queue(2);
+      const values=await Promise.all([first,last]);
+      console.log(JSON.stringify({values,aborted:signal.aborted}));
+    """.replace("PHASE", json.dumps(phase)),
+    )
+    assert result == dict(values=["TIMEOUT", 2], aborted=True)
+
+
+def test_network_and_http_errors_keep_useful_messages():
+    result = run_module(
+        "requests.js",
+        """
+      const results=[];
+      for(const fetchImpl of [()=>{throw Error('offline');},async()=>({ok:false,
+          status:400,json:async()=>({error:'图纸参数错误'})})]) {
+        try{await module.requestResource('/',{}, {fetchImpl});}
+        catch(e){results.push([e.code,e.status||null,e.message]);}
+      }
+      console.log(JSON.stringify(results));
+    """,
+    )
+    assert result[0][0] == "NETWORK" and "已保留" in result[0][2]
+    assert result[1] == ["HTTP", 400, "图纸参数错误"]
+
+
+def test_successful_json_and_binary_requests_clear_deadline():
+    assert run_module(
+        "requests.js",
+        """
+      const values=[];
+      for(const type of ['application/json','image/svg+xml']){
+        const fetchImpl=async()=>({ok:true,headers:{get:()=>type},
+          json:async()=>({ok:true}),blob:async()=> 'svg'});
+        values.push(await module.requestResource('/',{}, {fetchImpl,timeoutMs:100}));
+      }
+      console.log(JSON.stringify(values));
+    """,
+    ) == [dict(ok=True), "svg"]

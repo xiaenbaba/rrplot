@@ -1,5 +1,5 @@
 /* Read-only checks. Unused ports are valid: many glyphs offer alternate ports. */
-export function inspectDiagram(document, { nodes = [], routes = new Map(), bounds = [] } = {}) {
+export function inspectDiagram(document, { nodes = [], routes = new Map(), bounds = [], visual = false } = {}) {
   const issues = [], geometry = new Map(nodes.map(n => [n.id, n.geometry]));
   const degrees = new Map(), owners = new Map();
   const owner = ref => JSON.stringify(ref.nodeId !== undefined ? ['node', ref.nodeId] : ['junction', ref.junctionId]);
@@ -72,6 +72,56 @@ export function inspectDiagram(document, { nodes = [], routes = new Map(), bound
       outside.add(key);
       add('outside-page', { kind, id }, '对象超出页面边界', '导出时可能显示不完整，请调整位置、走线或页面尺寸。');
     }
+  }
+  if (visual) issues.push(...inspectVisualQuality(document, { nodes, routes, bounds }));
+  return issues;
+}
+
+/* Conservative geometry hints, only on demand. Never move or rewrite objects. */
+export function inspectVisualQuality(document, { nodes = [], routes = new Map(), bounds = [] } = {}) {
+  const issues = [], byId = new Map(nodes.map(n => [n.id, n]));
+  const devices = bounds.filter(b => b.kind === 'node' && byId.has(b.id));
+  const labels = bounds.filter(b => b.kind === 'label');
+  const overlap = (a, b, inset = 2) => Math.min(a[0] + a[2], b[0] + b[2]) - Math.max(a[0], b[0]) > inset
+    && Math.min(a[1] + a[3], b[1] + b[3]) - Math.max(a[1], b[1]) > inset;
+  const crosses = (points, box, inset) => {
+    const [x, y, w, h] = box, left = x + inset, right = x + w - inset, top = y + inset, bottom = y + h - inset;
+    if (left >= right || top >= bottom) return false;
+    for (let i = 1; i < (points?.length || 0); i++) {
+      const a = points[i - 1], b = points[i];
+      let low = 0, high = 1, hit = true;
+      for (let axis = 0; axis < 2; axis++) {
+        const min = axis ? top : left, max = axis ? bottom : right, d = b[axis] - a[axis];
+        if (Math.abs(d) < 1e-8) { if (a[axis] <= min || a[axis] >= max) { hit = false; break; } }
+        else { const t1 = (min - a[axis]) / d, t2 = (max - a[axis]) / d;
+          low = Math.max(low, Math.min(t1, t2)); high = Math.min(high, Math.max(t1, t2)); }
+      }
+      if (hit && high - low > 1e-6) return true;
+    }
+    return false;
+  };
+  const add = (code, ref, title, detail) => {
+    if (issues.length < 200) issues.push({ code, ref, title, detail, severity: 'hint' });
+  };
+  for (let i = 0; i < devices.length; i++) for (let j = i + 1; j < devices.length; j++) {
+    const a = devices[i], b = devices[j];
+    if (overlap(a.box, b.box, 6)) add('device-overlap', { kind: 'node', id: b.id }, '设备外形可能重叠',
+      `与设备 ${byId.get(a.id).title || a.id} 的包围框相交，请核对间距；旋转图元按包围框估算。`);
+  }
+  for (let i = 0; i < labels.length; i++) for (let j = i + 1; j < labels.length; j++) {
+    if (overlap(labels[i].box, labels[j].box)) add('label-overlap', { kind: 'label', id: labels[j].id },
+      '文字可能相互重叠', '文字边界相交，请核对标签位置；仅作排版提示。');
+  }
+  for (const edge of document.edges) {
+    const points = routes.get(edge.id);
+    if (!points?.length) continue;
+    for (const device of devices) {
+      if ([edge.source, edge.target].some(ref => ref.nodeId === device.id) || byId.get(device.id).mount?.edgeId === edge.id) continue;
+      if (crosses(points, device.box, 6)) add('pipe-through-device', { kind: 'edge', id: edge.id },
+        '管路可能穿过其他设备', `走线经过设备 ${byId.get(device.id).title || device.id} 的包围框内部，请核对走线或设备位置。`);
+    }
+    for (const label of labels) if (crosses(points, label.box, 1)) add('label-on-pipe', { kind: 'label', id: label.id },
+      '文字可能压住管路', `文字边界与管路 ${edge.id} 相交，请核对文字偏移；白底状态点也会提示。`);
   }
   return issues;
 }

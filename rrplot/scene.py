@@ -7,11 +7,10 @@ from importlib.resources import files
 from matplotlib.colors import is_color_like
 
 from .core import _orthogonalize, _polyline_point
-from .registry import describe, normalize_params
+from .registry import PIPE_ACCESSORIES, describe, normalize_params
 
 SCHEMA_VERSION = 1
-MOUNT_TYPES = {"expansion_valve", "globe_valve", "solenoid_valve",
-               "check_valve", "filter", "capillary", "muffler"}
+MOUNT_TYPES = PIPE_ACCESSORIES
 TEMPLATES = {
     "evi_ftvi": "EVI 过冷器喷气增焓",
     "ftvi": "FTVI 闪蒸罐喷气增焓",

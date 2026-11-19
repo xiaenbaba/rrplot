@@ -3,16 +3,22 @@ import { copySelection, captureSelection, pasteFragment, deleteSelection, transl
 import { inspectDiagram } from './checks.js';
 import { objectIndex, filterObjects } from './objects.js';
 import { styleTargets, applyStyles } from './styles.js';
-import { createLatestQueue } from './requests.js';
+import { createLatestQueue, requestResource } from './requests.js';
 import { monitorService } from './service.js';
 import { propertySection, glyphImage } from './inspector.js';
+import { createGlyphCache } from './glyphs.js';
+import { createCanvasRenderer } from './canvas.js';
+import { configureGlyphCapabilities } from './geometry.js';
 
 const $ = id => document.getElementById(id);
 const svg = $('diagram');
+let canvasRenderer = null;
+let canvasPass = false;
 const NS = 'http://www.w3.org/2000/svg';
 const clone = value => structuredClone(value);
 const uid = prefix => prefix + '-' + crypto.randomUUID().slice(0, 8);
 const DRAFT = 'rrplot-web-v1-draft';
+const BENCHMARK = (globalThis.location?.search || '').slice(1).split('&').includes('benchmark=1');
 const DRAFT_HISTORY = 'rrplot-web-v1-draft-history';
 const SHORTCUTS = 'rrplot-web-v1-single-key-shortcuts';
 const CANVAS_PREFERENCES = { grid: 'rrplot-web-v1-grid', snap: 'rrplot-web-v1-snap' };
@@ -43,6 +49,8 @@ let navigationSession = null, viewRevision = 0;
 let moveSession = null;
 let revision = 0, request = 0, messageTimer = null;
 let resolveQueue = null;
+let hydrateGlyphs = null;
+let serviceMonitored = false;
 const inspectorGroups = new Map();
 let view = { x: -40, y: -30, w: 840, h: 640 };
 
@@ -56,7 +64,7 @@ function html(tag, text, className) {
 function shape(tag, attrs = {}, parent = svg) {
   const e = document.createElementNS(NS, tag);
   Object.entries(attrs).forEach(([k, v]) => { if (v !== undefined) e.setAttribute(k, v); });
-  parent.append(e);
+  if (canvasPass && parent === svg) canvasRenderer.place(e); else parent.append(e);
   return e;
 }
 
@@ -69,18 +77,28 @@ function message(text) {
 }
 
 async function api(path, body) {
+  if (path === 'resolve') body = { ...body, sharedGlyphs: true };
   if (body?.document?.nodes?.some(node => node.mount) && !pipeMountsSupported)
     throw new Error('阀件挂接需要新版服务，请保存图纸后重启服务，再刷新页面。');
   if (body?.document?.labels?.some(label => label.edgeId) && !edgeLabelsSupported)
     throw new Error('管路状态点需要新版服务，请保存当前图纸后重启 start-web.cmd，再刷新页面。');
-  const response = await fetch('/api/' + path, body === undefined ? {} : {
+  const result = await requestResource('/api/' + path, body === undefined ? {} : {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
-  });
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error.error || `请求失败 (${response.status})`);
-  }
-  return response.headers.get('content-type')?.includes('application/json') ? response.json() : response.blob();
+  }, { timeoutMs: path.startsWith('export/') || path === 'preview' ? 60000 : 20000 });
+  if (path === 'resolve') { hydrateGlyphs ||= createGlyphCache(); return hydrateGlyphs(result); }
+  return result;
+}
+function requestFailure(error = null) {
+  const banner = $('request-banner');
+  banner.hidden = !error;
+  if (error) $('request-description').textContent = error.message;
+}
+async function retryService() {
+  const button = $('request-retry');
+  if (button.disabled) return;
+  button.disabled = true;
+  try { if (doc) await refresh(); else await init(); }
+  finally { button.disabled = false; }
 }
 
 function currentNodes(strict = false) {
@@ -439,6 +457,7 @@ function draftDate(saved) {
     ? time.toLocaleString() : '时间未知';
 }
 function renderDraftBanner() {
+  if (BENCHMARK) { $('draft-banner').hidden = true; return; }
   try {
     const current = localStorage.getItem(DRAFT);
     const records = draftRecords();
@@ -451,6 +470,7 @@ function renderDraftBanner() {
   } catch { $('draft-banner').hidden = true; }
 }
 function saveDraft() {
+  if (BENCHMARK) return true;
   try {
     const previous = localStorage.getItem(DRAFT), saved = parseDraft(previous);
     if (previous !== ownedDraft && saved && JSON.stringify(saved.document) !== JSON.stringify(doc)) {
@@ -474,9 +494,10 @@ async function refresh() {
   status('正在更新图纸…');
   try {
     resolveQueue ||= createLatestQueue(body => api('resolve', body));
-    const result = await resolveQueue({ document: clone(doc) });
+    const result = await resolveQueue({ document: clone(doc), sharedGlyphs: true });
     if (!result) return;
     if (token !== request || version !== revision) return;
+    requestFailure();
     geometries = new Map(result.nodes.map(n => [n.id, n.geometry]));
     syncMounts();
     junctionPreview = null;
@@ -488,7 +509,7 @@ async function refresh() {
     renderCanvas();
     status(draftError ? '已更新 · 草稿未保存，请保存 JSON' : '已更新 · 本机草稿自动保存');
   } catch (error) {
-    if (token === request) { message(error.message); status('图纸需要调整，或本机服务未连接'); }
+    if (token === request) { requestFailure(error); message(error.message); status('更新未完成 · 图纸和历史已保留，可重试'); }
   }
 }
 
@@ -511,6 +532,7 @@ function edit(fn) {
 }
 
 function clearDraft() {
+  if (BENCHMARK) return;
   try {
     if (ownedDraft !== null && localStorage.getItem(DRAFT) === ownedDraft) localStorage.removeItem(DRAFT);
     ownedDraft = null; draftError = false;
@@ -521,7 +543,7 @@ function clearDraft() {
 async function replaceDocument(next, preserveDraft = false, canApply = () => true) {
   if (!canApply()) return false;
   const token = ++request, version = revision;
-  const result = await api('resolve', { document: next });
+  const result = await api('resolve', { document: next, sharedGlyphs: true });
   if (token !== request || version !== revision || !canApply()) return false;
   edgeLabelsSupported = result.features?.includes('edgeLabels') || false;
   pipeMountsSupported = result.features?.includes('pipeMounts') || false;
@@ -531,7 +553,7 @@ async function replaceDocument(next, preserveDraft = false, canApply = () => tru
   pendingPort = null; connectionVertices = []; previewTarget = null; junctionPreview = null; reconnect = null; mode = 'select'; placement = null; dirty = false;
   clipboardPastes = 0;
   $('object-search').value = ''; $('object-kind').value = '';
-  if (!preserveDraft) clearDraft();
+  if (!preserveDraft && !BENCHMARK) clearDraft();
   else ownedDraft = null;
   render(); fit(); status('图纸已打开 · 点击对象编辑'); message('');
   return true;
@@ -651,6 +673,7 @@ function renderMountPreview() {
   if (!mountPreview) { marker?.setAttribute('visibility', 'hidden'); return; }
   if (!marker) marker = shape('circle', { r: 11, class: 'mount-target',
     'pointer-events': 'none', 'vector-effect': 'non-scaling-stroke' });
+  else if (canvasPass) canvasRenderer.place(marker);
   marker.setAttribute('cx', mountPreview.point[0]);
   marker.setAttribute('cy', mountPreview.point[1]);
   marker.setAttribute('visibility', 'visible');
@@ -696,124 +719,140 @@ function renderCanvas() {
   const connection = renderConnectionFeedback();
   const junction = renderJunctionFeedback();
   const previewClass = 'connection-preview' + (connection?.error ? ' invalid' : '');
-  svg.replaceChildren();
-  svg.classList.toggle('connecting', mode === 'connect' || mode === 'reconnect');
-  svg.classList.toggle('moving-all', mode === 'move-all');
-  svg.classList.toggle('box-selecting', mode === 'box-select' || drag?.kind === 'box');
-  svg.classList.toggle('placing', !!placement || ['junction', 'text'].includes(mode));
-  const defs = shape('defs');
-  const pattern = shape('pattern', { id: 'grid-pattern', width: 10, height: 10, patternUnits: 'userSpaceOnUse' }, defs);
-  shape('path', { d: 'M 10 0 L 0 0 0 10', fill: 'none', stroke: '#c6d6d1', 'stroke-width': .65 }, pattern);
-  shape('rect', { x: 0, y: 0, width: doc.page.width, height: doc.page.height, fill: '#fff', class: 'page' });
-  if ($('grid').checked) shape('rect', { width: doc.page.width, height: doc.page.height, fill: 'url(#grid-pattern)', opacity: .65, 'pointer-events': 'none' });
-  const nodes = currentNodes();
-  for (const edge of doc.edges) {
-    let points;
-    try { points = edgePoints(edge); } catch { continue; }
-    const g = shape('g', { class: 'edge' + (selected('edge', edge.id) ? ' selected' : '')
-      + (junction?.edgeId === edge.id ? ' junction-candidate' + (junction.error ? ' invalid' : '') : '')
-      + (connection?.pipeId === edge.id ? ' connection-candidate' + (connection.error ? ' invalid' : '') : '')
-      + (reconnect?.edgeId === edge.id ? ' reconnecting-edge' : ''), 'data-kind': 'edge', 'data-id': edge.id });
-    const p = points.map(p => p.join(',')).join(' ');
-    shape('polyline', { points: p, class: 'edge-hit' }, g);
-    shape('polyline', { points: p, class: 'edge-visible', fill: 'none', stroke: edge.color,
-      'stroke-width': edge.width * 100 / 72, 'stroke-linejoin': 'round', 'stroke-linecap': 'round',
-      'stroke-dasharray': edge.linestyle === 'dashed' ? '7 5' : undefined }, g);
-    if (edge.head) for (const at of edge.headAt || [.55]) {
-      const info = along(points, at); if (info.length < 1) continue;
-      const half = Math.min(20, info.length / 2), direction = info.direction;
-      const center = info.point.map((v, i) => Math.max(Math.min(info.start[i], info.end[i]) + (direction[i] ? half : 0), Math.min(Math.max(info.start[i], info.end[i]) - (direction[i] ? half : 0), v)));
-      const tip = center.map((v, i) => v + direction[i] * (half - 2));
-      const base = tip.map((v, i) => v - direction[i] * 7);
-      shape('polygon', { points: [tip, [base[0] - direction[1] * 2.7, base[1] + direction[0] * 2.7],
-        [base[0] + direction[1] * 2.7, base[1] - direction[0] * 2.7]].map(p => p.join(',')).join(' '), fill: edge.color, 'pointer-events': 'none' }, g);
+  canvasRenderer ||= createCanvasRenderer(svg);
+  canvasRenderer.begin(); canvasPass = true;
+  try {
+    svg.classList.toggle('connecting', mode === 'connect' || mode === 'reconnect');
+    svg.classList.toggle('moving-all', mode === 'move-all');
+    svg.classList.toggle('box-selecting', mode === 'box-select' || drag?.kind === 'box');
+    svg.classList.toggle('placing', !!placement || ['junction', 'text'].includes(mode));
+    const defs = shape('defs');
+    const pattern = shape('pattern', { id: 'grid-pattern', width: 10, height: 10, patternUnits: 'userSpaceOnUse' }, defs);
+    shape('path', { d: 'M 10 0 L 0 0 0 10', fill: 'none', stroke: '#c6d6d1', 'stroke-width': .65 }, pattern);
+    shape('rect', { x: 0, y: 0, width: doc.page.width, height: doc.page.height, fill: '#fff', class: 'page' });
+    if ($('grid').checked) shape('rect', { width: doc.page.width, height: doc.page.height, fill: 'url(#grid-pattern)', opacity: .65, 'pointer-events': 'none' });
+    const nodes = currentNodes();
+    const nodeMap = new Map(nodes.map(n => [n.id, n]));
+    const junctionMap = new Map(doc.junctions.map(j => [j.id, j]));
+    const resolveEndpoint = ref => endpoint(ref, nodeMap, junctionMap);
+    for (const edge of doc.edges) {
+      let points;
+      try { points = route(resolveEndpoint(edge.source), resolveEndpoint(edge.target), edge.vertices); } catch { continue; }
+      const cached = canvasRenderer.group('edge:' + edge.id, 'g', { class: 'edge' + (selected('edge', edge.id) ? ' selected' : '')
+        + (junction?.edgeId === edge.id ? ' junction-candidate' + (junction.error ? ' invalid' : '') : '')
+        + (connection?.pipeId === edge.id ? ' connection-candidate' + (connection.error ? ' invalid' : '') : '')
+        + (reconnect?.edgeId === edge.id ? ' reconnecting-edge' : ''), 'data-kind': 'edge', 'data-id': edge.id },
+        JSON.stringify([points, edge.color, edge.width, edge.linestyle, edge.head, edge.headAt]));
+      if (!cached.changed) continue;
+      const g = cached.element;
+      const p = points.map(p => p.join(',')).join(' ');
+      shape('polyline', { points: p, class: 'edge-hit' }, g);
+      shape('polyline', { points: p, class: 'edge-visible', fill: 'none', stroke: edge.color,
+        'stroke-width': edge.width * 100 / 72, 'stroke-linejoin': 'round', 'stroke-linecap': 'round',
+        'stroke-dasharray': edge.linestyle === 'dashed' ? '7 5' : undefined }, g);
+      if (edge.head) for (const at of edge.headAt || [.55]) {
+        const info = along(points, at); if (info.length < 1) continue;
+        const half = Math.min(20, info.length / 2), direction = info.direction;
+        const center = info.point.map((v, i) => Math.max(Math.min(info.start[i], info.end[i]) + (direction[i] ? half : 0), Math.min(Math.max(info.start[i], info.end[i]) - (direction[i] ? half : 0), v)));
+        const tip = center.map((v, i) => v + direction[i] * (half - 2));
+        const base = tip.map((v, i) => v - direction[i] * 7);
+        shape('polygon', { points: [tip, [base[0] - direction[1] * 2.7, base[1] + direction[0] * 2.7],
+          [base[0] + direction[1] * 2.7, base[1] - direction[0] * 2.7]].map(p => p.join(',')).join(' '), fill: edge.color, 'pointer-events': 'none' }, g);
+      }
     }
-  }
-  if (mode === 'connect' && pendingPort && previewTarget) {
-    try {
-      const start = endpoint(pendingPort, nodes, doc.junctions);
-      const points = route(start, previewTarget, connectionVertices);
-      shape('polyline', { points: points.map(p => p.join(',')).join(' '), class: previewClass });
-    } catch { /* The source may have been removed while connecting. */ }
-  }
-  if (mode === 'reconnect' && reconnect && previewTarget) {
-    try {
-      const edge = doc.edges.find(e => e.id === reconnect.edgeId);
-      const source = reconnect.side === 'source' ? previewTarget : endpoint(edge.source, nodes, doc.junctions);
-      const target = reconnect.side === 'target' ? previewTarget : endpoint(edge.target, nodes, doc.junctions);
-      const points = route(source, target, edge.vertices);
-      shape('polyline', { points: points.map(p => p.join(',')).join(' '), class: previewClass });
-    } catch { /* Geometry may still be loading. */ }
-  }
-  for (const n of nodes) {
-    const g = shape('g', { class: 'node' + (selected('node', n.id) ? ' selected' : ''),
-      'data-kind': 'node', 'data-id': n.id, transform: `translate(${n.x} ${n.y}) rotate(${n.rotation})` });
-    const [x, y, w, h] = n.geometry.box;
-    shape('title', {}, g).textContent = n.title;
-    if (n.mount) shape('rect', { x: -(n.params.w || 2*n.params.r)/2, y: -(n.params.h || 2*n.params.r)/2,
-      width: n.params.w || 2*n.params.r, height: n.params.h || 2*n.params.r, fill: '#fff', 'pointer-events': 'none' }, g);
-    shape('image', { x, y, width: w, height: h, href: n.geometry.image, class: 'node-image',
-      transform: `rotate(${glyphRotation(n)})` }, g);
-    shape('rect', { x: x - 3, y: y - 3, width: w + 6, height: h + 6, rx: 2, class: 'node-hit' }, g);
-    const seen = new Set();
-    if (n.mount) continue;
-    for (const [id, p] of Object.entries(n.geometry.ports)) {
-      const key = p.point.join(','); if (seen.has(key)) continue; seen.add(key);
-      const ref = { nodeId: n.id, portId: id };
-      const chosen = ports.some(p => eqRef(p, ref)) || eqRef(pendingPort, ref);
-      shape('circle', { cx: p.point[0], cy: p.point[1], r: 10,
-        class: 'port-hit', 'data-kind': 'port', 'data-ref': JSON.stringify(ref) }, g);
-      const circle = shape('circle', { cx: p.point[0], cy: p.point[1], r: 4.5,
-        class: 'port' + (chosen ? ' chosen' : ''), 'data-kind': 'port', 'data-ref': JSON.stringify(ref) }, g);
-      shape('title', {}, circle).textContent = id;
+    if (mode === 'connect' && pendingPort && previewTarget) {
+      try {
+        const start = endpoint(pendingPort, nodes, doc.junctions);
+        const points = route(start, previewTarget, connectionVertices);
+        shape('polyline', { points: points.map(p => p.join(',')).join(' '), class: previewClass });
+      } catch { /* The source may have been removed while connecting. */ }
     }
-  }
-  if (mountPreview) renderMountPreview();
-  for (const j of doc.junctions) {
-    const g = shape('g', { class: 'junction' + (selected('junction', j.id) ? ' selected' : ''),
-      'data-kind': 'junction', 'data-id': j.id });
-    shape('circle', { cx: j.x, cy: j.y, r: 10, class: 'junction-hit' }, g);
-    const c = shape('circle', { cx: j.x, cy: j.y, r: 4, class: 'junction-dot', 'pointer-events': 'none' }, g);
-    shape('title', {}, c).textContent = '三通';
-  }
-  for (const label of doc.labels) {
-    const [x, y] = labelPosition(label);
-    const g = shape('g', { class: 'diagram-label' + (selected('label', label.id) ? ' selected' : ''),
-      'data-kind': 'label', 'data-id': label.id });
-    const text = shape('text', { x, y, fill: label.color, 'font-family': fontFamily,
-      'font-size': label.size * 100 / 72, 'text-anchor': { left: 'start', center: 'middle', right: 'end' }[label.ha],
-      'dominant-baseline': 'central' }, g);
-    const lines = label.text.split('\n');
-    lines.forEach((line, i) => shape('tspan', { x, dy: i ? '1.2em' : `${-(lines.length - 1) * .6}em` }, text).textContent = line);
-    if (label.boxed || selected('label', label.id)) {
-      const b = text.getBBox();
-      const bg = shape('rect', { x: b.x - 2, y: b.y - 2, width: b.width + 4, height: b.height + 4,
-        fill: label.boxed ? '#fff' : '#d6eee4', opacity: label.boxed ? 1 : .55 }, g);
-      g.insertBefore(bg, text);
+    if (mode === 'reconnect' && reconnect && previewTarget) {
+      try {
+        const edge = doc.edges.find(e => e.id === reconnect.edgeId);
+        const source = reconnect.side === 'source' ? previewTarget : endpoint(edge.source, nodes, doc.junctions);
+        const target = reconnect.side === 'target' ? previewTarget : endpoint(edge.target, nodes, doc.junctions);
+        const points = route(source, target, edge.vertices);
+        shape('polyline', { points: points.map(p => p.join(',')).join(' '), class: previewClass });
+      } catch { /* Geometry may still be loading. */ }
     }
-  }
-  if (mode === 'connect' && pendingPort) connectionVertices.forEach(([x, y], index) => {
-    const g = shape('g', { 'data-kind': 'connection-vertex', 'data-index': index,
-      'data-point': JSON.stringify([x, y]), class: 'connection-waypoint-handle' });
-    shape('rect', { x: x - 10, y: y - 10, width: 20, height: 20, fill: 'transparent' }, g);
-    const marker = shape('rect', { x: x - 4, y: y - 4, width: 8, height: 8, rx: 1,
-      class: 'connection-waypoint', 'vector-effect': 'non-scaling-stroke' }, g);
-    shape('title', {}, marker).textContent = '拖动调整临时折点；Alt+点击删除；Esc 取消本次拖动';
-  });
-  if (connection) shape('circle', { cx: connection.point[0], cy: connection.point[1], r: 9,
-    class: 'connection-target' + (connection.error ? ' invalid' : ''), 'vector-effect': 'non-scaling-stroke' });
-  renderVertices();
-  if (junction) {
-    const attrs = { cx: junction.point[0], cy: junction.point[1], 'pointer-events': 'none' };
-    shape('circle', { ...attrs, r: 9, class: 'junction-preview' + (junction.error ? ' invalid' : ''),
-      'vector-effect': 'non-scaling-stroke' });
-    shape('circle', { ...attrs, r: 3, class: 'junction-preview-dot' + (junction.error ? ' invalid' : '') });
-  }
-  if (drag?.kind === 'box' && drag.moved) {
-    const [x, y] = drag.start, [ex, ey] = drag.point;
-    shape('rect', { x: Math.min(x, ex), y: Math.min(y, ey), width: Math.abs(ex - x),
-      height: Math.abs(ey - y), class: 'selection-marquee' });
-  }
+    for (const n of nodes) {
+      const cached = canvasRenderer.group('node:' + n.id, 'g', { class: 'node' + (selected('node', n.id) ? ' selected' : ''),
+        'data-kind': 'node', 'data-id': n.id, transform: `translate(${n.x} ${n.y}) rotate(${n.rotation})` },
+        JSON.stringify([n.title, n.geometry.glyphId || n.geometry.image, n.geometry.box, n.geometry.ports, n.mount, n.params, glyphRotation(n), ports, pendingPort]));
+      if (!cached.changed) continue;
+      const g = cached.element;
+      const [x, y, w, h] = n.geometry.box;
+      shape('title', {}, g).textContent = n.title;
+      if (n.mount) shape('rect', { x: -(n.params.w || 2*n.params.r)/2, y: -(n.params.h || 2*n.params.r)/2,
+        width: n.params.w || 2*n.params.r, height: n.params.h || 2*n.params.r, fill: '#fff', 'pointer-events': 'none' }, g);
+      shape('image', { x, y, width: w, height: h, href: n.geometry.image, class: 'node-image',
+        transform: `rotate(${glyphRotation(n)})` }, g);
+      shape('rect', { x: x - 3, y: y - 3, width: w + 6, height: h + 6, rx: 2, class: 'node-hit' }, g);
+      const seen = new Set();
+      if (n.mount) continue;
+      for (const [id, p] of Object.entries(n.geometry.ports)) {
+        const key = p.point.join(','); if (seen.has(key)) continue; seen.add(key);
+        const ref = { nodeId: n.id, portId: id };
+        const chosen = ports.some(p => eqRef(p, ref)) || eqRef(pendingPort, ref);
+        shape('circle', { cx: p.point[0], cy: p.point[1], r: 10,
+          class: 'port-hit', 'data-kind': 'port', 'data-ref': JSON.stringify(ref) }, g);
+        const circle = shape('circle', { cx: p.point[0], cy: p.point[1], r: 4.5,
+          class: 'port' + (chosen ? ' chosen' : ''), 'data-kind': 'port', 'data-ref': JSON.stringify(ref) }, g);
+        shape('title', {}, circle).textContent = id;
+      }
+    }
+    if (mountPreview) renderMountPreview();
+    for (const j of doc.junctions) {
+      const cached = canvasRenderer.group('junction:' + j.id, 'g', { class: 'junction' + (selected('junction', j.id) ? ' selected' : ''),
+        'data-kind': 'junction', 'data-id': j.id }, JSON.stringify([j.x, j.y]));
+      if (!cached.changed) continue;
+      const g = cached.element;
+      shape('circle', { cx: j.x, cy: j.y, r: 10, class: 'junction-hit' }, g);
+      const c = shape('circle', { cx: j.x, cy: j.y, r: 4, class: 'junction-dot', 'pointer-events': 'none' }, g);
+      shape('title', {}, c).textContent = '三通';
+    }
+    for (const label of doc.labels) {
+      const [x, y] = labelPosition(label);
+      const cached = canvasRenderer.group('label:' + label.id, 'g', { class: 'diagram-label' + (selected('label', label.id) ? ' selected' : ''),
+        'data-kind': 'label', 'data-id': label.id }, JSON.stringify([label, x, y, fontFamily, selected('label', label.id)]));
+      if (!cached.changed) continue;
+      const g = cached.element;
+      const text = shape('text', { x, y, fill: label.color, 'font-family': fontFamily,
+        'font-size': label.size * 100 / 72, 'text-anchor': { left: 'start', center: 'middle', right: 'end' }[label.ha],
+        'dominant-baseline': 'central' }, g);
+      const lines = label.text.split('\n');
+      lines.forEach((line, i) => shape('tspan', { x, dy: i ? '1.2em' : `${-(lines.length - 1) * .6}em` }, text).textContent = line);
+      if (label.boxed || selected('label', label.id)) {
+        const b = text.getBBox();
+        const bg = shape('rect', { x: b.x - 2, y: b.y - 2, width: b.width + 4, height: b.height + 4,
+          fill: label.boxed ? '#fff' : '#d6eee4', opacity: label.boxed ? 1 : .55 }, g);
+        g.insertBefore(bg, text);
+      }
+    }
+    if (mode === 'connect' && pendingPort) connectionVertices.forEach(([x, y], index) => {
+      const g = shape('g', { 'data-kind': 'connection-vertex', 'data-index': index,
+        'data-point': JSON.stringify([x, y]), class: 'connection-waypoint-handle' });
+      shape('rect', { x: x - 10, y: y - 10, width: 20, height: 20, fill: 'transparent' }, g);
+      const marker = shape('rect', { x: x - 4, y: y - 4, width: 8, height: 8, rx: 1,
+        class: 'connection-waypoint', 'vector-effect': 'non-scaling-stroke' }, g);
+      shape('title', {}, marker).textContent = '拖动调整临时折点；Alt+点击删除；Esc 取消本次拖动';
+    });
+    if (connection) shape('circle', { cx: connection.point[0], cy: connection.point[1], r: 9,
+      class: 'connection-target' + (connection.error ? ' invalid' : ''), 'vector-effect': 'non-scaling-stroke' });
+    renderVertices();
+    if (junction) {
+      const attrs = { cx: junction.point[0], cy: junction.point[1], 'pointer-events': 'none' };
+      shape('circle', { ...attrs, r: 9, class: 'junction-preview' + (junction.error ? ' invalid' : ''),
+        'vector-effect': 'non-scaling-stroke' });
+      shape('circle', { ...attrs, r: 3, class: 'junction-preview-dot' + (junction.error ? ' invalid' : '') });
+    }
+    if (drag?.kind === 'box' && drag.moved) {
+      const [x, y] = drag.start, [ex, ey] = drag.point;
+      shape('rect', { x: Math.min(x, ex), y: Math.min(y, ey), width: Math.abs(ex - x),
+        height: Math.abs(ey - y), class: 'selection-marquee' });
+    }
+  } finally { canvasRenderer.end(); canvasPass = false; }
   updateView();
 }
 
@@ -1996,14 +2035,14 @@ function pasteClipboard() {
     status('已粘贴 · 可拖动整组调整位置 · Ctrl+Z 撤销');
   } catch (error) { message(error.message); }
 }
-function history(direction) {
+function history(direction, { deferRefresh = false } = {}) {
   if (drag?.kind === 'connection-vertex') cancelDrag();
   if (reconnect) cancelReconnect();
   const from = direction === 'undo' ? undo : redo, to = direction === 'undo' ? redo : undo;
   if (!from.length) return;
   cancelDocumentLoad();
   to.push(clone(doc)); doc = from.pop(); clearSelection(); ports = []; pendingPort = null; connectionVertices = []; previewTarget = null;
-  revision++; dirty = true; saveDraft(); render(); void refresh();
+  revision++; dirty = true; saveDraft(); render(); if (!deferRefresh) void refresh();
 }
 
 function download(blob, filename) {
@@ -2346,12 +2385,12 @@ async function runChecks() {
   }
   geometries = new Map(result.nodes.map(n => [n.id, n.geometry])); fontFamily = result.fontFamily; renderCanvas();
   const routes = new Map(doc.edges.map(edge => [edge.id, edgePoints(edge)]));
-  const issues = inspectDiagram(doc, { nodes: currentNodes(), routes, bounds: selectionCandidates() });
+  const issues = inspectDiagram(doc, { nodes: currentNodes(), routes, bounds: selectionCandidates(), visual: true });
   const root = $('checks-results'); root.replaceChildren();
-  $('checks-summary').textContent = issues.length ? `发现 ${issues.length} 项待核对，点击结果定位并查看属性。` : '未发现连接或页面越界问题。';
+  $('checks-summary').textContent = issues.length ? `发现 ${issues.length} 项待核对，点击结果定位并查看属性。排版提示按包围框估算，不修改图纸。` : '未发现连接、页面越界或排版提示。';
   for (const issue of issues.slice(0, 100)) {
     const button = html('button', undefined, 'check-result');
-    button.append(html('strong', issue.title), html('span', objectName(issue.ref), 'check-object'), html('span', issue.detail, 'check-detail'), html('span', '定位 →', 'check-locate'));
+    button.append(html('strong', (issue.severity === 'hint' ? '排版提示 · ' : '') + issue.title), html('span', objectName(issue.ref), 'check-object'), html('span', issue.detail, 'check-detail'), html('span', '定位 →', 'check-locate'));
     button.addEventListener('click', () => locateIssue(issue.ref)); root.append(button);
   }
   if (issues.length > 100) root.append(html('p', '仅显示前 100 项；修改后再次检查可查看剩余结果。', 'muted'));
@@ -2360,6 +2399,7 @@ async function runChecks() {
 }
 
 const actions = {
+  'retry-service': retryService,
   help: showHelp, 'close-help': () => $('help-dialog').close(),
   new: () => loadDocument(() => ({ schemaVersion: 1, title: '未命名图纸', page: { width: 1000, height: 700 }, nodes: [], edges: [], junctions: [], labels: [] }), '新建空白图纸', 'new'),
   open: () => { if (!document.querySelector('dialog[open]')) $('file-input').click(); },
@@ -2878,7 +2918,7 @@ function nudgeSelected(event) {
 }
 document.addEventListener('pointerdown', endNudge, true);
 document.addEventListener('focusin', endNudge);
-window.addEventListener('beforeunload', event => { if (dirty) { event.preventDefault(); event.returnValue = ''; } });
+window.addEventListener('beforeunload', event => { if (dirty && !BENCHMARK) { event.preventDefault(); event.returnValue = ''; } });
 window.addEventListener('keydown', async event => {
   if (event.target.matches('input,textarea,select') || event.target.isContentEditable || event.isComposing || document.querySelector('dialog[open]')) return;
   if (event.key.startsWith('Arrow') && !event.ctrlKey && !event.metaKey && !event.altKey
@@ -2929,10 +2969,12 @@ new ResizeObserver(() => {
 }).observe($('canvas-toolbar'));
 
 async function init() {
-  monitorService($('service-state'));
+  if (!BENCHMARK && !serviceMonitored) { serviceMonitored = true; monitorService($('service-state')); }
   try {
     const data = await Promise.all([api('catalog'), api('templates'), api('templates/evi_ftvi')]);
     [catalog] = data;
+    configureGlyphCapabilities(catalog);
+    $('palette').replaceChildren(); $('templates').replaceChildren();
     for (const entry of catalog) {
       const b = html('button', undefined, 'part-button'); b.dataset.part = entry.type; b.draggable = false;
       const icon = html('span', undefined, 'part-icon');
@@ -2959,7 +3001,27 @@ async function init() {
     filterPalette();
     filterTemplates();
     await replaceDocument(data[2], true);
+    requestFailure();
     renderDraftBanner();
-  } catch (error) { message('无法连接本机服务。请运行 python server/run.py。' + error.message); status('服务未连接'); }
+    if (BENCHMARK) parent.postMessage({ type: 'benchmark-ready' }, location.origin);
+  } catch (error) { requestFailure(error); message(error.message); status('服务未连接 · 可点击重新连接'); }
+}
+if (BENCHMARK) {
+  let benchmarkBusy = false;
+  window.addEventListener('message', async event => {
+    if (event.origin !== location.origin || event.source !== parent || event.data?.type !== 'benchmark-run' || benchmarkBusy) return;
+    benchmarkBusy = true;
+    try {
+      const { runBenchmark } = await import('./benchmark.js');
+      const result = await runBenchmark({
+        load: d => replaceDocument(d, true), render: () => renderCanvas(),
+        select: () => { setSelection('node', doc.nodes[Math.floor(doc.nodes.length / 2)].id); render(); },
+        move: () => { const before = clone(doc); doc.nodes[Math.floor(doc.nodes.length / 2)].x += 10; finishEdit(before, { deferRefresh: true }); },
+        undo: () => history('undo', { deferRefresh: true }), elements: () => svg.querySelectorAll('*').length
+      });
+      parent.postMessage({ type: 'benchmark-result', result }, location.origin);
+    } catch (error) { parent.postMessage({ type: 'benchmark-error', error: error.message }, location.origin); }
+    finally { benchmarkBusy = false; }
+  });
 }
 void init();

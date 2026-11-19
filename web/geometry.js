@@ -91,10 +91,10 @@ export function selectInBox(candidates, start, end, base = []) {
 
 export function endpoint(ref, nodes, junctions) {
   if (ref.junctionId) {
-    const j = junctions.find(j => j.id === ref.junctionId);
+    const j = Array.isArray(junctions) ? junctions.find(j => j.id === ref.junctionId) : junctions.get(ref.junctionId);
     return { point: [j.x, j.y], direction: [0, 0] };
   }
-  const n = nodes.find(n => n.id === ref.nodeId);
+  const n = Array.isArray(nodes) ? nodes.find(n => n.id === ref.nodeId) : nodes.get(ref.nodeId);
   const p = n.geometry.ports[ref.portId];
   const [x, y] = rotate(p.point, n.rotation);
   return { point: [n.x + x, n.y + y], direction: rotate(p.direction, n.rotation) };
@@ -219,7 +219,18 @@ export function splitRoute(points, fraction = .5) {
 /* Pipe accessories keep the parent pipe intact. No hydraulic calculations. */
 
 export const MOUNT_TYPES = ['expansion_valve', 'globe_valve', 'solenoid_valve', 'check_valve', 'filter', 'capillary', 'muffler'];
+export function configureGlyphCapabilities(catalog) {
+  if (catalog.length && catalog.every(entry => typeof entry.capabilities?.pipeMount === 'boolean'))
+    MOUNT_TYPES.splice(0, MOUNT_TYPES.length, ...catalog.filter(entry => entry.capabilities.pipeMount).map(entry => entry.type));
+}
 export function glyphRotation(node) {
+  const policy = node.geometry?.capabilities?.upright;
+  if (node.geometry?.capabilities) {
+    if (!policy || node.params?.[policy.field] !== policy.value) return 0;
+    const angle = ((node.rotation || 0) + (policy.offsets?.[node.params?.[policy.offsetField]] || 0)) % 360;
+    return (angle + 360) % 360 >= 180 ? 180 : 0;
+  }
+  // Compatibility with services predating capability declarations.
   if (node.type === 'solenoid_valve' && node.params?.style === 'bowtie')
     return (node.rotation || 0) % 360 >= 180 ? 180 : 0;
   if (node.type !== 'expansion_valve' || node.params?.style !== 'dome') return 0;
@@ -227,7 +238,7 @@ export function glyphRotation(node) {
   return angle >= 180 ? 180 : 0;
 }
 export function canMount(document, node) {
-  return MOUNT_TYPES.includes(node?.type) && !document.edges.some(edge =>
+  return (node?.geometry?.capabilities?.pipeMount ?? MOUNT_TYPES.includes(node?.type)) && !document.edges.some(edge =>
     [edge.source, edge.target].some(ref => ref.nodeId === node.id));
 }
 export function mountPose(node, geometry, points, mount = node.mount) {

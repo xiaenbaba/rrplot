@@ -4,6 +4,30 @@ import math
 
 from . import parts
 
+PIPE_ACCESSORIES = frozenset({"expansion_valve", "globe_valve", "solenoid_valve",
+                              "check_valve", "filter", "capillary", "muffler"})
+UPRIGHT_STYLES = {
+    "expansion_valve": dict(field="style", value="dome",
+                            offsetField="orient", offsets={"v": 90}),
+    "solenoid_valve": dict(field="style", value="bowtie"),
+}
+
+
+def capabilities(kind):
+    """图元行为声明；不写入用户图纸，保留旧 JSON 的参数与端口。"""
+    result = dict(pipeMount=kind in PIPE_ACCESSORIES, rotationStep=90)
+    if kind in UPRIGHT_STYLES:
+        result["upright"] = copy.deepcopy(UPRIGHT_STYLES[kind])
+    return result
+
+
+def glyph_rotation(kind, params, rotation):
+    policy = UPRIGHT_STYLES.get(kind)
+    if not policy or params.get(policy["field"]) != policy["value"]:
+        return 0
+    offset = policy.get("offsets", {}).get(params.get(policy.get("offsetField")), 0)
+    return 180 if (rotation + offset) % 360 >= 180 else 0
+
 
 def number(label, default, low=1, high=1000):
     return dict(label=label, default=default, min=low, max=high, kind="number")
@@ -116,7 +140,7 @@ REGISTRY = {
 def catalog():
     """仅返回 JSON 可序列化的描述。"""
     return [dict(type=key, label=item["label"],
-                 fields=copy.deepcopy(item["fields"]))
+                 fields=copy.deepcopy(item["fields"]), capabilities=capabilities(key))
             for key, item in REGISTRY.items() if not item.get("legacy")]
 
 
@@ -206,8 +230,8 @@ def describe(kind, params):
         bottom += params["stub"]
     elif kind == "sensor":
         bottom += params["stub"]
-    return dict(width=w, height=h, box=[left - 3, top - 3,
-                                      right - left + 6, bottom - top + 6],
+    return dict(width=w, height=h, capabilities=capabilities(kind),
+                box=[left - 3, top - 3, right - left + 6, bottom - top + 6],
                 ports={key: dict(point=list(point),
                                  direction=list(part.direction(key)))
                        for key, point in part.ports.items()})
