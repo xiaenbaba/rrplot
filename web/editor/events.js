@@ -40,6 +40,7 @@ export function createEventsController(state, commands) {
       'close-connection-coordinates': () => commands.$('connection-coordinates-dialog').close(),
       'clipboard-copy': commands.copyToClipboard, 'clipboard-paste': commands.pasteClipboard,
       'page-layout': commands.showPageLayout, 'batch-styles': commands.showBatchStyles,
+      'auto-route': () => commands.autoRoute(),
       'close-styles': () => commands.$('styles-dialog').close(),
       'close-move': () => commands.$('move-dialog').close(),
       fit: commands.fit, 'fit-content': () => commands.focusDrawing('all'), 'fit-selection': () => commands.focusDrawing('selection'),

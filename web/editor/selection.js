@@ -106,7 +106,10 @@ export function createSelectionController(state, commands) {
       button.disabled = !!commands.pipeActionsBusy() || (action === 'clear-vertices'
         && !state.doc.edges.some(edge => commands.selected('edge', edge.id) && edge.vertices.length));
     }
-    root.append(commands.html('p', '仅处理直接选中的管路。反转保留走线及状态点位置；清除折点恢复自动走线，状态点沿新路径跟随。每次操作可一次撤销。', 'muted'));
+    const routing = commands.inspectorButton(buttons, '自动避障布线', () => commands.autoRoute('selection'));
+    routing.disabled = !!commands.pipeActionsBusy();
+    routing.title = '重新计算所选管路折点，绕开设备并保持端口和三通连接；Ctrl+Z 撤销';
+    root.append(commands.html('p', '仅处理直接选中的管路。反转保留走线及状态点位置；清除折点恢复基础走线。避障布线替换手动折点并绕开设备，状态点和挂接阀件沿新路径跟随；每次操作可一次撤销。', 'muted'));
   }
 
   function operateSelectedPipes(action) {

@@ -61,6 +61,9 @@ def test_static_and_catalog_interfaces(service):
     status, headers, body = request(service, "/checks.js")
     assert status == 200 and b"inspectDiagram" in body
     assert headers["Content-Type"].startswith("text/javascript")
+    status, headers, body = request(service, "/routing.js")
+    assert status == 200 and b"avoidObstacles" in body
+    assert headers["Content-Type"].startswith("text/javascript")
     status, headers, body = request(service, "/objects.js")
     assert status == 200 and b"objectIndex" in body
     assert headers["Content-Type"].startswith("text/javascript")

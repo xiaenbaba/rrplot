@@ -44,6 +44,7 @@ export function createEditorState() {
     clipboardPastes: 0,
     pageMargin: 40,
     pageLayoutBusy: false,
+    routingSession: null,
     styleSession: null,
     saving: false,
     pendingDownload: null,

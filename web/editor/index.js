@@ -15,6 +15,7 @@ import { createSidebarController } from './sidebar.js';
 import { createEventsController } from './events.js';
 import { createStylesController } from './styles.js';
 import { createStartupController } from './startup.js';
+import { createRoutingController } from './routing.js';
 
 /** Wire one editor instance. Factories never import each other.
  * The shared command table resolves cross-controller calls without import cycles;
@@ -39,6 +40,7 @@ export function createEditor() {
   Object.assign(commands, createEventsController(state, commands));
   Object.assign(commands, createStylesController(state, commands));
   Object.assign(commands, createStartupController(state, commands));
+  Object.assign(commands, createRoutingController(state, commands));
   let bound = false;
   function bindEvents() {
     if (bound) return;

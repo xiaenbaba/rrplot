@@ -12,6 +12,7 @@
 | export | 正式预览、图像资源释放、缩放及 SVG/PNG/PDF 导出 |
 | canvas / viewport | SVG 渲染和临时辅助层；坐标、边界、缩放、定位 |
 | connections | 连线预览/校验、三通插入/分支及端点重接 |
+| routing | 按所选/整图运行避障事务，进度、取消、过期结果保护及单次撤销 |
 | coordinates | 折点坐标窗口、窗口内历史、导入/复制和走线预览 |
 | pointer / keyboard | 指针拖动、图元拖放；快捷键、连续微调和取消 |
 | selection | 增删/复制/粘贴、平移、对齐/分布和纸张排版 |

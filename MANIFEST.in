@@ -1,7 +1,8 @@
-include WEB_PROJECT_PLAN.md
+include docs/README.md docs/ARCHITECTURE.md
+recursive-include docs/plans *.md
+recursive-include review *.md
 include start-web.cmd stop-web.cmd restart-web.cmd status-web.cmd web-service.cmd
-include ROADMAP.md
-include ARCHITECTURE.md CHANGELOG.md
+include CHANGELOG.md
 recursive-include tests/fixtures *.json
 include tests/conftest.py
 include tests/web_editor_harness.cjs

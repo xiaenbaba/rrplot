@@ -52,7 +52,7 @@ schemaVersion 保持 1，设备、端口 ID、管路和挂接关系保留现有�
 文件载入、解析、预览和导出继续使用原有 revision/request/session 判断；
 拖动和微调仍由 session 统一提交历史。事件绑定与所属控制器放在一起，
 页面动作、跨标签页通知和通用偏好在 events 中协调。开发说明见
-[web/editor/README.md](web/editor/README.md)。
+[web/editor/README.md](../web/editor/README.md)。
 
 画布先在脱离页面的 SVG 分组中建立新对象，按顺序通过 DocumentFragment
 批量挂入；已有分组保留 DOM 身份。图元图像在 SVG defs 中按图像标识与边界
@@ -87,7 +87,16 @@ schemaVersion 保持 1，设备、端口 ID、管路和挂接关系保留现有�
 
 ## 继续演进
 
-现行待办见 ROADMAP.md，版本行为变化见 CHANGELOG.md；WEB_PROJECT_PLAN.md
+自动避障由 `web/routing.js` 提供纯计算：旋转设备包围框外扩 12 单位，设备
+边界和端口引出点构成坐标压缩正交网格，A* 使用曼哈顿距离及转弯成本。
+保留已畅通的基础直连，受限搜索及最多 100 折点，最终以现有 `route()` 复核
+并存为普通 vertices；Python 无需第二套路由算法，画布和正式导出保持一致。
+`editor/routing.js` 按管路让出事件循环，提交前检查文档实例、revision、几何、
+载入和交互状态；Esc 或编辑取消过期结果，整批失败不提交，成功只产生一条历史。
+挂接阀件使用最终路线复算，检查与其他管路/设备及页面边界的冲突。文字和
+管路交叉避让、自动跟随设备移动重算留作后续需求。
+
+现行待办见 [路线图](plans/ROADMAP.md)，版本行为变化见 [变更记录](../CHANGELOG.md)；[Web 项目方案](plans/WEB_PROJECT_PLAN.md)
 保留历史实施日志。编辑器职责拆分及本轮性能优化已完成；后续以多种真实图纸
-和稳定前台环境继续测量，补充持续端到端测试。完整 Web 安装包、自动避障、
+和稳定前台环境继续测量，补充持续端到端测试。完整 Web 安装包、
 协作与热力计算单独规划。

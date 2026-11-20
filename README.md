@@ -58,9 +58,9 @@ ruff check rrplot tests examples server
 服务使用 Python 标准库，无需安装 Node.js、npm 或图编辑器框架。
 
 支持 `start-web.cmd`、`status-web.cmd`、`stop-web.cmd`、`restart-web.cmd` 统一服务管理。
-现行架构见 [ARCHITECTURE.md](ARCHITECTURE.md)，优化进度见 [ROADMAP.md](ROADMAP.md)。
+现行架构见 [架构说明](docs/ARCHITECTURE.md)，优化进度见 [路线图](docs/plans/ROADMAP.md)。
 详细操作见 [Web 使用说明](web/README.md)，历史设计与验收记录见
-[Web 项目方案](WEB_PROJECT_PLAN.md)。首版面向本机单用户，尚不支持自动避障和全图元库。
+[Web 项目方案](docs/plans/WEB_PROJECT_PLAN.md)。面向本机单用户，支持按需设备避障布线，尚未覆盖全部图元。
 
 ## 快速上手
 
@@ -220,7 +220,9 @@ examples/      每张图一个脚本 + 同名 PNG
 tests/         pytest 回归测试(端口/走线/错误提示/全件渲染)
 references/    早期原型脚本与 SVG 符号源文件
 SVG/           export_parts_svg.py 导出的部件单图(可直接进论文/PPT)
-docs/          Sphinx 文档:tutorial(上手)/ design(原理)/ api(自动提取)
+docs/          使用与开发文档:tutorial / design / api / ARCHITECTURE.md
+docs/plans/    路线图、实施计划与验收记录
+review/        项目评审、复审与专项审查记录
 ```
 
 ## 文档
@@ -229,7 +231,11 @@ docs/          Sphinx 文档:tutorial(上手)/ design(原理)/ api(自动提取)
 | --- | --- |
 | `docs/tutorial.rst` | 上手教程:最小例子、via 三种写法、标注语法、部件速查表、排错 |
 | `docs/design.rst` | 设计说明:坐标系约定、端口法向规则、走线三阶段算法、扩展部件的三条路 |
-| `docs/api.rst` | 全部模块与函数的 API 参考(autodoc 自动提取) |
+| `docs/api/index.rst` | 全部模块与函数的 API 参考(autodoc 自动提取) |
+| [docs/README.md](docs/README.md) | 文档导航、分类和维护约定 |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 当前架构、模块边界和数据流 |
+| [docs/plans/README.md](docs/plans/README.md) | 路线图与实施计划索引 |
+| [review/README.md](review/README.md) | 项目评审索引与历史审查记录 |
 
 本地构建(0 警告):
 

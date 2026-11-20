@@ -83,6 +83,9 @@ export function createKeyboardController(state, commands) {
     document.addEventListener('focusin', commands.endNudge);
     window.addEventListener('beforeunload', event => { if (state.dirty && !BENCHMARK) { event.preventDefault(); event.returnValue = ''; } });
     window.addEventListener('keydown', async event => {
+      if (event.key === 'Escape' && state.routingSession) {
+        state.routingSession = null; event.preventDefault(); commands.status('已取消避障布线 · 原走线保留'); return;
+      }
       if (event.target.matches('input,textarea,select') || event.target.isContentEditable || event.isComposing || document.querySelector('dialog[open]')) return;
       if (event.key.startsWith('Arrow') && !event.ctrlKey && !event.metaKey && !event.altKey
         && (event.target === document.body || event.target === state.svg || state.svg.contains(event.target))) {

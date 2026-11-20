@@ -55,7 +55,20 @@ rrplot 项目文档
    tests/         — pytest 回归测试
    references/    — 早期原型脚本与 SVG 符号源文件
    SVG/           — export_parts_svg.py 导出的部件单图
-   docs/          — Sphinx 文档
+   docs/          — 使用/API 文档与当前架构
+   docs/plans/    — 路线图、实施计划与验收记录
+   review/        — 历史评审与复审记录
+
+开发与实施文档
+--------------
+
+以下 Markdown 文档可在仓库阅读，也可下载原文：
+
+* :download:`文档导航 <README.md>`
+* :download:`架构说明 <ARCHITECTURE.md>`
+* :download:`计划索引 <plans/README.md>`
+* :download:`路线图 <plans/ROADMAP.md>`
+* :download:`Web 项目方案与实施计划 <plans/WEB_PROJECT_PLAN.md>`
 
 索引
 ----

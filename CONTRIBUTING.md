@@ -21,12 +21,18 @@ rrplot/     库本体:core(引擎)/ parts(部件)/ hvac、svgparts(HVAC)/
                style(样式)/ _primitives(底层绘制)
 examples/      每张图一个脚本 + 同名 PNG(入库)
 tests/         pytest 回归测试
-docs/          Sphinx 文档
+docs/          使用/API 文档与架构说明，入口 docs/README.md
+docs/plans/    路线图、专项实施计划与验收记录
+review/        项目评审与复审记录，新报告按 review-YYYYMMDD.md 命名
 references/    早期原型与参考脚本(不入库的生成物见 .gitignore)
 SVG/           export_parts_svg.py 导出的部件单图
 ```
 
 `references/` 下的东西不是库的一部分,改动它不受 CI 约束。
+
+路线优先级与完成状态维护在 `docs/plans/ROADMAP.md`；详细方案和验收记录
+放在同目录的专项计划中。当前架构维护在 `docs/ARCHITECTURE.md`，历史评审
+放在 `review/`；已替代的计划可移入 `docs/plans/archive/` 并更新索引和链接。
 
 ## 加一个部件
 
