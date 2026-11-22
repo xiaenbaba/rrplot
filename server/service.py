@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import secrets
+import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -12,6 +13,17 @@ ROOT = Path(__file__).resolve().parents[1]
 STATE = ROOT / ".rrplot-web"
 PROJECT_ID = hashlib.sha256(str(ROOT).casefold().encode()).hexdigest()[:20]
 _cached = (None, None)
+
+
+def safe_console():
+    """让 CLI 中文输出在旧控制台（如英文 Windows 的 cp1252）降级而非崩溃。
+
+    无法编码的字符原位替换，不再抛 UnicodeEncodeError；
+    中文 Windows（cp936/UTF-8）下的显示不受影响。
+    """
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")
 
 
 def code_fingerprint():

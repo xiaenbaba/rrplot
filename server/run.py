@@ -30,6 +30,7 @@ from server.service import (  # noqa: E402
     code_fingerprint,
     identity,
     remove_instance,
+    safe_console,
     save_instance,
 )
 
@@ -180,4 +181,5 @@ def main():
 
 
 if __name__ == "__main__":
+    safe_console()
     main()

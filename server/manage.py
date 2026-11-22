@@ -13,7 +13,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from server.service import PROJECT_ID, STATE, state_path, wait_until  # noqa: E402
+from server.service import (  # noqa: E402
+    PROJECT_ID,
+    STATE,
+    safe_console,
+    state_path,
+    wait_until,
+)
 
 
 def health(port):
@@ -180,4 +186,5 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
+    safe_console()
     sys.exit(main())

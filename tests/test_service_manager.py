@@ -2,6 +2,7 @@
 
 import http.client
 import json
+import os
 import socket
 import subprocess
 import sys
@@ -102,6 +103,39 @@ def test_code_fingerprint_changes_when_source_changes(tmp_path, monkeypatch):
     source.write_text("second")
     assert service.code_fingerprint() != first
     assert service.code_fingerprint() == service.code_fingerprint()
+
+
+def test_safe_console_replaces_unencodable_output():
+    """safe_console() 后旧控制台打印中文降级替换，不抛 UnicodeEncodeError。"""
+    service.safe_console()
+    print("服务未启动：http://127.0.0.1:59341/")
+    print("运行中 · v1.3.0", file=sys.stderr)
+
+
+def test_manage_status_on_legacy_console_encoding():
+    """英文 Windows（cp1252 控制台）下 manage.py 的中文提示不再使进程崩溃。"""
+    root = Path(__file__).resolve().parents[1]
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    env = dict(os.environ, PYTHONIOENCODING="cp1252")
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(root / "server/manage.py"),
+            "status",
+            "--port",
+            str(port),
+        ],
+        cwd=root,
+        capture_output=True,
+        encoding="utf-8",
+        errors="replace",
+        env=env,
+        timeout=30,
+    )
+    assert "UnicodeEncodeError" not in (result.stdout + result.stderr)
+    assert result.stdout, "应打印降级后的状态文本"
 
 
 def test_real_service_start_status_restart_and_stop():
