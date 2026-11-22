@@ -1,6 +1,6 @@
 # rrplot —— 通用制冷循环/HVAC 示意图库
 
-[![CI](https://github.com/xiaenbaba/cycle-plot/actions/workflows/ci.yml/badge.svg)](https://github.com/xiaenbaba/cycle-plot/actions/workflows/ci.yml)
+[![CI](https://github.com/xiaenbaba/rrplot/actions/workflows/ci.yml/badge.svg)](https://github.com/xiaenbaba/rrplot/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 

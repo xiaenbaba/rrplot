@@ -28,7 +28,7 @@ test = ["pytest>=7,<10", "pytest-cov>=4,<8"]
 docs = ["sphinx>=7,<9", "sphinx-rtd-theme>=3,<4"]
 
 [project.urls]
-Repository = "https://github.com/xiaenbaba/cycle-plot"
+Repository = "https://github.com/xiaenbaba/rrplot"
 
 [tool.setuptools.packages.find]
 include = ["rrplot*", "cycleplot*"]
