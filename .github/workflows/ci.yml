@@ -16,6 +16,14 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
         python-version: ["3.9", "3.12", "3.13"]
+        exclude:
+          # ubuntu-latest 已滚到 26.04,官方不再为它构建 Python 3.9
+          - os: ubuntu-latest
+            python-version: "3.9"
+        include:
+          # 3.9 钉在仍有官方构建的 24.04 上
+          - os: ubuntu-24.04
+            python-version: "3.9"
     steps:
       - uses: actions/checkout@v4
 
