@@ -41,8 +41,8 @@ API 逐项说明见 :doc:`/api/index`,动手画图见 :doc:`tutorial`。
 
 .. note::
 
-   ``Diagram`` 允许 ``width=0``/``height=0`` 这种退化输入(此时 matplotlib
-   会发一条 ``xlim`` 警告),主要用于测试;画图请给正常尺寸。
+   ``Diagram`` 允许 ``width=0``/``height=0`` 这种退化输入(此时会跳过
+   ``set_xlim``/``set_ylim`` 以避免 Matplotlib 告警),主要用于测试;画图请给正常尺寸。
 
 
 2. 端口:相对偏移 + 外法向
@@ -69,7 +69,8 @@ API 逐项说明见 :doc:`/api/index`,动手画图见 :doc:`tutorial`。
    node["suction"].point   # (330, 140) + (0, -95) = (330, 45)
    node["suction"].dir     # (0, -1) 朝上
 
-### 法向怎么定
+法向怎么定
+~~~~~~~~~~
 
 :meth:`Part.direction` 的判定顺序:
 
@@ -88,15 +89,17 @@ API 逐项说明见 :doc:`/api/index`,动手画图见 :doc:`tutorial`。
    回落到按偏移推断;:func:`rrplot.core.make_partial` 实现了这个规则
    (见 ``new_dirs.pop(k, None)``)。需要固定方向就在 ``dirs=`` 里显式补回来。
 
-### 命名约定
+命名约定
+~~~~~~~~
 
-库内两类端口命名,不要混:
+库内三类端口命名,不要混:
 
-- **贯通式两口元件** (阀、过滤器、毛细管)用 ``in`` / ``out``,
-  惯例是 **in 在东、out 在西**,即图内主流向自东向西;
+- **贯通式两口元件** (截止阀、电磁阀、电子膨胀阀、单向阀、过滤器、毛细管、消音器)用
+  ``in`` / ``out``,默认 **in 在西、out 在东** (竖放元件如毛细管/消音器/``orient="v"`` 膨胀阀为
+  in 在北、out 在南;唯一例外是对顶三角阀 ``bowtie_valve`` 系按参考图流向为 in 在东、out 在西);
 - **多口/换热类部件** (蒸发器、冷凝器、容器)用
   ``left`` / ``right`` / ``top`` / ``bottom`` 表示边中点;
-- **有专门热力学含义的** 用领域名:``suction`` / ``discharge`` / ``inj`` /
+- **有专门热力学含义的** 用领域名:``suction`` / ``discharge`` / ``vapor_inj`` /
   ``vapor`` / ``exhaust``,读者不看文档也知道接的是什么。
 
 端口名拼错时错误信息会列出全部可用端口:
@@ -116,7 +119,8 @@ API 逐项说明见 :doc:`/api/index`,动手画图见 :doc:`tutorial`。
 
    端口 A ──▶ 展开 via ──▶ 端口 B  →  _fit_end(两端)  →  _orthogonalize(全部)
 
-### 3.1 展开 via
+3.1 展开 via
+~~~~~~~~~~~~
 
 ``via`` 是一个序列,元素支持三种写法,可在同一条管线里混用:
 
@@ -145,7 +149,8 @@ API 逐项说明见 :doc:`/api/index`,动手画图见 :doc:`tutorial`。
 
    ValueError: via[0] 方向令牌 'q' 无效,可用:down,e,left,n,right,s,up,w,左,上,右,下
 
-### 3.2 端口吸附(_fit_end)
+3.2 端口吸附(_fit_end)
+~~~~~~~~~~~~~~~~~~~~~~
 
 部件是按坐标摆的,端口旁的第一段很容易和端口差几像素,画出来就是一根
 **接缝碎块**。:func:`rrplot.core._fit_end` 处理两种情况:
@@ -161,7 +166,8 @@ API 逐项说明见 :doc:`/api/index`,动手画图见 :doc:`tutorial`。
 10px 这个容差是权衡出来的:小于它大概率是笔误,大于它就是用户真的想
 画一条偏离的引管,不该被改写。
 
-### 3.3 正交化(_orthogonalize)
+3.3 正交化(_orthogonalize)
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 展开后的折点里可能有斜线段,直接画出来是斜的示意图,不好看也不符合
 PFD 惯例。:func:`rrplot.core._orthogonalize` 遍历相邻点,发现方向
@@ -246,8 +252,8 @@ PFD 惯例。:func:`rrplot.core._orthogonalize` 遍历相邻点,发现方向
 
    from rrplot import make_partial, parts
 
-   rect = parts.make_rect(260, 110)
-   evap2 = make_partial(rect, {"vapor_out": (-65, -55)}, dirs={"vapor_out": "n"})
+   hx = parts.make_heat_exchanger(260, 110, shape="rect_x")
+   evap2 = make_partial(hx, {"vapor_out": (-65, -55)}, dirs={"vapor_out": "n"})
 
 **路线二:新写一个绘制函数 + 端口表。** 在 :mod:`rrplot.parts` 里加
 ``def _xxx(ax, x, y, label="新部件", **kw): ...``,再 ``xxx = _part("新部件",

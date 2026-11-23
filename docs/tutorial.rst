@@ -78,10 +78,10 @@ Linux 装 ``fonts-noto-cjk``。详见 README 的"字体"一节。
 
 .. code-block:: powershell
 
-   python examples/compressor_symbols.py      # 7 种压缩机画法
-   python examples/heat_exchanger_shapes.py   # 换热器 7 种画法对照
+   python examples/compressor_symbols.py      # 2 种压缩机画法
+   python examples/heat_exchanger_shapes.py   # 换热器 4 种画法对照
 
-或者看 ``SVG/`` 目录下 37 张导出的部件单图,挑好之后 ``from rrplot.svgparts`` 之外,
+或者看 ``SVG/`` 目录下导出的部件单图,挑好之后按部件名调用,也可以
 用 ``python export_parts_svg.py`` 重新导出。
 
 
@@ -213,6 +213,15 @@ Linux 装 ``fonts-noto-cjk``。详见 README 的"字体"一节。
    * - ``vessel``
      - ``top`` ``bottom`` ``left`` ``right`` ``vapor``
      - 闪发罐:胶囊形上下封头 + 液位线
+   * - ``separator_utube`` (工厂 ``make_separator_utube``)
+     - ``in`` ``out`` ``drain``
+     - U 形管气液分离器,支持 ``flip=True`` 镜像进出管
+   * - ``oil_separator`` (工厂 ``make_oil_separator``)
+     - ``left`` ``top`` ``bottom``
+     - 油分离器:侧进顶出、底部回油
+   * - ``make_muffler`` / ``make_sensor``
+     - ``in`` ``out`` / ``tap``
+     - 消音器(竖放两口)与温度/压力测点圆圈(底部单测量口)
 
 **尺寸不合适就用工厂生成** (端口偏移会跟着尺寸走):
 
@@ -335,9 +344,9 @@ Linux 装 ``fonts-noto-cjk``。详见 README 的"字体"一节。
 
 **中文显示成方框**
    跑 ``use_font()``。只匹配到 DejaVu Serif 说明系统没装中文字体,
-   按 README"字体"一节装宋体 / Songti SC / Noto CJK,或用
-   ``matplotlib.font_manager.fontManager.addfont()`` 注册自备字体,
-   再把族名加进 ``rrplot.style.FONT_CANDIDATES`` 头部。
+   按 README"字体"一节装宋体 / Songti SC / Noto CJK,或直接调用
+   ``rrplot.register_font("path/to/font.ttf")`` 注册外部字体并自动刷新字体栈
+   (手动修改 ``rrplot.style.FONT_CANDIDATES`` 后也请调用 ``rrplot.refresh_fonts()``)。
 
 **端口名报错**
    错误信息会列出全部可用端口,照抄即可。
@@ -381,7 +390,7 @@ Linux 装 ``fonts-noto-cjk``。详见 README 的"字体"一节。
 10. 现成示例
 ----------------------------------------
 
-``examples/`` 下 13 个脚本,每个都配一张同名 PNG,建议对照着改:
+``examples/`` 下 19 个脚本,每个都配一张同名 PNG,建议对照着改:
 
 .. list-table::
    :header-rows: 1
@@ -391,6 +400,8 @@ Linux 装 ``fonts-noto-cjk``。详见 README 的"字体"一节。
      - 内容
    * - ``vrf_multisplit.py``
      - 多联机(VRF)系统图(室外机 + 室内机 1…n,综合布线范例,建议从这个开始读)
+   * - ``vrf_multisplit_annex_d.py``
+     - 多联机现场测点布置(GB/T 27941—2026 附录 D 图 D.3)
    * - ``ftvi_cycle.py``
      - FTVI 闪发罐喷气增焓系统图(电子膨胀阀节流)
    * - ``evi_ftvi_layout.py``
@@ -402,15 +413,17 @@ Linux 装 ``fonts-noto-cjk``。详见 README 的"字体"一节。
    * - ``evi_economizer_cycle.py``
      - 普通热泵 EVI 经济器竖直排布(主路上下贯通,喷气支路左右贯通)
    * - ``compressor_symbols.py``
-     - 7 种压缩机画法速观
+     - 2 种压缩机画法速观
    * - ``heat_exchanger_shapes.py``
-     - 7 种换热器画法速观
+     - 4 种换热器画法速观
    * - ``hvac_system.py`` / ``hvac_system_notank.py``
      - 空气能供暖系统(带 / 无水箱)
    * - ``hvacsvg_demo.py``
      - ``load_svg_part`` 直接加载 SVG 符号
    * - ``four_way_round_demo.py``
      - 四通阀圆体回路
+   * - ``separator_utube_demo.py``
+     - U 形管气液分离器图元(镜像/翻转可选)
    * - ``globe_valve_demo.py``
      - 截止阀图元(沙漏 + 手轮)
    * - ``solenoid_valve_demo.py``
@@ -430,4 +443,4 @@ Linux 装 ``fonts-noto-cjk``。详见 README 的"字体"一节。
 - 想知道 ``via`` / ``states`` / ``bridge`` 的完整参数:见 :doc:`/api/index`
 - 想加测试:``tests/test_rrplot.py`` 里有端口定义、走线算法、
   错误提示、全件渲染四类现成范式,照着写即可
-- 改了代码先跑 ``python -m pytest`` 和 ``ruff check rrplot tests``
+- 改了代码先跑 ``python -m pytest`` 和 ``ruff check rrplot tests examples server tools export_parts_svg.py``

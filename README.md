@@ -42,7 +42,7 @@ python -m pytest
 静态检查(CI 里跑同一条):
 
 ```powershell
-ruff check rrplot tests examples server
+ruff check rrplot tests examples server tools export_parts_svg.py
 ```
 
 ## 浏览器编辑器
@@ -191,7 +191,7 @@ from rrplot.parts import (make_expansion_valve_x, make_four_way_round,
 | vrf_multisplit_annex_d.py | 多联机现场测点布置(GB/T 27941—2026 附录 D 图 D.3) |
 
 `examples/scenes/` 存放编辑器导出的 JSON 图纸,可在网页编辑器中通过
-“载入”打开继续编辑或导出 PNG/SVG/PDF:
+顶部“打开”按钮载入继续编辑或导出 PNG/SVG/PDF:
 
 | 图纸 | 内容 |
 | --- | --- |
@@ -218,16 +218,21 @@ python examples/hvac_system.py
 1. 调用 `use_font()` 看实际生效的字体族,确认栈里没有一个已安装;
 2. Windows 装宋体/新宋体,macOS 装 Songti SC,Linux 装
    `fonts-noto-cjk` 或思源宋体,装完重启 Python 进程;
-3. 自备字体文件时用 `matplotlib.font_manager.fontManager.addfont()`
-   注册,再把族名加进 `rrplot.style.FONT_CANDIDATES` 头部。
+3. 自备字体文件时调用 `rrplot.register_font("path/to/font.ttf")` 注册并
+   置为首选字体;若手动调整 `rrplot.style.FONT_CANDIDATES`,随后调用
+   `rrplot.refresh_fonts()` 刷新字体栈。
 
 ## 目录结构
 
 ```
 rrplot/     库本体:core(引擎)/ part(部件模型)/ parts(部件)/ hvac、svgparts(HVAC)/
+               registry、scene、scene_renderer(场景与注册表)/ templates/(9 套模板)/
                style(样式)/ _primitives(底层绘制)
+server/        本机 Web 服务与启停管理(run.py / manage.py / service.py)
+web/           原生 ES modules SVG 浏览器编辑器(含 web/editor/ 控制器)
+tools/         发布版本校验与性能基准工具
 examples/      每张图一个脚本 + 同名 PNG;scenes/ 下为编辑器导出的 JSON 图纸
-tests/         pytest 回归测试(端口/走线/错误提示/全件渲染)
+tests/         pytest 回归测试(端口/走线/场景/Web 交互/全件渲染)
 references/    早期原型脚本与 SVG 符号源文件
 SVG/           export_parts_svg.py 导出的部件单图(可直接进论文/PPT)
 docs/          使用与开发文档:tutorial / design / api / ARCHITECTURE.md
@@ -261,7 +266,7 @@ python -m sphinx -b html docs docs/_build/html
 新增部件请在 `rrplot/parts.py` 里写绘制函数 + 端口表(或用
 `make_partial` 派生),并在 `tests/test_rrplot.py` 补端口断言、
 在 `examples/` 加一个演示脚本;提交前跑通 `python -m pytest` 与
-`ruff check rrplot tests`。
+`ruff check rrplot tests examples server tools export_parts_svg.py`。
 
 ## 许可
 

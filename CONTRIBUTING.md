@@ -8,7 +8,7 @@
 ```powershell
 pip install -e ".[test]"     # 开发:装包 + pytest
 python -m pytest             # 全部用例
-ruff check rrplot tests examples   # 静态检查(CI 同款)
+ruff check rrplot tests examples server tools export_parts_svg.py   # 静态检查(CI 同款)
 ```
 
 提交前这两条必须通过。CI 还会:跑 `pytest --cov`(覆盖率下限 90%)、逐个执行

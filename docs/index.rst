@@ -4,7 +4,7 @@ rrplot 项目文档
 制冷循环 / HVAC 示意图绘制库:坐标式部件拼装 + 走线式连管,
 输出 PNG / PDF / SVG。
 
-**版本:** 1.3.0
+**版本:** |release|
 
 .. toctree::
    :maxdepth: 2
@@ -50,8 +50,12 @@ rrplot 项目文档
 ::
 
    rrplot/        — 核心库代码(core 引擎 / part 模型 / parts 部件 /
-                     hvac、svgparts(HVAC)/ style(样式)/ _primitives(底层绘制))
-   examples/      — 每张图一个脚本 + 同名 PNG
+                     hvac、svgparts(HVAC)/ registry、scene、scene_renderer(场景)/
+                     style(样式)/ _primitives(底层绘制))
+   server/        — 本机 Web 服务与启停管理
+   web/           — 原生 ES modules SVG 浏览器编辑器
+   tools/         — 发布版本校验与基准工具
+   examples/      — 每张图一个脚本 + 同名 PNG;scenes/ 存放编辑器 JSON 场景
    tests/         — pytest 回归测试
    references/    — 早期原型脚本与 SVG 符号源文件
    SVG/           — export_parts_svg.py 导出的部件单图

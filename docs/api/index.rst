@@ -20,6 +20,7 @@ API 参考
    core
    parts
    part
+   scene
    hvac
    svgparts
    style
