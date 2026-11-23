@@ -4,6 +4,7 @@
 | --- | --- |
 | [ROADMAP.md](ROADMAP.md) | 当前优先级、完成状态、后续事项及已有验收记录 |
 | [WEB_PROJECT_PLAN.md](WEB_PROJECT_PLAN.md) | Web 技术方案、实施步骤和详细交付记录 |
+| [公网部署方案](public-deployment.md) | 生产入口、部署文件、试运行验收和回退，待实施 |
 
 ## 维护约定
 
