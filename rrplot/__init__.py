@@ -21,7 +21,7 @@ from .parts import COMPRESSOR_STYLES, HEX_SHAPES
 from .style import FONT, FONT_STACK, LINE, apply_style, context
 from .svgparts import load_svg_part
 
-__version__ = "1.3.0"
+__version__ = "1.3.1"
 
 __all__ = ["__version__", "Diagram", "Node", "Pipe", "Port", "State",
            "make_partial", "use_font", "parts", "hvac", "style", "FONT",
