@@ -15,50 +15,66 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import matplotlib.pyplot as plt
-from rrplot import Diagram, parts, use_font
-from rrplot.parts import (COMPRESSOR_STYLES, HEX_SHAPES, Part,
-                             make_compressor, make_heat_exchanger)
+import matplotlib  # noqa: E402
+
+matplotlib.use("Agg")
+
+from rrplot import Diagram, parts, use_font  # noqa: E402
+from rrplot.parts import (  # noqa: E402
+    COMPRESSOR_STYLES,
+    HEX_SHAPES,
+    Part,
+    make_compressor,
+    make_heat_exchanger,
+)
 
 CANVAS = 600                     # 部件居中放置,紧裁后无留白
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "SVG")
 
+HEX_CN = {
+    "rect_diag": "矩形对角",
+    "rect_x": "矩形对角X",
+    "rect_zigzag7": "7点之字",
+    "fan_coil": "风机盘管",
+}
+
 
 def export(part, label, fname):
-    d = Diagram(width=CANVAS, height=CANVAS)
-    d.add(part, label, loc=(CANVAS / 2, CANVAS / 2))
-    path = os.path.join(OUT, fname)
-    d.save(path, tight=True)
-    plt.close(d.fig)
+    with Diagram(width=CANVAS, height=CANVAS) as d:
+        d.add(part, label, loc=(CANVAS / 2, CANVAS / 2))
+        path = os.path.join(OUT, fname)
+        d.save(path, tight=True)
     print("  已导出:", fname)
-
-
-COMPRESSOR_CN = {"圆形": "圆形(圆体双弦)", "方形": "方形(胶囊壳体)"}
-HEX_CN = {"rect_diag": "矩形对角", "rect_x": "矩形对角X",
-          "rect_zigzag7": "7点之字"}
+    return fname
 
 
 def main():
     os.makedirs(OUT, exist_ok=True)
     use_font()
+    exported = set()
 
     print("[1/3] parts 模块实例图元")
-    for name, obj in vars(parts).items():
+    for name, obj in sorted(vars(parts).items()):
         if not isinstance(obj, Part) or name.startswith("_"):
             continue
         if name == "compressor":
-            continue                    # 由压缩机两种 style 代表
-        export(obj, obj.name, f"{name}.svg")
+            continue                    # 由压缩机各 style 代表
+        exported.add(export(obj, obj.name, f"{name}.svg"))
 
-    print("[2/3] 压缩机 2 种机身")
+    print(f"[2/3] 压缩机 {len(COMPRESSOR_STYLES)} 种机身")
     for s in COMPRESSOR_STYLES:
         p = make_compressor(r=95, style=s, name=f"压缩机({s})")
-        export(p, s, f"compressor__{s}.svg")
+        exported.add(export(p, s, f"compressor__{s}.svg"))
 
-    print("[3/3] 换热器 3 种换热面")
+    print(f"[3/3] 换热器 {len(HEX_SHAPES)} 种换热面")
     for sh in HEX_SHAPES:
         p = make_heat_exchanger(shape=sh, name=f"换热器({sh})")
-        export(p, HEX_CN[sh], f"heat_exchanger__{sh}.svg")
+        exported.add(export(p, HEX_CN.get(sh, sh), f"heat_exchanger__{sh}.svg"))
+
+    for stale in sorted(f for f in os.listdir(OUT) if f.endswith(".svg")):
+        if stale not in exported:
+            os.remove(os.path.join(OUT, stale))
+            print("  已清理过期文件:", stale)
 
     files = sorted(f for f in os.listdir(OUT) if f.endswith(".svg"))
     print(f"\n完成,共 {len(files)} 个 SVG,目录: {OUT}")

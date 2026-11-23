@@ -6,11 +6,11 @@
   <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:date>2026-11-01T09:02:52.958336</dc:date>
+    <dc:date>2026-11-23T15:25:39.691175</dc:date>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
-      <dc:title>Matplotlib v3.10.3, https://matplotlib.org/</dc:title>
+      <dc:title>Matplotlib v3.9.4, https://matplotlib.org/</dc:title>
      </cc:Agent>
     </dc:creator>
    </cc:Work>
@@ -30,36 +30,21 @@ z
   </g>
   <g id="axes_1">
    <g id="patch_2">
-    <path d="M 219.5856 189.3456 
-L 219.6144 189.3456 
-Q 236.8944 189.3456 236.8944 206.6256 
-L 236.8944 232.5744 
-Q 236.8944 249.8544 219.6144 249.8544 
-L 219.5856 249.8544 
-Q 202.3056 249.8544 202.3056 232.5744 
-L 202.3056 206.6256 
-Q 202.3056 189.3456 219.5856 189.3456 
+    <path d="M 219.5856 151.1856 
+L 219.6144 151.1856 
+Q 253.8144 151.1856 253.8144 185.3856 
+L 253.8144 253.8144 
+Q 253.8144 288.0144 219.6144 288.0144 
+L 219.5856 288.0144 
+Q 185.3856 288.0144 185.3856 253.8144 
+L 185.3856 185.3856 
+Q 185.3856 151.1856 219.5856 151.1856 
 z
-" clip-path="url(#p8974995793)" style="fill: #ffffff; stroke: #000000; stroke-width: 1.5; stroke-linejoin: miter"/>
-   </g>
-   <g id="line2d_1">
-    <path d="M 219.6 189.36 
-L 219.6 180.72 
-" clip-path="url(#p8974995793)" style="fill: none; stroke: #000000; stroke-width: 1.5; stroke-linecap: round"/>
-   </g>
-   <g id="line2d_2">
-    <path d="M 219.6 249.84 
-L 219.6 258.48 
-" clip-path="url(#p8974995793)" style="fill: none; stroke: #000000; stroke-width: 1.5; stroke-linecap: round"/>
-   </g>
-   <g id="line2d_3">
-    <path d="M 234.288 241.662805 
-L 234.288 250.302805 
-" clip-path="url(#p8974995793)" style="fill: none; stroke: #000000; stroke-width: 1.5; stroke-linecap: round"/>
+" clip-path="url(#p9e61546327)" style="fill: #ffffff; stroke: #000000; stroke-width: 1.5; stroke-linejoin: miter"/>
    </g>
    <g id="text_1">
-    <!-- 方 -->
-    <g transform="translate(209.6 214.974687) scale(0.2 -0.2)">
+    <!-- 方形 -->
+    <g transform="translate(201.6 312.484219) scale(0.18 -0.18)">
      <defs>
       <path id="SimSun-65b9" d="M 275 3925 
 L 5250 3925 
@@ -98,12 +83,6 @@ Q 2975 4725 2625 5075
 L 2675 5150 
 z
 " transform="scale(0.015625)"/>
-     </defs>
-     <use xlink:href="#SimSun-65b9"/>
-    </g>
-    <!-- 形 -->
-    <g transform="translate(209.6 233.834688) scale(0.2 -0.2)">
-     <defs>
       <path id="SimSun-5f62" d="M 5175 5025 
 L 5650 4675 
 Q 5425 4600 4950 4100 
@@ -164,13 +143,14 @@ L 2700 -325
 z
 " transform="scale(0.015625)"/>
      </defs>
-     <use xlink:href="#SimSun-5f62"/>
+     <use xlink:href="#SimSun-65b9"/>
+     <use xlink:href="#SimSun-5f62" x="100"/>
     </g>
    </g>
   </g>
  </g>
  <defs>
-  <clipPath id="p8974995793">
+  <clipPath id="p9e61546327">
    <rect x="3.6" y="3.6" width="432" height="432"/>
   </clipPath>
  </defs>

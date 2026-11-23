@@ -6,11 +6,11 @@
   <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:date>2026-10-14T17:22:43.378066</dc:date>
+    <dc:date>2026-11-23T15:25:39.127929</dc:date>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
-      <dc:title>Matplotlib v3.10.3, https://matplotlib.org/</dc:title>
+      <dc:title>Matplotlib v3.9.4, https://matplotlib.org/</dc:title>
      </cc:Agent>
     </dc:creator>
    </cc:Work>
@@ -30,174 +30,77 @@ z
   </g>
   <g id="axes_1">
    <g id="patch_2">
-    <path d="M 194.4 206.64 
-L 244.8 206.64 
-L 244.8 232.56 
-L 194.4 232.56 
+    <path d="M 193.68 206.64 
+L 245.52 206.64 
+L 245.52 232.56 
+L 193.68 232.56 
 z
-" clip-path="url(#pe59d85efd2)" style="fill: #ffffff; stroke: #000000; stroke-linejoin: miter"/>
+" clip-path="url(#p73123f00b6)" style="fill: #ffffff; stroke: #000000; stroke-linejoin: miter"/>
    </g>
-   <g id="patch_3">
-    <path d="M 219.6 207.36 
-C 222.846086 207.36 225.959658 208.649684 228.254987 210.945013 
-C 230.550316 213.240342 231.84 216.353914 231.84 219.6 
-C 231.84 222.846086 230.550316 225.959658 228.254987 228.254987 
-C 225.959658 230.550316 222.846086 231.84 219.6 231.84 
-C 216.353914 231.84 213.240342 230.550316 210.945013 228.254987 
-C 208.649684 225.959658 207.36 222.846086 207.36 219.6 
-C 207.36 216.353914 208.649684 213.240342 210.945013 210.945013 
-C 213.240342 208.649684 216.353914 207.36 219.6 207.36 
-z
-" clip-path="url(#pe59d85efd2)" style="fill: #ffffff; stroke: #000000; stroke-linejoin: miter"/>
+   <g id="line2d_1">
+    <path d="M 232.56 206.64 
+L 245.52 219.6 
+" clip-path="url(#p73123f00b6)" style="fill: none; stroke: #000000; stroke-width: 0.6; stroke-linecap: round"/>
+   </g>
+   <g id="line2d_2">
+    <path d="M 219.6 206.64 
+L 245.52 232.56 
+" clip-path="url(#p73123f00b6)" style="fill: none; stroke: #000000; stroke-width: 0.6; stroke-linecap: round"/>
+   </g>
+   <g id="line2d_3">
+    <path d="M 206.64 206.64 
+L 232.56 232.56 
+" clip-path="url(#p73123f00b6)" style="fill: none; stroke: #000000; stroke-width: 0.6; stroke-linecap: round"/>
+   </g>
+   <g id="line2d_4">
+    <path d="M 193.68 206.64 
+L 219.6 232.56 
+" clip-path="url(#p73123f00b6)" style="fill: none; stroke: #000000; stroke-width: 0.6; stroke-linecap: round"/>
+   </g>
+   <g id="line2d_5">
+    <path d="M 193.68 219.6 
+L 206.64 232.56 
+" clip-path="url(#p73123f00b6)" style="fill: none; stroke: #000000; stroke-width: 0.6; stroke-linecap: round"/>
+   </g>
+   <g id="line2d_6">
+    <path d="M 193.68 219.6 
+L 206.64 206.64 
+" clip-path="url(#p73123f00b6)" style="fill: none; stroke: #000000; stroke-width: 0.6; stroke-linecap: round"/>
+   </g>
+   <g id="line2d_7">
+    <path d="M 193.68 232.56 
+L 219.6 206.64 
+" clip-path="url(#p73123f00b6)" style="fill: none; stroke: #000000; stroke-width: 0.6; stroke-linecap: round"/>
+   </g>
+   <g id="line2d_8">
+    <path d="M 206.64 232.56 
+L 232.56 206.64 
+" clip-path="url(#p73123f00b6)" style="fill: none; stroke: #000000; stroke-width: 0.6; stroke-linecap: round"/>
+   </g>
+   <g id="line2d_9">
+    <path d="M 219.6 232.56 
+L 245.52 206.64 
+" clip-path="url(#p73123f00b6)" style="fill: none; stroke: #000000; stroke-width: 0.6; stroke-linecap: round"/>
+   </g>
+   <g id="line2d_10">
+    <path d="M 232.56 232.56 
+L 245.52 219.6 
+" clip-path="url(#p73123f00b6)" style="fill: none; stroke: #000000; stroke-width: 0.6; stroke-linecap: round"/>
+   </g>
+   <g id="line2d_11">
+    <path d="M 185.04 219.6 
+L 193.68 219.6 
+" clip-path="url(#p73123f00b6)" style="fill: none; stroke: #000000; stroke-width: 1.5; stroke-linecap: round"/>
+   </g>
+   <g id="line2d_12">
+    <path d="M 245.52 219.6 
+L 254.16 219.6 
+" clip-path="url(#p73123f00b6)" style="fill: none; stroke: #000000; stroke-width: 1.5; stroke-linecap: round"/>
    </g>
    <g id="text_1">
-    <!-- 干燥过滤器 -->
-    <g transform="translate(177.1 258.392734) scale(0.17 -0.17)">
+    <!-- 过滤器 -->
+    <g transform="translate(192.6 255.621094) scale(0.18 -0.18)">
      <defs>
-      <path id="SimSun-5e72" d="M 3300 2325 
-L 3300 925 
-Q 3300 -125 3325 -475 
-L 2900 -675 
-Q 2925 400 2925 1200 
-L 2925 2325 
-L 1050 2325 
-Q 725 2325 450 2250 
-L 225 2475 
-L 2925 2475 
-L 2925 4325 
-L 1525 4325 
-Q 1200 4325 925 4250 
-L 700 4475 
-L 4750 4475 
-L 5075 4800 
-L 5550 4325 
-L 3300 4325 
-L 3300 2475 
-L 5200 2475 
-L 5600 2875 
-L 6150 2325 
-L 3300 2325 
-z
-" transform="scale(0.015625)"/>
-      <path id="SimSun-71e5" d="M 3300 4800 
-L 3300 4075 
-L 4725 4075 
-L 4725 4800 
-L 3300 4800 
-z
-M 2675 3175 
-L 2675 2450 
-L 3425 2450 
-L 3425 3175 
-L 2675 3175 
-z
-M 3800 1500 
-Q 3800 1775 3775 2075 
-L 4275 1850 
-L 4125 1725 
-L 4125 1500 
-L 5475 1500 
-L 5800 1825 
-L 6175 1350 
-L 4325 1350 
-Q 5150 150 6125 25 
-L 6125 -75 
-Q 5750 -100 5625 -350 
-Q 4725 225 4225 1350 
-L 4125 1350 
-Q 4125 -25 4150 -450 
-L 3775 -575 
-Q 3800 50 3800 1250 
-Q 3025 50 1725 -525 
-L 1700 -450 
-Q 2900 300 3475 1350 
-L 2825 1350 
-Q 2500 1350 2225 1275 
-L 2000 1500 
-L 3800 1500 
-z
-M 2950 5150 
-L 3300 4950 
-L 4700 4950 
-L 4875 5175 
-L 5225 4900 
-L 5050 4750 
-Q 5050 4000 5075 3825 
-L 4725 3700 
-L 4725 3925 
-L 3300 3925 
-L 3300 3775 
-L 2950 3675 
-Q 2975 4050 2975 4462 
-Q 2975 4875 2950 5150 
-z
-M 2350 3500 
-L 2675 3325 
-L 3400 3325 
-L 3550 3525 
-L 3875 3275 
-L 3725 3125 
-Q 3725 2425 3750 2175 
-L 3425 2050 
-L 3425 2300 
-L 2675 2300 
-L 2675 2100 
-L 2350 1975 
-Q 2375 2250 2375 2725 
-Q 2375 3200 2350 3500 
-z
-M 1200 5225 
-L 1725 5000 
-L 1550 4825 
-L 1550 3275 
-Q 1975 3800 2150 4225 
-L 2550 3900 
-Q 2350 3800 2087 3575 
-Q 1825 3350 1550 3100 
-Q 1550 2275 1450 1325 
-Q 1900 1125 2062 987 
-Q 2225 850 2225 675 
-Q 2225 550 2162 425 
-Q 2100 300 2050 300 
-Q 1975 300 1900 500 
-Q 1775 825 1425 1225 
-Q 1150 75 325 -650 
-L 275 -600 
-Q 775 100 1000 850 
-Q 1225 1600 1225 3112 
-Q 1225 4625 1200 5225 
-z
-M 725 3650 
-Q 800 3225 825 2925 
-Q 850 2625 712 2500 
-Q 575 2375 450 2387 
-Q 325 2400 325 2475 
-Q 325 2550 400 2675 
-Q 550 2950 625 3650 
-L 725 3650 
-z
-M 4575 3150 
-L 4575 2400 
-L 5375 2400 
-L 5375 3150 
-L 4575 3150 
-z
-M 4250 3475 
-L 4575 3300 
-L 5350 3300 
-L 5500 3525 
-L 5825 3250 
-L 5675 3100 
-Q 5675 2400 5700 2175 
-L 5375 2050 
-L 5375 2250 
-L 4575 2250 
-L 4575 2125 
-L 4250 2025 
-Q 4275 2400 4275 2725 
-Q 4275 3050 4250 3475 
-z
-" transform="scale(0.015625)"/>
       <path id="SimSun-8fc7" d="M 2500 3200 
 L 2550 3275 
 Q 3075 2925 3287 2687 
@@ -507,17 +410,15 @@ L 3575 3200
 z
 " transform="scale(0.015625)"/>
      </defs>
-     <use xlink:href="#SimSun-5e72"/>
-     <use xlink:href="#SimSun-71e5" transform="translate(100 0)"/>
-     <use xlink:href="#SimSun-8fc7" transform="translate(200 0)"/>
-     <use xlink:href="#SimSun-6ee4" transform="translate(300 0)"/>
-     <use xlink:href="#SimSun-5668" transform="translate(400 0)"/>
+     <use xlink:href="#SimSun-8fc7"/>
+     <use xlink:href="#SimSun-6ee4" x="100"/>
+     <use xlink:href="#SimSun-5668" x="200"/>
     </g>
    </g>
   </g>
  </g>
  <defs>
-  <clipPath id="pe59d85efd2">
+  <clipPath id="p73123f00b6">
    <rect x="3.6" y="3.6" width="432" height="432"/>
   </clipPath>
  </defs>
