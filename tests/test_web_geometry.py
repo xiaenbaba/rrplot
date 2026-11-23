@@ -42,8 +42,8 @@ def test_split_self_crossing_route_uses_travelled_segment(fraction, index):
         "console.log(JSON.stringify(geometry.splitRoute(cases.points,cases.at)));",
         dict(points=points, at=fraction))
     assert split["index"] == index
-    assert split["prefix"] == [*points[1:index + 1], split["point"]]
-    assert split["suffix"] == [split["point"], *points[index + 1:-1]]
+    assert split["prefix"] == points[1:index + 1]
+    assert split["suffix"] == points[index + 1:-1]
 
 
 def check_moves(cases, results):

@@ -170,11 +170,15 @@ def test_export_valid_file_and_closes_figure(fmt, signature):
     lambda d: d["nodes"][0]["params"].update(extra=1),
     lambda d: d["nodes"][0].update(x=float("nan")),
     lambda d: d["nodes"][0].update(rotation=45),
+    lambda d: d["nodes"][0].update(rotation=False),
     lambda d: d["nodes"][0].update(title=4),
     lambda d: d["edges"][0].update(source=[0, 0]),
     lambda d: d["edges"][0].update(source={"nodeId": "missing", "portId": "left"}),
+    lambda d: d["edges"][0].update(source={"nodeId": [], "portId": "left"}),
     lambda d: d["edges"][0].update(source={"nodeId": "comp", "portId": "missing"}),
+    lambda d: d["edges"][0].update(source={"nodeId": "comp", "portId": []}),
     lambda d: d["edges"][0].update(source={"junctionId": "missing"}),
+    lambda d: d["edges"][0].update(source={"junctionId": []}),
     lambda d: d["edges"][0].update(vertices="bad"),
     lambda d: d["edges"][0].update(vertices=[[1]]),
     lambda d: d["edges"][0].update(width=-1),
@@ -190,12 +194,30 @@ def test_export_valid_file_and_closes_figure(fmt, signature):
     lambda d: d["labels"][0].update(color="not-a-color"),
     lambda d: d["labels"][0].update(boxed=4),
     lambda d: d["labels"][0].update(nodeId="missing"),
+    lambda d: d["labels"][0].update(nodeId=[]),
 ])
 def test_invalid_scene_reports_error(change):
     d = load_template("evi_ftvi")
     change(d)
     with pytest.raises(ValueError):
         validate_scene(d)
+
+
+@pytest.mark.parametrize(
+    "path",
+    sorted(
+        Path(__file__).resolve().parents[1]
+        .joinpath("examples/scenes")
+        .glob("*.json")
+    ),
+    ids=lambda p: p.name,
+)
+def test_example_scenes_resolve_and_roundtrip(path):
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    validated = validate_scene(raw)
+    scene = resolve_scene(validated)
+    assert scene["document"] == validated
+    assert scene["nodes"] and scene["edges"]
 
 
 def test_invalid_export_or_geometry_and_failure_closes_figure():
@@ -256,23 +278,32 @@ def test_frontend_and_backend_routes_agree():
 
 
 def test_frontend_split_route_anchors_both_edges_at_junction():
-    """插入三通时，前后两段都必须显式保留同一个连接点。"""
+    """插入三通时，前后两段保持原走线且不产生与三通重合的冗余折点。"""
     executable = shutil.which("node")
     if not executable:
         pytest.skip("Node not installed; optional JavaScript geometry check")
     raw = Path(__file__).resolve().parents[1].joinpath("web/geometry.js").read_bytes()
     module = "data:text/javascript;base64," + base64.b64encode(raw).decode()
-    script = ("import fs from 'node:fs'; const {splitRoute}=await import("
+    script = ("import fs from 'node:fs'; const {splitRoute,route}=await import("
               + json.dumps(module)
               + "); const points=JSON.parse(fs.readFileSync(0,'utf8'));"
-              "console.log(JSON.stringify(splitRoute(points)));" )
+              "const split=splitRoute(points);"
+              "const short=splitRoute([[0,0],[40,0]],0.25);"
+              "const shortRoute=route({point:[0,0],direction:[1,0]},"
+              "{point:short.point,direction:[0,0]},short.prefix);"
+              "console.log(JSON.stringify({split,short,shortRoute}));")
     points = [[0, 0], [100, 0], [100, 100], [200, 100]]
     result = subprocess.run([executable, "--input-type=module", "-e", script],
                             input=json.dumps(points), text=True,
                             capture_output=True, check=True)
-    split = json.loads(result.stdout)
-    assert split["prefix"][-1] == split["point"]
-    assert split["suffix"][0] == split["point"]
+    data = json.loads(result.stdout)
+    split = data["split"]
+    assert split["point"] == [100, 50]
+    assert split["prefix"] == [[100, 0]]
+    assert split["suffix"] == [[100, 100]]
+    # 近端口（<20 单位）拆分保持直连，不产生引出段过冲折返
+    assert data["short"]["prefix"] == []
+    assert data["shortRoute"] == [[0, 0], [10, 0]]
 
 
 @pytest.mark.parametrize("name", list(TEMPLATES))

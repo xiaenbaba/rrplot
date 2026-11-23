@@ -44,8 +44,8 @@ def color(value, label):
         raise ValueError(f"{label} 必须是有效颜色，如 #111111")
 
 
-def validate_scene(document):
-    """复制并规范图纸；无效引用明确报错，不静默丢弃数据。"""
+def _validate_scene(document):
+    """内部校验并返回 (规范图纸, 节点几何表, 预计算管路路径表)。"""
     if not isinstance(document, dict) or document.get("schemaVersion") != 1:
         raise ValueError("仅支持 schemaVersion=1 的图纸")
     d = copy.deepcopy(document)
@@ -81,13 +81,14 @@ def validate_scene(document):
             node["params"] = dict(params, shape="fan_coil", orient="h")
             legacy_fan_coils.add(node["id"])
         node["params"] = normalize_params(node.get("type"), node.get("params", {}))
-        descriptions[node["id"]] = describe(node["type"], node["params"])
+        descriptions[node["id"]] = describe(
+            node["type"], node["params"], _normalized=True)
         if not isinstance(node.setdefault("title", node["type"]), str):
             raise ValueError("设备名称必须是文字")
         for axis in ("x", "y"):
             finite(node.get(axis), "设备 " + axis)
         angle = node.setdefault("rotation", 0)
-        if angle not in (0, 90, 180, 270):
+        if isinstance(angle, bool) or angle not in (0, 90, 180, 270):
             raise ValueError("旋转角必须为 0、90、180、270")
     for junction in d["junctions"]:
         for axis in ("x", "y"):
@@ -102,12 +103,17 @@ def validate_scene(document):
             if not isinstance(ref, dict):
                 raise ValueError("管路必须引用设备端口或三通")
             if "junctionId" in ref and set(ref) == {"junctionId"}:
-                if ref["junctionId"] not in junctions:
+                jid = ref["junctionId"]
+                if not isinstance(jid, str) or jid not in junctions:
                     raise ValueError("管路引用了不存在的三通")
-            elif set(ref) == {"nodeId", "portId"} and ref["nodeId"] in nodes:
+            elif (set(ref) == {"nodeId", "portId"}
+                    and isinstance(ref["nodeId"], str)
+                    and ref["nodeId"] in nodes):
                 if nodes[ref["nodeId"]].get("mount") is not None:
                     raise ValueError("挂接阀件属于管路附件，不能同时作为独立管路端点")
-                if ref["portId"] not in descriptions[ref["nodeId"]]["ports"]:
+                pid = ref["portId"]
+                if (not isinstance(pid, str)
+                        or pid not in descriptions[ref["nodeId"]]["ports"]):
                     raise ValueError("管路引用了不存在的端口")
             else:
                 raise ValueError("管路引用了不存在的设备或端口")
@@ -141,6 +147,7 @@ def validate_scene(document):
         finite(mount.setdefault("at", 0.5), "挂接位置", 0, 1)
         if not isinstance(mount.setdefault("reverse", False), bool):
             raise ValueError("挂接反向必须为布尔值")
+    paths = None
     if mounted:
         geometry_nodes = {key: dict(n, geometry=descriptions[key])
                           for key, n in nodes.items()}
@@ -161,8 +168,10 @@ def validate_scene(document):
         if not isinstance(label.setdefault("boxed", False), bool):
             raise ValueError("标签背景必须为布尔值")
         color(label.setdefault("color", "#111111"), "标签颜色")
-        if "nodeId" in label and label["nodeId"] not in nodes:
-            raise ValueError("标签引用了不存在的设备")
+        if "nodeId" in label:
+            nid = label["nodeId"]
+            if not isinstance(nid, str) or nid not in nodes:
+                raise ValueError("标签引用了不存在的设备")
         if "edgeId" in label:
             if "nodeId" in label:
                 raise ValueError("标签不能同时附着于设备和管路")
@@ -170,7 +179,12 @@ def validate_scene(document):
                     or label["edgeId"] not in edge_ids):
                 raise ValueError("标签引用了不存在的管路")
             finite(label.setdefault("at", 0.5), "状态点位置", 0, 1)
-    return d
+    return d, descriptions, paths
+
+
+def validate_scene(document):
+    """复制并规范图纸；无效引用明确报错，不静默丢弃数据。"""
+    return _validate_scene(document)[0]
 
 
 def rotate(point, angle):
@@ -230,15 +244,19 @@ def route(source, target, vertices):
 
 
 def resolve_scene(document):
-    d = validate_scene(document)
-    nodes = {n["id"]: dict(n, geometry=describe(n["type"], n["params"]))
+    d, descriptions, cached_paths = _validate_scene(document)
+    nodes = {n["id"]: dict(n, geometry=descriptions[n["id"]])
              for n in d["nodes"]}
     junctions = {j["id"]: j for j in d["junctions"]}
     edges = []
     for edge in d["edges"]:
-        a = endpoint(edge["source"], nodes, junctions)
-        b = endpoint(edge["target"], nodes, junctions)
-        edges.append(dict(edge, points=route(a, b, edge["vertices"])))
+        if cached_paths is not None:
+            points = cached_paths[edge["id"]]
+        else:
+            a = endpoint(edge["source"], nodes, junctions)
+            b = endpoint(edge["target"], nodes, junctions)
+            points = route(a, b, edge["vertices"])
+        edges.append(dict(edge, points=points))
     labels = []
     edge_points = {edge["id"]: edge["points"] for edge in edges}
     for label in d["labels"]:

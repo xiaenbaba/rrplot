@@ -12,10 +12,21 @@ warnings.warn(
     stacklevel=2,
 )
 
-for _name in ("core", "parts", "hvac", "style", "svgparts", "_primitives"):
-    sys.modules[f"{__name__}.{_name}"] = importlib.import_module(
-        f"rrplot.{_name}"
-    )
+for _name in (
+    "core",
+    "part",
+    "parts",
+    "hvac",
+    "style",
+    "svgparts",
+    "registry",
+    "scene",
+    "scene_renderer",
+    "_primitives",
+):
+    _mod = importlib.import_module(f"rrplot.{_name}")
+    sys.modules[f"{__name__}.{_name}"] = _mod
+    globals()[_name] = _mod
 
 from rrplot import *  # noqa: F401,F403,E402
 

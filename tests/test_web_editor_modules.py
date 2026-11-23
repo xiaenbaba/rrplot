@@ -84,6 +84,24 @@ assert.deepEqual(a.state.doc,original);
 assert.deepEqual(a.state.undo,[]);
 assert.deepEqual(a.state.redo,[]);
 assert.equal(a.state.dirty,false);
+// Cold start before features are known must not pre-block mounts/edge labels.
+const c=createEditor();
+const seenUrls=[];
+globalThis.fetch=async(url,options)=>{
+  seenUrls.push(url);
+  return {ok:true,headers:{get:()=>'application/json'},
+    json:async()=>({document:JSON.parse(options.body).document,
+      nodes:[],fontFamily:'serif',features:['edgeLabels','pipeMounts']})};
+};
+const coldRes=await c.commands.api('resolve',{document:{schemaVersion:1,
+  nodes:[{id:'v',mount:{edgeId:'e',at:0.5}}],
+  labels:[{id:'l',edgeId:'e',at:0.5,text:'1'}]}});
+assert.deepEqual(seenUrls,['/api/resolve']);
+assert.deepEqual(coldRes.features,['edgeLabels','pipeMounts']);
+// Once known to be legacy, pre-blocking still applies.
+c.state.featuresKnown=true;c.state.pipeMountsSupported=false;
+await assert.rejects(()=>c.commands.api('resolve',{document:{schemaVersion:1,
+  nodes:[{id:'v',mount:{edgeId:'e',at:0.5}}],labels:[]}}),/阀件挂接/);
 """
     result = subprocess.run(
         [executable, "--experimental-default-type=module", "--input-type=module",

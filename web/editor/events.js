@@ -62,7 +62,7 @@ export function createEventsController(state, commands) {
     });
     document.addEventListener('click', async event => {
       const action = event.target.closest('[data-action]')?.dataset.action;
-      if (action && (state.doc || ['help', 'close-help'].includes(action))) try { await commands.actions[action]?.(); } catch (error) { commands.message(error.message); }
+      if (action && (state.doc || ['help', 'close-help', 'retry-service'].includes(action))) try { await commands.actions[action]?.(); } catch (error) { commands.message(error.message); }
       const tool = event.target.closest('[data-tool]')?.dataset.tool;
       if (tool) commands.setTool(tool);
     });

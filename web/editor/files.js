@@ -88,6 +88,7 @@ export function createFilesController(state, commands) {
     const result = await commands.api('resolve', { document: next, sharedGlyphs: true });
     const resolved = BENCHMARK ? performance.now() : 0;
     if (token !== state.request || version !== state.revision || !canApply()) return false;
+    state.featuresKnown = true;
     state.edgeLabelsSupported = result.features?.includes('edgeLabels') || false;
     state.pipeMountsSupported = result.features?.includes('pipeMounts') || false;
     ++state.revision;

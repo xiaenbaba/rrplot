@@ -188,9 +188,14 @@ def load_svg_part(file, ports=None, name=None, scale=1.0, bridge=0, moves=None,
         root = ET.fromstring(raw_svg)
     except ET.ParseError as exc:
         raise ValueError(f"SVG XML 无法解析: {path}") from exc
-    vb = root.get("viewBox", "0 0 160 100").split()
-    w, h = float(vb[2]), float(vb[3])
-    cx, cy = w / 2.0, h / 2.0
+    vb_tokens = [
+        tok for tok in re.split(r"[\s,]+", root.get("viewBox", "0 0 160 100").strip())
+        if tok
+    ]
+    if len(vb_tokens) != 4:
+        raise ValueError(f"SVG viewBox 格式无效: {root.get('viewBox')!r}")
+    vb_x, vb_y, w, h = (float(v) for v in vb_tokens)
+    cx, cy = vb_x + w / 2.0, vb_y + h / 2.0
 
     raw = root.get("data-connection-points", "").strip() or "[]"
     pts = []
@@ -214,11 +219,11 @@ def load_svg_part(file, ports=None, name=None, scale=1.0, bridge=0, moves=None,
             for pid, px, py in pts:
                 if pid not in want:
                     continue
-                if px <= 0:
+                if px <= vb_x:
                     seg = ((px, py), (px + bridge, py))
-                elif px >= w:
+                elif px >= vb_x + w:
                     seg = ((px, py), (px - bridge, py))
-                elif py <= 0:
+                elif py <= vb_y:
                     seg = ((px, py), (px, py + bridge))
                 else:
                     seg = ((px, py), (px, py - bridge))

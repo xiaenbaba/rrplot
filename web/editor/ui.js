@@ -34,9 +34,9 @@ export function createUiController(state, commands) {
 
   async function api(path, body) {
     if (path === 'resolve') body = { ...body, sharedGlyphs: true };
-    if (body?.document?.nodes?.some(node => node.mount) && !state.pipeMountsSupported)
+    if (state.featuresKnown && body?.document?.nodes?.some(node => node.mount) && !state.pipeMountsSupported)
       throw new Error('阀件挂接需要新版服务，请保存图纸后重启服务，再刷新页面。');
-    if (body?.document?.labels?.some(label => label.edgeId) && !state.edgeLabelsSupported)
+    if (state.featuresKnown && body?.document?.labels?.some(label => label.edgeId) && !state.edgeLabelsSupported)
       throw new Error('管路状态点需要新版服务，请保存当前图纸后重启 start-web.cmd，再刷新页面。');
     const result = await requestResource('/api/' + path, body === undefined ? {} : {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)

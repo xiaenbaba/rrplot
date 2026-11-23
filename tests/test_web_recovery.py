@@ -47,3 +47,30 @@ def test_outdated_failure_does_not_replace_newer_success_with_error_banner():
     )
     assert output["results"] == [dict(hidden=True, title="最新图纸")]
     assert output["messages"] == []
+
+
+def test_initial_startup_failure_allows_retry_service_click_and_syncs_features():
+    output = connection_scenario(
+        """
+      let initCalls=0;
+      init=async()=>{initCalls++;};
+      doc=null;
+      const click=listeners.get('document:click');
+      await click({target:{closest:sel=>sel==='[data-action]'
+        ? {dataset:{action:'retry-service'}} : null}});
+      results.push({initCalls});
+      // Refresh after server upgrade updates feature flags.
+      doc={schemaVersion:1,nodes:[],edges:[],junctions:[],labels:[]};
+      featuresKnown=false;pipeMountsSupported=false;edgeLabelsSupported=false;
+      refresh=actualRefresh;renderSaveState=()=>{};renderCanvas=()=>{};
+      api=async()=>({nodes:[],fontFamily:'serif',features:['edgeLabels','pipeMounts']});
+      await refresh();
+      results.push({featuresKnown,edgeLabelsSupported,pipeMountsSupported});
+    """,
+    )
+    assert output["results"][0] == dict(initCalls=1)
+    assert output["results"][1] == dict(
+        featuresKnown=True,
+        edgeLabelsSupported=True,
+        pipeMountsSupported=True,
+    )

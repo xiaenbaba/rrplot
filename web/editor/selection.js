@@ -141,6 +141,7 @@ export function createSelectionController(state, commands) {
     const { ref, item } = entry;
     if (ref.kind === 'node') {
       const geometry = state.geometries.get(item.id), rotated = item.rotation % 180 !== 0;
+      if (!geometry) return { x: item.x, y: item.y, left: item.x, right: item.x, top: item.y, bottom: item.y, width: 0, height: 0 };
       const width = rotated ? geometry.height : geometry.width, height = rotated ? geometry.width : geometry.height;
       return { x: item.x, y: item.y, left: item.x - width / 2, right: item.x + width / 2,
         top: item.y - height / 2, bottom: item.y + height / 2, width, height };

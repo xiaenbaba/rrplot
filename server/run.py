@@ -9,7 +9,7 @@ import threading
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -69,7 +69,7 @@ class Handler(BaseHTTPRequestHandler):
                        "application/json; charset=utf-8", status)
 
     def do_GET(self):
-        path = urlsplit(self.path).path
+        path = unquote(urlsplit(self.path).path)
         try:
             if path == "/api/health":
                 current = code_fingerprint()
@@ -102,8 +102,14 @@ class Handler(BaseHTTPRequestHandler):
                 mime = {".js": "text/javascript", ".html": "text/html",
                         ".css": "text/css"}[target.suffix] + "; charset=utf-8"
             self.send_data(target.read_bytes(), mime)
-        except (ValueError, OSError) as exc:
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError,
+                TimeoutError, socket.timeout):
+            return
+        except (ValueError, TypeError, KeyError, OSError) as exc:
             self.json_response(dict(error=str(exc)), 400)
+        except Exception:
+            traceback.print_exc()
+            self.json_response(dict(error="服务处理失败，请查看本机服务日志"), 500)
 
     def do_POST(self):
         path = urlsplit(self.path).path
@@ -145,6 +151,9 @@ class Handler(BaseHTTPRequestHandler):
                     output = export_scene(body["document"], fmt, body.get("dpi", 140))
                 return self.send_data(output, MIMES[fmt], filename="rrplot." + fmt)
             self.json_response(dict(error="接口不存在"), 404)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError,
+                TimeoutError, socket.timeout):
+            return
         except (ValueError, TypeError, KeyError, UnicodeDecodeError) as exc:
             self.json_response(dict(error=str(exc)), 400)
         except Exception:

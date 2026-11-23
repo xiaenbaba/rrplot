@@ -99,12 +99,15 @@ export function avoidObstacles(a, b, obstacles, { page, clearance = 12, maxState
     Math.min(start[1], target[1], ...boxes.map(o => o.box[1])) - 20,
     Math.max(start[0], target[0], ...boxes.map(o => o.box[2])) + 20,
     Math.max(start[1], target[1], ...boxes.map(o => o.box[3])) + 20];
+  const clamp = (v, low, high) => Math.max(low, Math.min(high, v));
   const inPage = p => p[0] >= limits[0] - EPS && p[1] >= limits[1] - EPS
     && p[0] <= limits[2] + EPS && p[1] <= limits[3] + EPS;
   if (![a.point, start, target, b.point].every(inPage)) fail('端口或引出段超出纸张，请先调整设备或扩大页面。');
-  const xs = [...new Set([start[0], target[0], limits[0], limits[2], ...boxes.flatMap(o => [o.box[0], o.box[2]])])]
+  const startGrid = [clamp(start[0], limits[0], limits[2]), clamp(start[1], limits[1], limits[3])];
+  const targetGrid = [clamp(target[0], limits[0], limits[2]), clamp(target[1], limits[1], limits[3])];
+  const xs = [...new Set([startGrid[0], targetGrid[0], limits[0], limits[2], ...boxes.flatMap(o => [o.box[0], o.box[2]])])]
     .filter(x => x >= limits[0] && x <= limits[2]).sort((x, y) => x - y);
-  const ys = [...new Set([start[1], target[1], limits[1], limits[3], ...boxes.flatMap(o => [o.box[1], o.box[3]])])]
+  const ys = [...new Set([startGrid[1], targetGrid[1], limits[1], limits[3], ...boxes.flatMap(o => [o.box[1], o.box[3]])])]
     .filter(y => y >= limits[1] && y <= limits[3]).sort((x, y) => x - y);
   if (xs.length * ys.length > 120000) fail('障碍数量过多，请减少设备数量后重试。');
   const rows = new Map(), cols = new Map();
@@ -113,13 +116,13 @@ export function avoidObstacles(a, b, obstacles, { page, clearance = 12, maxState
     if (!cache.has(key)) cache.set(key, boxes.filter(o => key > o.box[1 - axis] + EPS && key < o.box[3 - axis] - EPS));
     return !cache.get(key).some(o => crossesBox(p, q, o.box));
   };
-  const width = xs.length, startId = ys.indexOf(start[1]) * width + xs.indexOf(start[0]);
-  const targetId = ys.indexOf(target[1]) * width + xs.indexOf(target[0]);
+  const width = xs.length, startId = ys.indexOf(startGrid[1]) * width + xs.indexOf(startGrid[0]);
+  const targetId = ys.indexOf(targetGrid[1]) * width + xs.indexOf(targetGrid[0]);
   const point = id => [xs[id % width], ys[Math.floor(id / width)]];
-  const distance = p => Math.abs(p[0] - target[0]) + Math.abs(p[1] - target[1]);
+  const distance = p => Math.abs(p[0] - targetGrid[0]) + Math.abs(p[1] - targetGrid[1]);
   const axisOf = end => end.direction[0] ? 0 : end.direction[1] ? 1 : 2;
   const initial = startId * 3 + axisOf(a), best = new Map([[initial, 0]]), previous = new Map();
-  const heap = new Heap(); heap.push({ key: initial, cost: 0, score: distance(start) });
+  const heap = new Heap(); heap.push({ key: initial, cost: 0, score: distance(startGrid) });
   let found = null, visited = 0;
   while (heap.items.length) {
     const current = heap.pop();
@@ -198,9 +201,12 @@ export function validateRoutedMounts(document, nodes, changes) {
     }
   }
   for (const edge of candidate.edges) {
+    const relevant = byId.has(edge.id)
+      ? valves.filter(valve => valve.mount.edgeId !== edge.id)
+      : valves.filter(valve => valve.mount.edgeId !== edge.id && byId.has(valve.mount.edgeId));
+    if (!relevant.length) continue;
     const points = route(endpoint(edge.source, lookup, candidate.junctions), endpoint(edge.target, lookup, candidate.junctions), edge.vertices);
-    for (const valve of valves) {
-      if (valve.mount.edgeId === edge.id) continue;
+    for (const valve of relevant) {
       const [x, y, w, h] = transformedBox(valve.geometry.box, [valve.x, valve.y], valve.rotation);
       if (points.some((p, i) => i && crossesBox(points[i - 1], p, [x - 12, y - 12, x + w + 12, y + h + 12])))
         throw new Error(`挂接阀件 ${valve.title || valve.id} 随改线移动后会挡住管路 ${edge.id}，请先调整挂接位置或分批布线。`);

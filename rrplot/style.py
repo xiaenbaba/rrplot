@@ -11,18 +11,43 @@ FONT_CANDIDATES = [
     "DejaVu Serif",
 ]
 
-_installed = {f.name for f in fm.fontManager.ttflist}
-FONT = next((c for c in FONT_CANDIDATES if c in _installed), "DejaVu Serif")
-# 交给 matplotlib 做逐字回退:西文用 Times,汉字回退到宋体
-FONT_STACK = [c for c in FONT_CANDIDATES if c in _installed] or [FONT]
+FONT = "DejaVu Serif"
+# 交给 matplotlib 做逐字回退:西文用 Times,汉字回退到宋体;原地更新便于跨模块共享
+FONT_STACK = [FONT]
 
 STYLE_PARAMS = {
     "font.family": "serif",
-    "font.serif": FONT_CANDIDATES,
+    "font.serif": list(FONT_CANDIDATES),
     # 数学文本(如 EEV$_1$ 的下标)用 STIX,与 Times 风格一致
     "mathtext.fontset": "stix",
     "axes.unicode_minus": False,
 }
+
+
+def refresh_fonts():
+    """重新扫描 Matplotlib 已安装字体并刷新 FONT / FONT_STACK / 全局配置。
+
+    调用 ``matplotlib.font_manager.fontManager.addfont(...)`` 或调整
+    ``FONT_CANDIDATES`` 后调用本函数,即可让后续绘图与 ``use_font()`` 生效。
+    """
+    global FONT
+    installed = {f.name for f in fm.fontManager.ttflist}
+    FONT = next((c for c in FONT_CANDIDATES if c in installed), "DejaVu Serif")
+    FONT_STACK[:] = [c for c in FONT_CANDIDATES if c in installed] or [FONT]
+    STYLE_PARAMS["font.serif"] = list(FONT_CANDIDATES)
+    matplotlib.rcParams["font.serif"] = list(FONT_CANDIDATES)
+    return FONT
+
+
+def register_font(path, family=None):
+    """注册外部字体文件并设为最高优先级候选字体,返回当前生效字体名。"""
+    fm.fontManager.addfont(path)
+    if family is None:
+        family = fm.FontProperties(fname=path).get_name()
+    if family in FONT_CANDIDATES:
+        FONT_CANDIDATES.remove(family)
+    FONT_CANDIDATES.insert(0, family)
+    return refresh_fonts()
 
 
 def apply_style(**overrides):
@@ -46,6 +71,7 @@ def context(**overrides):
         yield
 
 
+refresh_fonts()
 apply_style()
 
 LINE = "#000000"

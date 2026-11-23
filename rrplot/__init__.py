@@ -18,12 +18,21 @@
 from . import hvac, parts, style
 from .core import Diagram, Node, Pipe, Port, State, make_partial, use_font
 from .parts import COMPRESSOR_STYLES, HEX_SHAPES
-from .style import FONT, FONT_STACK, LINE, apply_style, context
+from .style import (
+    FONT,
+    FONT_STACK,
+    LINE,
+    apply_style,
+    context,
+    refresh_fonts,
+    register_font,
+)
 from .svgparts import load_svg_part
 
 __version__ = "1.3.1"
 
 __all__ = ["__version__", "Diagram", "Node", "Pipe", "Port", "State",
            "make_partial", "use_font", "parts", "hvac", "style", "FONT",
-           "FONT_STACK", "LINE", "apply_style", "context", "HEX_SHAPES",
-           "COMPRESSOR_STYLES", "load_svg_part"]
+           "FONT_STACK", "LINE", "apply_style", "context", "refresh_fonts",
+           "register_font", "HEX_SHAPES", "COMPRESSOR_STYLES",
+           "load_svg_part"]

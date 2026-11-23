@@ -55,6 +55,11 @@ export function createSessionController(state, commands) {
       if (!result) return;
       if (token !== state.request || version !== state.revision) return;
       commands.requestFailure();
+      if (Array.isArray(result.features)) {
+        state.featuresKnown = true;
+        state.edgeLabelsSupported = result.features.includes('edgeLabels');
+        state.pipeMountsSupported = result.features.includes('pipeMounts');
+      }
       state.geometries = new Map(result.nodes.map(n => [n.id, n.geometry]));
       commands.syncMounts();
       state.junctionPreview = null;

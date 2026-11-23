@@ -213,3 +213,30 @@ console.log(JSON.stringify(result));
     assert resolve_scene(document)['edges'][0]['points'] == result['points']
     for fmt, signature in [('svg', b'<?xml'), ('png', b'\x89PNG'), ('pdf', b'%PDF')]:
         assert export_scene(document, fmt).startswith(signature)
+
+
+def test_router_clamps_boundary_eps_and_ignores_unrelated_mount_collisions():
+    run_js("""
+// Point within EPS outside page border must clamp into grid instead of indexOf === -1.
+const a={point:[-1e-10,100],direction:[0,0]};
+const b={point:[300+1e-10,100],direction:[0,0]};
+const res=routing.avoidObstacles(a,b,[{id:'mid',box:[130,80,40,40]}],
+  {page:{width:300,height:200}});
+assert.ok(res.points.length>=4 && res.points.every(p=>p.every(Number.isFinite)));
+// Unrelated pre-existing edge/valve collision must not block routing a separate edge.
+const valve={id:'v',type:'globe_valve',x:150,y:100,rotation:0,
+  mount:{edgeId:'e1',at:.5,reverse:false},
+  geometry:{box:[-10,-10,20,20],ports:{
+    in:{point:[-10,0],direction:[-1,0]},out:{point:[10,0],direction:[1,0]}}}};
+const doc={page:{width:400,height:400},nodes:[valve],labels:[],
+  junctions:[
+    {id:'a',x:50,y:100},{id:'b',x:250,y:100},
+    {id:'c',x:150,y:50},{id:'d',x:150,y:150},
+    {id:'p',x:50,y:320},{id:'q',x:350,y:320}],
+  edges:[
+    {id:'e1',source:{junctionId:'a'},target:{junctionId:'b'},vertices:[]},
+    {id:'e2',source:{junctionId:'c'},target:{junctionId:'d'},vertices:[]},
+    {id:'e3',source:{junctionId:'p'},target:{junctionId:'q'},vertices:[]}]};
+routing.validateRoutedMounts(doc,[valve],[{id:'e3',vertices:[[200,320]]}]);
+console.log('true');
+""", None)

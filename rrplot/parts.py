@@ -2,7 +2,7 @@
 """部件库:每个部件是一个绘制函数(以中心为锚点)+ 端口定义。
 
 端口 ports: 名称 -> (dx, dy),相对部件锚点的偏移。dx/dy 同时隐含接管方向
-(单轴端口取该轴符号;双轴非零的端口需要显式方向,见 Part.port_dir)。
+(单轴端口取该轴符号;双轴非零的端口需要显式方向,见 Part.direction)。
 
 命名约定:贯通式两口元件(阀、过滤器、毛细管等)用 in/out;
 多口/换热类部件用 left/right/top/bottom 表示边中点。
@@ -414,6 +414,8 @@ compressor = make_compressor()
 
 def make_vessel(w=66, h=150, liquid=0.42, name="闪发罐"):
     """立式容器/闪发罐部件。vapor 口在筒体上端右侧(闪发气出口)。"""
+    if h < w:
+        raise ValueError("容器高度 h 不能小于宽度 w")
     rx = w / 2
     body_top = -(h / 2 - rx)
 
@@ -604,6 +606,9 @@ def make_filter(w=72, h=36, n=7, stub=12, name="过滤器"):
 
     n 为每个方向的网格线数(含角点触线),默认 7;尺寸不合用工厂改。
     """
+    if isinstance(n, bool) or not isinstance(n, int) or n < 1:
+        raise ValueError("过滤器网格线数 n 必须为正整数")
+
     def draw(ax, x, y, label=None, **kw):
         _filter(ax, x, y, label=label, w=w, h=h, n=n, stub=stub)
 

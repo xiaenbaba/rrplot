@@ -179,10 +179,11 @@ def make_registered(kind, params):
     return REGISTRY[kind]["factory"](**normalize_params(kind, params))
 
 
-def describe(kind, params):
+def describe(kind, params, *, _normalized=False):
     """返回以中心为原点的尺寸、端口和法向；SVG 由 renderer 生成。"""
-    params = normalize_params(kind, params)
-    part = make_registered(kind, params)
+    if not _normalized:
+        params = normalize_params(kind, params)
+    part = REGISTRY[kind]["factory"](**params)
     if kind in ("compressor", "expansion_valve", "four_way_valve",
                 "solenoid_valve", "sensor"):
         w = 2 * params["r"]

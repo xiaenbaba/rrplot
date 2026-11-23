@@ -138,11 +138,11 @@ export function along(points, fraction) {
       const a = points[i], b = points[i + 1];
       return { point: a.map((v, j) => v + (b[j] - v) * t),
         direction: lengths[i] ? a.map((v, j) => (b[j] - v) / lengths[i]) : [1, 0],
-        start: a, end: b, length: lengths[i] };
+        start: a, end: b, length: lengths[i], index: i };
     }
     distance -= lengths[i];
   }
-  return { point: points[0], direction: [1, 0], length: 0, start: points[0], end: points[0] };
+  return { point: points[0], direction: [1, 0], length: 0, start: points[0], end: points[0], index: 0 };
 }
 
 export function nearestSegment(points, point) {
@@ -200,19 +200,16 @@ export function moveSegment(source, target, vertices, index, offset) {
   return [...prefix, shift(start), shift(end), ...suffix].slice(1, -1);
 }
 
-// Split a routed polyline while retaining the exact split point in both
-// halves.  This is used when inserting a junction into an existing edge;
-// explicit endpoints keep the two rendered edges anchored to the junction
-// even when the original route contains corners or port lead-ins.
+// Split a routed polyline without duplicating the junction point as a manual
+// vertex.  Omitting the coincident endpoint preserves straight-line routing
+// near ports (< 20 units) and keeps both halves editable in the coordinate form.
 export function splitRoute(points, fraction = .5) {
-  const { point, start } = along(points, fraction);
-  // Use the travelled segment, including when the route crosses itself.
-  const index = points.indexOf(start);
+  const { point, index } = along(points, fraction);
   return {
     point,
     index,
-    prefix: [...points.slice(1, index + 1), point],
-    suffix: [point, ...points.slice(index + 1, -1)],
+    prefix: points.slice(1, index + 1),
+    suffix: points.slice(index + 1, -1),
   };
 }
 

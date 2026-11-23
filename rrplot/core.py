@@ -153,9 +153,10 @@ def _polyline_span(pts, frac):
     total = sum(lens) or 1.0
     target = frac * total
     acc = 0.0
-    for (a, b), L in zip(segs, lens):
-        if acc + L >= target or (a, b) is segs[-1]:
-            t = 0.0 if L == 0 else (target - acc) / L
+    last_idx = len(segs) - 1
+    for i, ((a, b), L) in enumerate(zip(segs, lens)):
+        if acc + L >= target or i == last_idx:
+            t = 0.0 if L == 0 else min(1.0, max(0.0, (target - acc) / L))
             x = a[0] + (b[0] - a[0]) * t
             y = a[1] + (b[1] - a[1]) * t
             ux = (b[0] - a[0]) / L if L else 1.0

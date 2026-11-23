@@ -840,8 +840,11 @@ def test_cycleplot_compatibility_alias():
         importlib.reload(cycleplot)
     import rrplot
 
+    import cycleplot.scene
+
     assert cycleplot.__version__ == rrplot.__version__
     assert cycleplot.Diagram is Diagram
+    assert cycleplot.scene.SCHEMA_VERSION == 1
     assert any(issubclass(w.category, DeprecationWarning) for w in caught)
 
 
@@ -897,6 +900,83 @@ def test_save_multiple_formats(tmp_path=None):
     assert os.path.getsize(pdf) > 1000
     assert d.save(os.path.join(tmp, "s.png")) == os.path.join(tmp, "s.png")
     plt.close(d.fig)
+
+
+def test_polyline_span_end_preserves_last_segment_direction():
+    """frac=1.0 即使浮点累加略小于总长,也应停在末段并保留末段方向。"""
+    from rrplot.core import _polyline_span
+
+    # 多段非精确二进制小数,验证末段朝左/向上时不误落回 (1.0, 0.0)
+    pts = [(0.0, 0.0), (0.0, -0.1), (0.0, -0.2), (0.0, -0.3), (-0.3, -0.3)]
+    pt, direction, s0, s1, total = _polyline_span(pts, 1.0)
+    assert pt == (-0.3, -0.3)
+    assert direction == (-1.0, 0.0)
+    assert s1 > s0 and abs(s1 - total) < 1e-12
+    # 超过 1.0 的浮点误差仍应被钳在末段终点而非掉出循环
+    pt2, dir2, s0_2, s1_2, _ = _polyline_span(pts, 1.0 + 1e-15)
+    assert pt2 == (-0.3, -0.3)
+    assert dir2 == (-1.0, 0.0)
+    assert s1_2 > s0_2
+
+
+def test_refresh_fonts_updates_shared_font_stack_in_place():
+    """修改 FONT_CANDIDATES 后 refresh_fonts() 原地更新 FONT_STACK。"""
+    from rrplot import _primitives, style
+
+    before_candidates = list(style.FONT_CANDIDATES)
+    before_stack = list(style.FONT_STACK)
+    try:
+        assert _primitives.FONT_STACK is style.FONT_STACK
+        if len(before_stack) >= 2:
+            second = before_stack[1]
+            style.FONT_CANDIDATES.remove(second)
+            style.FONT_CANDIDATES.insert(0, second)
+            chosen = style.refresh_fonts()
+            assert chosen == second
+            assert style.FONT == second
+            assert _primitives.FONT_STACK[0] == second
+        else:
+            assert style.refresh_fonts() == style.FONT
+        # 验证 register_font() 能注册字体文件并置顶候选栈
+        sample_ttf = style.fm.fontManager.ttflist[0].fname
+        registered = style.register_font(sample_ttf)
+        assert registered == style.FONT == style.FONT_CANDIDATES[0]
+        assert _primitives.FONT_STACK[0] == registered
+    finally:
+        style.FONT_CANDIDATES[:] = before_candidates
+        style.refresh_fonts()
+        assert style.FONT_STACK == before_stack
+
+
+def test_vessel_filter_validation_and_svg_comma_viewbox(tmp_path=None):
+    """make_vessel / make_filter 边界校验,以及逗号分隔且非零起点的 viewBox。"""
+    import tempfile
+
+    _raises(ValueError, parts.make_vessel, w=100, h=50)
+    _raises(ValueError, parts.make_filter, n=0)
+    _raises(ValueError, parts.make_filter, n=True)
+
+    tmp = tmp_path if tmp_path is not None else tempfile.mkdtemp()
+    svg_path = os.path.join(tmp, "comma_vb.svg")
+    with open(svg_path, "w", encoding="utf-8") as f:
+        f.write(
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="10,20,100,60" '
+            'data-connection-points=\'[{"id":"in","x":10,"y":50},'
+            '{"id":"out","x":110,"y":50}]\'>'
+            '<rect x="20" y="30" width="80" height="40" fill="none" stroke="black"/>'
+            "</svg>"
+        )
+    part = load_svg_part(svg_path, bridge=10)
+    assert part.port("in") == (-50.0, 0.0)
+    assert part.port("out") == (50.0, 0.0)
+    with Diagram(width=200, height=120) as d:
+        d.add(part, "测试", loc=(100, 60))
+        d.render()
+
+    bad_vb = os.path.join(tmp, "bad_vb.svg")
+    with open(bad_vb, "w", encoding="utf-8") as f:
+        f.write('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100"/>')
+    _raises(ValueError, load_svg_part, bad_vb)
 
 
 if __name__ == "__main__":

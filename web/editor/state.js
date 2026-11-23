@@ -28,6 +28,7 @@ export function createEditorState() {
     connectionCoordinates: null,
     junctionPreview: null,
     reconnect: null,
+    featuresKnown: false,
     edgeLabelsSupported: false,
     pipeMountsSupported: false,
     mountPreview: null,

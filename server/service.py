@@ -5,6 +5,7 @@ import json
 import os
 import secrets
 import sys
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -13,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 STATE = ROOT / ".rrplot-web"
 PROJECT_ID = hashlib.sha256(str(ROOT).casefold().encode()).hexdigest()[:20]
 _cached = (None, None)
+_cache_lock = threading.Lock()
 
 
 def safe_console():
@@ -28,25 +30,36 @@ def safe_console():
 
 def code_fingerprint():
     global _cached
-    files = sorted(
-        [
-            p
-            for folder in ("rrplot", "server", "web")
-            for p in (ROOT / folder).rglob("*")
-            if p.is_file() and p.suffix in (".py", ".js", ".css", ".html", ".json")
-        ]
-    )
-    signature = tuple(
-        (str(p.relative_to(ROOT)), p.stat().st_mtime_ns, p.stat().st_size)
-        for p in files
-    )
-    if signature != _cached[0]:
-        digest = hashlib.sha256()
+    with _cache_lock:
+        files = sorted(
+            [
+                p
+                for folder in ("rrplot", "server", "web")
+                for p in (ROOT / folder).rglob("*")
+                if p.is_file()
+                and p.suffix in (".py", ".js", ".css", ".html", ".json")
+            ]
+        )
+        entries = []
         for path in files:
-            digest.update(str(path.relative_to(ROOT)).encode())
-            digest.update(path.read_bytes())
-        _cached = (signature, digest.hexdigest()[:12])
-    return _cached[1]
+            try:
+                stat = path.stat()
+            except OSError:
+                continue
+            entries.append((path, str(path.relative_to(ROOT)),
+                            stat.st_mtime_ns, stat.st_size))
+        signature = tuple((rel, mtime, size) for _, rel, mtime, size in entries)
+        if signature != _cached[0]:
+            digest = hashlib.sha256()
+            for path, rel, _, _ in entries:
+                try:
+                    content = path.read_bytes()
+                except OSError:
+                    continue
+                digest.update(rel.encode())
+                digest.update(content)
+            _cached = (signature, digest.hexdigest()[:12])
+        return _cached[1]
 
 
 def identity():
@@ -74,6 +87,8 @@ def save_instance(server):
         ),
         encoding="utf-8",
     )
+    if os.name != "nt":
+        os.chmod(temporary, 0o600)
     temporary.replace(path)
 
 
