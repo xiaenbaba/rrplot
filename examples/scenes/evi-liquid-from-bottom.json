@@ -1,0 +1,333 @@
+{
+  "schemaVersion": 1,
+  "title": "未命名图纸",
+  "page": {
+    "width": 1000,
+    "height": 700
+  },
+  "nodes": [
+    {
+      "id": "node-e47144d5",
+      "type": "compressor",
+      "title": "压缩机",
+      "x": 260,
+      "y": 310,
+      "params": {
+        "r": 42,
+        "style": "圆形"
+      },
+      "rotation": 0
+    },
+    {
+      "id": "node-282c7c13",
+      "type": "heat_exchanger",
+      "title": "换热器",
+      "x": 540,
+      "y": 150,
+      "params": {
+        "w": 160,
+        "h": 56,
+        "shape": "rect_x",
+        "orient": "h"
+      },
+      "rotation": 0
+    },
+    {
+      "id": "node-116069bb",
+      "type": "intermediate_hex",
+      "title": "中间换热器",
+      "x": 812,
+      "y": 390,
+      "params": {
+        "w": 80,
+        "h": 120,
+        "drop": 0.275,
+        "orient": "v"
+      },
+      "rotation": 0
+    },
+    {
+      "id": "node-8058bb3d",
+      "type": "expansion_valve",
+      "title": "膨胀阀",
+      "x": 710,
+      "y": 550,
+      "params": {
+        "r": 10,
+        "orient": "v"
+      },
+      "rotation": 90
+    },
+    {
+      "id": "node-5fd8ed6d",
+      "type": "heat_exchanger",
+      "title": "换热器",
+      "x": 540,
+      "y": 550,
+      "params": {
+        "w": 160,
+        "h": 56,
+        "shape": "rect_x",
+        "orient": "h"
+      },
+      "rotation": 0
+    },
+    {
+      "id": "node-0f9dcfe7",
+      "type": "expansion_valve",
+      "title": "膨胀阀",
+      "x": 790,
+      "y": 490,
+      "params": {
+        "r": 10,
+        "orient": "v"
+      },
+      "rotation": 0
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-dec8e730",
+      "source": {
+        "nodeId": "node-e47144d5",
+        "portId": "top"
+      },
+      "target": {
+        "nodeId": "node-282c7c13",
+        "portId": "left"
+      },
+      "vertices": [],
+      "head": true,
+      "headAt": [
+        0.55
+      ],
+      "color": "#111111",
+      "width": 1.8,
+      "linestyle": "solid"
+    },
+    {
+      "id": "edge-85baf189",
+      "source": {
+        "nodeId": "node-282c7c13",
+        "portId": "right"
+      },
+      "target": {
+        "nodeId": "node-116069bb",
+        "portId": "main_in"
+      },
+      "vertices": [],
+      "head": true,
+      "headAt": [
+        0.55
+      ],
+      "color": "#111111",
+      "width": 1.8,
+      "linestyle": "solid"
+    },
+    {
+      "id": "edge-aea7bb3b",
+      "source": {
+        "nodeId": "node-8058bb3d",
+        "portId": "out"
+      },
+      "target": {
+        "nodeId": "node-5fd8ed6d",
+        "portId": "right"
+      },
+      "vertices": [],
+      "head": true,
+      "headAt": [
+        0.55
+      ],
+      "color": "#111111",
+      "width": 1.8,
+      "linestyle": "solid"
+    },
+    {
+      "id": "edge-c10f6b2c",
+      "source": {
+        "nodeId": "node-5fd8ed6d",
+        "portId": "left"
+      },
+      "target": {
+        "nodeId": "node-e47144d5",
+        "portId": "bottom"
+      },
+      "vertices": [],
+      "head": true,
+      "headAt": [
+        0.55
+      ],
+      "color": "#111111",
+      "width": 1.8,
+      "linestyle": "solid"
+    },
+    {
+      "id": "edge-b6a6462f",
+      "source": {
+        "nodeId": "node-0f9dcfe7",
+        "portId": "in"
+      },
+      "target": {
+        "nodeId": "node-116069bb",
+        "portId": "sub_in"
+      },
+      "vertices": [],
+      "head": true,
+      "headAt": [
+        0.55
+      ],
+      "color": "#111111",
+      "width": 1.8,
+      "linestyle": "solid"
+    },
+    {
+      "id": "edge-f9fb2ee3",
+      "source": {
+        "nodeId": "node-116069bb",
+        "portId": "sub_out"
+      },
+      "target": {
+        "nodeId": "node-e47144d5",
+        "portId": "right"
+      },
+      "vertices": [],
+      "head": true,
+      "headAt": [
+        0.55
+      ],
+      "color": "#111111",
+      "width": 1.8,
+      "linestyle": "solid"
+    },
+    {
+      "id": "edge-1015d7b7",
+      "source": {
+        "junctionId": "junction-24d68717"
+      },
+      "target": {
+        "nodeId": "node-0f9dcfe7",
+        "portId": "out"
+      },
+      "vertices": [],
+      "head": true,
+      "headAt": [
+        0.55
+      ],
+      "color": "#111111",
+      "width": 1.8,
+      "linestyle": "solid"
+    },
+    {
+      "id": "edge-42d21c9a",
+      "source": {
+        "junctionId": "junction-24d68717"
+      },
+      "target": {
+        "nodeId": "node-8058bb3d",
+        "portId": "in"
+      },
+      "vertices": [],
+      "head": true,
+      "headAt": [
+        0.55
+      ],
+      "color": "#111111",
+      "width": 1.8,
+      "linestyle": "solid"
+    },
+    {
+      "id": "edge-5278bae0",
+      "source": {
+        "nodeId": "node-116069bb",
+        "portId": "main_out"
+      },
+      "target": {
+        "junctionId": "junction-24d68717"
+      },
+      "vertices": [],
+      "head": true,
+      "headAt": [
+        0.55
+      ],
+      "color": "#111111",
+      "width": 1.8,
+      "linestyle": "solid"
+    }
+  ],
+  "junctions": [
+    {
+      "id": "junction-24d68717",
+      "x": 790,
+      "y": 550
+    }
+  ],
+  "labels": [
+    {
+      "id": "label-4a849691",
+      "nodeId": "node-e47144d5",
+      "x": 80,
+      "y": 50,
+      "text": "压缩机",
+      "size": 15,
+      "ha": "center",
+      "color": "#111111",
+      "boxed": false
+    },
+    {
+      "id": "label-776d516c",
+      "nodeId": "node-282c7c13",
+      "x": 0,
+      "y": 52,
+      "text": "换热器",
+      "size": 15,
+      "ha": "center",
+      "color": "#111111",
+      "boxed": false
+    },
+    {
+      "id": "label-fd7a2695",
+      "nodeId": "node-116069bb",
+      "x": -130,
+      "y": -10,
+      "text": "中间换热器",
+      "size": 15,
+      "ha": "center",
+      "color": "#111111",
+      "boxed": false
+    },
+    {
+      "id": "label-d95a7a98",
+      "nodeId": "node-8058bb3d",
+      "x": 40,
+      "y": 0,
+      "text": "膨胀阀",
+      "size": 15,
+      "ha": "center",
+      "color": "#111111",
+      "boxed": false
+    },
+    {
+      "id": "label-be8a9047",
+      "nodeId": "node-5fd8ed6d",
+      "x": 0,
+      "y": 52,
+      "text": "换热器",
+      "size": 15,
+      "ha": "center",
+      "color": "#111111",
+      "boxed": false
+    },
+    {
+      "id": "label-dc345f41",
+      "nodeId": "node-0f9dcfe7",
+      "x": -70,
+      "y": 0,
+      "text": "膨胀阀",
+      "size": 15,
+      "ha": "center",
+      "color": "#111111",
+      "boxed": false
+    }
+  ]
+}

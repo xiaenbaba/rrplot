@@ -188,6 +188,16 @@ from rrplot.parts import (make_expansion_valve_x, make_four_way_round,
 | expansion_valve_eng_demo.py | 电子膨胀阀图元演示(工程画法,无执行机构) |
 | check_valve_demo.py | 单向阀图元演示(实心三角,方向可选) |
 | filter_demo.py | 过滤器图元演示(矩形 + 菱形网格) |
+| vrf_multisplit_annex_d.py | 多联机现场测点布置(GB/T 27941—2026 附录 D 图 D.3) |
+
+`examples/scenes/` 存放编辑器导出的 JSON 图纸,可在网页编辑器中通过
+“载入”打开继续编辑或导出 PNG/SVG/PDF:
+
+| 图纸 | 内容 |
+| --- | --- |
+| evi-subcooler-injection.json | EVI 过冷器喷气增焓(带电磁阀) |
+| evi-liquid-from-bottom.json | EVI 过冷器下取液变体 |
+| heat-pump-with-separator.json | 带气液分离器的普通热泵 |
 
 改完脚本直接重跑即覆盖同名 PNG:
 
@@ -216,7 +226,7 @@ python examples/hvac_system.py
 ```
 rrplot/     库本体:core(引擎)/ part(部件模型)/ parts(部件)/ hvac、svgparts(HVAC)/
                style(样式)/ _primitives(底层绘制)
-examples/      每张图一个脚本 + 同名 PNG
+examples/      每张图一个脚本 + 同名 PNG;scenes/ 下为编辑器导出的 JSON 图纸
 tests/         pytest 回归测试(端口/走线/错误提示/全件渲染)
 references/    早期原型脚本与 SVG 符号源文件
 SVG/           export_parts_svg.py 导出的部件单图(可直接进论文/PPT)

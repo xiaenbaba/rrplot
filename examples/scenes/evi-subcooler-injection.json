@@ -1,0 +1,460 @@
+{
+  "schemaVersion": 1,
+  "title": "EVI 过冷器喷气增焓",
+  "page": {
+    "width": 760,
+    "height": 580
+  },
+  "nodes": [
+    {
+      "id": "cond",
+      "type": "heat_exchanger",
+      "title": "冷凝器",
+      "x": 334,
+      "y": 70,
+      "params": {
+        "w": 200,
+        "h": 56,
+        "shape": "rect_x",
+        "orient": "h"
+      },
+      "rotation": 0
+    },
+    {
+      "id": "evap",
+      "type": "heat_exchanger",
+      "title": "蒸发器",
+      "x": 330,
+      "y": 490,
+      "params": {
+        "w": 200,
+        "h": 56,
+        "shape": "rect_x",
+        "orient": "h"
+      },
+      "rotation": 0
+    },
+    {
+      "id": "comp",
+      "type": "compressor",
+      "title": "压缩机",
+      "x": 600,
+      "y": 272,
+      "params": {
+        "r": 42,
+        "style": "圆形"
+      },
+      "rotation": 0
+    },
+    {
+      "id": "eev2",
+      "type": "expansion_valve",
+      "title": "EEV2",
+      "x": 110,
+      "y": 410,
+      "params": {
+        "r": 10,
+        "orient": "v"
+      },
+      "rotation": 0
+    },
+    {
+      "id": "subcooler",
+      "type": "heat_exchanger",
+      "title": "过冷器",
+      "x": 110,
+      "y": 272,
+      "params": {
+        "w": 66,
+        "h": 150,
+        "shape": "rect_zigzag7",
+        "orient": "v"
+      },
+      "rotation": 0
+    },
+    {
+      "id": "eev1",
+      "type": "expansion_valve",
+      "title": "EEV1",
+      "x": 40,
+      "y": 171,
+      "params": {
+        "r": 10,
+        "orient": "v"
+      },
+      "rotation": 0
+    }
+  ],
+  "junctions": [
+    {
+      "id": "split",
+      "x": 110,
+      "y": 70
+    }
+  ],
+  "edges": [
+    {
+      "id": "discharge",
+      "source": {
+        "nodeId": "comp",
+        "portId": "top"
+      },
+      "target": {
+        "nodeId": "cond",
+        "portId": "right"
+      },
+      "vertices": [
+        [
+          600,
+          70
+        ]
+      ],
+      "headAt": [
+        0.3,
+        0.7
+      ],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid"
+    },
+    {
+      "id": "to-evap",
+      "source": {
+        "nodeId": "eev2",
+        "portId": "out"
+      },
+      "target": {
+        "nodeId": "evap",
+        "portId": "left"
+      },
+      "vertices": [
+        [
+          110,
+          490
+        ]
+      ],
+      "headAt": [
+        0.55
+      ],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid"
+    },
+    {
+      "id": "suction",
+      "source": {
+        "nodeId": "evap",
+        "portId": "right"
+      },
+      "target": {
+        "nodeId": "comp",
+        "portId": "bottom"
+      },
+      "vertices": [
+        [
+          600,
+          490
+        ]
+      ],
+      "headAt": [
+        0.3,
+        0.7
+      ],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid"
+    },
+    {
+      "id": "cond-split",
+      "source": {
+        "nodeId": "cond",
+        "portId": "left"
+      },
+      "target": {
+        "junctionId": "split"
+      },
+      "vertices": [],
+      "headAt": [
+        0.55
+      ],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid"
+    },
+    {
+      "id": "main-in",
+      "source": {
+        "junctionId": "split"
+      },
+      "target": {
+        "nodeId": "subcooler",
+        "portId": "top"
+      },
+      "vertices": [],
+      "headAt": [
+        0.5
+      ],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid"
+    },
+    {
+      "id": "main-out",
+      "source": {
+        "nodeId": "subcooler",
+        "portId": "bottom"
+      },
+      "target": {
+        "nodeId": "eev2",
+        "portId": "in"
+      },
+      "vertices": [],
+      "headAt": [
+        0.55
+      ],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid"
+    },
+    {
+      "id": "branch-in",
+      "source": {
+        "junctionId": "split"
+      },
+      "target": {
+        "nodeId": "eev1",
+        "portId": "in"
+      },
+      "vertices": [
+        [
+          40,
+          70
+        ]
+      ],
+      "headAt": [
+        0.5
+      ],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid"
+    },
+    {
+      "id": "branch-expanded",
+      "source": {
+        "nodeId": "eev1",
+        "portId": "out"
+      },
+      "target": {
+        "nodeId": "subcooler",
+        "portId": "left"
+      },
+      "vertices": [
+        [
+          40,
+          272
+        ]
+      ],
+      "headAt": [
+        0.55
+      ],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid"
+    },
+    {
+      "id": "injection",
+      "source": {
+        "nodeId": "subcooler",
+        "portId": "right"
+      },
+      "target": {
+        "nodeId": "comp",
+        "portId": "left"
+      },
+      "vertices": [],
+      "headAt": [
+        0.55
+      ],
+      "head": true,
+      "width": 1.8,
+      "color": "#111111",
+      "linestyle": "solid"
+    }
+  ],
+  "labels": [
+    {
+      "id": "label-cond",
+      "text": "冷凝器",
+      "x": 0,
+      "y": -42,
+      "size": 15,
+      "ha": "center",
+      "boxed": false,
+      "color": "#111111",
+      "nodeId": "cond"
+    },
+    {
+      "id": "label-evap",
+      "text": "蒸发器",
+      "x": 0,
+      "y": -40,
+      "size": 15,
+      "ha": "center",
+      "boxed": false,
+      "color": "#111111",
+      "nodeId": "evap"
+    },
+    {
+      "id": "label-comp",
+      "text": "压缩机",
+      "x": -60,
+      "y": 26,
+      "size": 15,
+      "ha": "right",
+      "boxed": false,
+      "color": "#111111",
+      "nodeId": "comp"
+    },
+    {
+      "id": "label-eev2",
+      "text": "EEV2",
+      "x": 22,
+      "y": 2,
+      "size": 13,
+      "ha": "left",
+      "boxed": false,
+      "color": "#111111",
+      "nodeId": "eev2"
+    },
+    {
+      "id": "label-subcooler",
+      "text": "过冷器",
+      "x": 16,
+      "y": -92,
+      "size": 15,
+      "ha": "left",
+      "boxed": false,
+      "color": "#111111",
+      "nodeId": "subcooler"
+    },
+    {
+      "id": "label-eev1",
+      "text": "EEV1",
+      "x": 16,
+      "y": 0,
+      "size": 13,
+      "ha": "left",
+      "boxed": false,
+      "color": "#111111",
+      "nodeId": "eev1"
+    },
+    {
+      "id": "label-branch",
+      "text": "喷气支路",
+      "x": 240,
+      "y": 306,
+      "size": 11,
+      "ha": "center",
+      "boxed": false,
+      "color": "#111111"
+    },
+    {
+      "id": "state-5",
+      "text": "5",
+      "x": 126,
+      "y": 56,
+      "size": 13,
+      "ha": "left",
+      "boxed": false,
+      "color": "#111111"
+    },
+    {
+      "id": "state-6",
+      "text": "6",
+      "x": 74,
+      "y": 185,
+      "size": 13,
+      "ha": "left",
+      "boxed": false,
+      "color": "#111111"
+    },
+    {
+      "id": "state-7",
+      "text": "7",
+      "x": 126,
+      "y": 360,
+      "size": 13,
+      "ha": "left",
+      "boxed": false,
+      "color": "#111111"
+    },
+    {
+      "id": "state-8",
+      "text": "8",
+      "x": 44,
+      "y": 262,
+      "size": 13,
+      "ha": "left",
+      "boxed": false,
+      "color": "#111111"
+    },
+    {
+      "id": "state-9",
+      "text": "9",
+      "x": 536,
+      "y": 254,
+      "size": 13,
+      "ha": "left",
+      "boxed": false,
+      "color": "#111111"
+    },
+    {
+      "id": "state-1",
+      "text": "1",
+      "x": 604,
+      "y": 326,
+      "size": 13,
+      "ha": "left",
+      "boxed": false,
+      "color": "#111111"
+    },
+    {
+      "id": "state-2",
+      "text": "2",
+      "x": 564,
+      "y": 275,
+      "size": 13,
+      "ha": "left",
+      "boxed": false,
+      "color": "#111111"
+    },
+    {
+      "id": "state-3",
+      "text": "3",
+      "x": 631,
+      "y": 275,
+      "size": 13,
+      "ha": "left",
+      "boxed": false,
+      "color": "#111111"
+    },
+    {
+      "id": "state-4",
+      "text": "4",
+      "x": 606,
+      "y": 215,
+      "size": 13,
+      "ha": "left",
+      "boxed": false,
+      "color": "#111111"
+    }
+  ]
+}
