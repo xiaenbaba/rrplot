@@ -838,9 +838,9 @@ def test_cycleplot_compatibility_alias():
         warnings.simplefilter("always", DeprecationWarning)
         import cycleplot
         importlib.reload(cycleplot)
-    import rrplot
-
     import cycleplot.scene
+
+    import rrplot
 
     assert cycleplot.__version__ == rrplot.__version__
     assert cycleplot.Diagram is Diagram
