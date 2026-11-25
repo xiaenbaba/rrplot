@@ -8,7 +8,7 @@
 T/P 传感器圆圈,一键输出 PNG / PDF / SVG。坐标 1:1 对应画布像素(x 向右,
 y 向下),所见即所得。
 
-**版本：** 1.3.1
+**版本：** 1.3.2
 **依赖：** Python 3.9+, matplotlib, numpy
 
 ![多联机(VRF)系统图](examples/vrf_multisplit.png)
