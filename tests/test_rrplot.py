@@ -764,6 +764,22 @@ def test_clear_render_rebuilds_after_node_mutation():
     plt.close(d.fig)
 
 
+def test_clear_render_recomputes_modified_pipe_routes():
+    with Diagram(width=240, height=160) as diagram:
+        pipe = diagram.pipe((0, 0), (200, 100), via=[(50, 50)], head=False)
+        diagram.render()
+        original = list(pipe.points())
+        pipe.via = [(100, 80)]
+        diagram.clear_render().render()
+        assert pipe.points() == [(0, 0), (0, 80), (100, 80), (200, 80), (200, 100)]
+        assert pipe.points() != original
+        assert list(zip(*diagram.ax.lines[0].get_data())) == pipe.points()
+        line_count = len(diagram.ax.lines)
+        diagram.render()
+        diagram.render()
+        assert len(diagram.ax.lines) == line_count
+
+
 def test_sensor_and_text_helpers():
     """Diagram.sensor()/text() 都能落笔,不报错。"""
     d = Diagram(width=200, height=150)

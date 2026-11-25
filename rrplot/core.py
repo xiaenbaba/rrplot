@@ -451,6 +451,8 @@ class Diagram:
         self.fig.patch.set_facecolor("white")
         self._drawn_nodes.clear()
         self._drawn_pipes.clear()
+        for pipe in self._pipes:
+            pipe._pts = None
         return self
 
     def save(self, *paths, dpi=100, tight=True):

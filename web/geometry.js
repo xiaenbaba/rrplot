@@ -205,12 +205,11 @@ export function moveSegment(source, target, vertices, index, offset) {
 // near ports (< 20 units) and keeps both halves editable in the coordinate form.
 export function splitRoute(points, fraction = .5) {
   const { point, index } = along(points, fraction);
-  return {
-    point,
-    index,
-    prefix: points.slice(1, index + 1),
-    suffix: points.slice(index + 1, -1),
-  };
+  const prefix = points.slice(1, index + 1), suffix = points.slice(index + 1, -1);
+  const coincides = vertex => vertex?.every((value, axis) => Math.abs(value - point[axis]) < 1e-6);
+  while (coincides(prefix.at(-1))) prefix.pop();
+  while (coincides(suffix[0])) suffix.shift();
+  return { point, index, prefix, suffix };
 }
 
 /* Pipe accessories keep the parent pipe intact. No hydraulic calculations. */

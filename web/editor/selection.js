@@ -155,7 +155,8 @@ export function createSelectionController(state, commands) {
     if (ref.kind === 'node' && item.mount) detachNode(item, commands.currentNodes().find(n => n.id === item.id));
     if (ref.kind === 'node' || ref.kind === 'junction') { item.x = +x.toFixed(4); item.y = +y.toFixed(4); return; }
     if (item.nodeId) {
-      const node = state.doc.nodes.find(candidate => candidate.id === item.nodeId);
+      const node = commands.currentNodes().find(candidate => candidate.id === item.nodeId)
+        || state.doc.nodes.find(candidate => candidate.id === item.nodeId);
       const local = rotate([x - node.x, y - node.y], -node.rotation);
       item.x = +local[0].toFixed(4); item.y = +local[1].toFixed(4);
     } else if (item.edgeId) {
@@ -170,13 +171,15 @@ export function createSelectionController(state, commands) {
     const boxes = entries.map(commands.layoutBox), before = clone(state.doc);
     const minLeft = Math.min(...boxes.map(box => box.left)), maxRight = Math.max(...boxes.map(box => box.right));
     const minTop = Math.min(...boxes.map(box => box.top)), maxBottom = Math.max(...boxes.map(box => box.bottom));
+    const moves = [];
     if (action === 'distribute-x' || action === 'distribute-y') {
       if (entries.length < 3) return commands.message('均匀分布至少需要三个对象。');
       const axis = action === 'distribute-x' ? 'x' : 'y';
       const order = entries.map((entry, index) => ({ entry, box: boxes[index] })).sort((a, b) => a.box[axis] - b.box[axis]);
       const first = order[0].box[axis], step = (order.at(-1).box[axis] - first) / (order.length - 1);
-      order.forEach(({ entry, box }, index) => commands.moveLayoutRef(entry, axis === 'x' ? first + step * index : box.x,
-        axis === 'y' ? first + step * index : box.y));
+      order.forEach(({ entry, box }, index) => moves.push({ entry,
+        x: axis === 'x' ? first + step * index : box.x,
+        y: axis === 'y' ? first + step * index : box.y }));
     } else {
       const target = { 'align-left': minLeft, 'align-center-x': (minLeft + maxRight) / 2, 'align-right': maxRight,
         'align-top': minTop, 'align-center-y': (minTop + maxBottom) / 2, 'align-bottom': maxBottom }[action];
@@ -186,13 +189,19 @@ export function createSelectionController(state, commands) {
           : action === 'align-center-x' ? target : box.x;
         const y = action === 'align-top' ? target + box.height / 2 : action === 'align-bottom' ? target - box.height / 2
           : action === 'align-center-y' ? target : box.y;
-        commands.moveLayoutRef(entry, x, y);
+        moves.push({ entry, x, y });
       });
     }
+    // Place parents first so attached labels use the final node/pipe geometry.
+    const parents = moves.filter(move => move.entry.ref.kind !== 'label');
+    const labels = moves.filter(move => move.entry.ref.kind === 'label');
+    for (const { entry, x, y } of [...parents, ...labels]) commands.moveLayoutRef(entry, x, y);
     commands.finishEdit(before);
   }
 
   function addNode(type, position) {
+    if (state.doc.nodes.length >= 2000 || state.doc.labels.length >= 2000)
+      return commands.message('添加设备会超过对象上限（设备、标签各最多 2000 项），请先减少对象。');
     state.mountPreview = null;
     const entry = state.catalog.find(c => c.type === type), id = uid('node');
     commands.edit(() => {
